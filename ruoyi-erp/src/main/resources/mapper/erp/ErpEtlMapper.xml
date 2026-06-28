@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.erp.mapper.ErpEtlMapper">
+    <delete id="deleteDwdOrderItems">
+        delete from dwd_order_item where dt = date(#{dt})
+    </delete>
+
+    <insert id="buildDwdOrderItems">
+        insert into dwd_order_item(
+            order_id, shop_id, shop_name, product_id, product_name, sku_id, sku_name, quantity,
+            pay_amount, product_cost, platform_fee, ad_cost, freight_fee, refund_cost,
+            profit_amount, order_status, pay_time, dt
+        )
+        select o.order_id,
+               o.shop_id,
+               o.shop_name,
+               jt.product_id,
+               jt.product_name,
+               jt.sku_id,
+               jt.sku_name,
+               jt.quantity,
+               jt.pay_amount,
+               coalesce(jt.product_cost, 0),
+               coalesce(o.platform_fee, 0),
+               coalesce(o.ad_cost, 0),
+               coalesce(o.freight_fee, 0),
+               coalesce(o.refund_cost, 0),
+               jt.pay_amount - coalesce(jt.product_cost, 0) - coalesce(o.platform_fee, 0)
+                   - coalesce(o.ad_cost, 0) - coalesce(o.freight_fee, 0) - coalesce(o.refund_cost, 0),
+               o.order_status,
+               o.pay_time,
+               date(o.pay_time)
+        from ods_order_raw o
+        join json_table(o.sku_order_list, '$[*]' columns (
+            product_id bigint path '$.productId',
+            product_name varchar(128) path '$.productName',
+            sku_id bigint path '$.skuId',
+            sku_name varchar(128) path '$.skuName',
+            quantity int path '$.quantity',
+            pay_amount decimal(12,2) path '$.payAmount',
+            product_cost decimal(12,2) path '$.productCost'
+        )) jt
+        where date(o.pay_time) = date(#{dt})
+    </insert>
+
+    <insert id="rebuildDwsFinanceDayProfit">
+        replace into dws_finance_day_profit(
+            dt, shop_id, shop_name, gmv, net_amount, product_cost, platform_fee, ad_cost,
+            freight_fee, after_sale_cost, profit_amount, order_count
+        )
+        select dt,
+               shop_id,
+               max(shop_name),
+               sum(pay_amount),
+               sum(pay_amount - coalesce(refund_cost, 0)),
+               sum(product_cost),
+               sum(platform_fee),
+               sum(ad_cost),
+               sum(freight_fee),
+               sum(refund_cost),
+               sum(profit_amount),
+               count(distinct order_id)
+        from dwd_order_item
+        where dt = date(#{dt})
+        group by dt, shop_id
+    </insert>
+</mapper>

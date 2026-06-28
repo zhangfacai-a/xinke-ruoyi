@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.erp.mapper.ErpInventoryMapper">
+    <resultMap id="ErpInventoryResult" type="ErpInventoryBalance">
+        <id property="balanceId" column="balance_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="skuId" column="sku_id"/>
+        <result property="skuCode" column="sku_code"/>
+        <result property="skuName" column="sku_name"/>
+        <result property="availableQty" column="available_qty"/>
+        <result property="lockedQty" column="locked_qty"/>
+        <result property="inboundQty" column="inbound_qty"/>
+        <result property="defectiveQty" column="defective_qty"/>
+        <result property="safetyQty" column="safety_qty"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <select id="selectInventoryList" parameterType="ErpInventoryBalance" resultMap="ErpInventoryResult">
+        select balance_id, warehouse_id, warehouse_name, sku_id, sku_code, sku_name,
+               available_qty, locked_qty, inbound_qty, defective_qty, safety_qty, cost_price,
+               create_time, update_time
+        from erp_inventory_balance
+        <where>
+            <if test="warehouseName != null and warehouseName != ''">and warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="skuCode != null and skuCode != ''">and sku_code like concat('%', #{skuCode}, '%')</if>
+            <if test="skuName != null and skuName != ''">and sku_name like concat('%', #{skuName}, '%')</if>
+        </where>
+        order by balance_id desc
+    </select>
+</mapper>
