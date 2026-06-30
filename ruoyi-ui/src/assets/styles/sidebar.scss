@@ -46,7 +46,7 @@
 
     &.has-logo {
       .el-scrollbar {
-        height: calc(100% - 50px);
+        height: calc(100% - 56px);
       }
     }
 
@@ -74,8 +74,8 @@
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       white-space: nowrap !important;
-      height: 44px !important;
-      line-height: 44px !important;
+      height: 37px !important;
+      line-height: 37px !important;
     }
 
     .el-menu-item .el-menu-tooltip__trigger {
@@ -203,22 +203,30 @@
 
   .hideSidebar {
     .sidebar-container {
-      width: 54px !important;
+      width: 64px !important;
     }
 
     .main-container {
-      margin-left: 54px;
+      margin-left: 64px;
     }
 
     .sub-menu-title-noDropdown {
       padding: 0 !important;
       position: relative;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
 
       .el-tooltip {
+        width: 100%;
         padding: 0 !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
 
         .svg-icon {
-          margin-left: 20px;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
         }
       }
     }
@@ -228,15 +236,40 @@
 
       &>.el-sub-menu__title {
         padding: 0 !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
 
         .svg-icon {
-          margin-left: 20px;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
         }
 
       }
     }
 
     .el-menu--collapse {
+      width: 64px !important;
+
+      .el-menu-item,
+      .el-sub-menu__title {
+        width: 44px !important;
+        height: 40px !important;
+        line-height: 40px !important;
+        margin: 4px auto !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+      }
+
+      .svg-icon {
+        width: 18px;
+        height: 18px;
+        margin: 0 !important;
+      }
+
       .el-sub-menu {
         &>.el-sub-menu__title {
           &>span {

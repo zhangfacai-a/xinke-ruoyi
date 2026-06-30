@@ -41,6 +41,29 @@ function addIframe() {
   width: 100%;
   position: relative;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(162, 155, 254, 0.16), transparent 28%),
+    radial-gradient(circle at 88% 0%, rgba(108, 92, 231, 0.10), transparent 26%);
+}
+
+.app-main::before {
+  content: "";
+  position: fixed;
+  right: 34px;
+  bottom: 32px;
+  width: 210px;
+  height: 210px;
+  border-radius: 48px;
+  background:
+    linear-gradient(135deg, rgba(108, 92, 231, 0.08), rgba(162, 155, 254, 0.05));
+  transform: rotate(18deg);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-main > * {
+  position: relative;
+  z-index: 1;
 }
 
 .fixed-header + .app-main {

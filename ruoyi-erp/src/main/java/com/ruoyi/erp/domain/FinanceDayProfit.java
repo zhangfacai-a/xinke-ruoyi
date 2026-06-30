@@ -10,6 +10,10 @@ public class FinanceDayProfit
     private Date dt;
     private Long shopId;
     private String shopName;
+    private Long operatorId;
+    private String operatorName;
+    private String channelCode;
+    private String channelName;
     private BigDecimal gmv;
     private BigDecimal netAmount;
     private BigDecimal productCost;
@@ -18,6 +22,7 @@ public class FinanceDayProfit
     private BigDecimal freightFee;
     private BigDecimal afterSaleCost;
     private BigDecimal profitAmount;
+    private BigDecimal shareProfitAmount;
     private BigDecimal roi;
 
     public Date getDt() { return dt; }
@@ -26,6 +31,14 @@ public class FinanceDayProfit
     public void setShopId(Long shopId) { this.shopId = shopId; }
     public String getShopName() { return shopName; }
     public void setShopName(String shopName) { this.shopName = shopName; }
+    public Long getOperatorId() { return operatorId; }
+    public void setOperatorId(Long operatorId) { this.operatorId = operatorId; }
+    public String getOperatorName() { return operatorName; }
+    public void setOperatorName(String operatorName) { this.operatorName = operatorName; }
+    public String getChannelCode() { return channelCode; }
+    public void setChannelCode(String channelCode) { this.channelCode = channelCode; }
+    public String getChannelName() { return channelName; }
+    public void setChannelName(String channelName) { this.channelName = channelName; }
     public BigDecimal getGmv() { return gmv; }
     public void setGmv(BigDecimal gmv) { this.gmv = gmv; }
     public BigDecimal getNetAmount() { return netAmount; }
@@ -42,6 +55,8 @@ public class FinanceDayProfit
     public void setAfterSaleCost(BigDecimal afterSaleCost) { this.afterSaleCost = afterSaleCost; }
     public BigDecimal getProfitAmount() { return profitAmount; }
     public void setProfitAmount(BigDecimal profitAmount) { this.profitAmount = profitAmount; }
+    public BigDecimal getShareProfitAmount() { return shareProfitAmount; }
+    public void setShareProfitAmount(BigDecimal shareProfitAmount) { this.shareProfitAmount = shareProfitAmount; }
     public BigDecimal getRoi() { return roi; }
     public void setRoi(BigDecimal roi) { this.roi = roi; }
 }

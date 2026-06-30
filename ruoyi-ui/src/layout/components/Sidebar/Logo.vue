@@ -1,108 +1,123 @@
 <template>
-  <div class="sidebar-logo-container" :class="{ 'collapse': collapse }">
-    <transition name="sidebarLogoFade">
-      <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
-        <h1 v-else class="sidebar-title">{{ title }}</h1>
-      </router-link>
-      <router-link v-else key="expand" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
-        <h1 class="sidebar-title">{{ title }}</h1>
-      </router-link>
-    </transition>
+  <div class="sidebar-logo-container" :class="{ collapse }">
+    <router-link class="sidebar-logo-link" to="/" :title="collapse ? 'Xinke ERP' : ''">
+
+      <!-- LOGO（已替换为图片） -->
+      <span class="brand-mark" aria-hidden="true">
+        <img class="brand-mark-img" src="/src/assets/logo/logo.png" alt="logo" />
+      </span>
+
+      <!-- 文字 -->
+      <span v-if="!collapse" class="brand-copy">
+        <strong>Xinke ERP</strong>
+        <small>OpsPlatform</small>
+      </span>
+
+    </router-link>
   </div>
 </template>
 
 <script setup>
-import logo from '@/assets/logo/logo.png'
-import useSettingsStore from '@/store/modules/settings'
-import variables from '@/assets/styles/variables.module.scss'
-
 defineProps({
   collapse: {
     type: Boolean,
     required: true
   }
 })
-
-const title = import.meta.env.VITE_APP_TITLE
-const settingsStore = useSettingsStore()
-const sideTheme = computed(() => settingsStore.sideTheme)
-
-// 获取Logo背景色
-const getLogoBackground = computed(() => {
-  if (settingsStore.isDark) {
-    return 'var(--sidebar-bg)'
-  }
-  if (settingsStore.navType == 3) {
-    return variables.menuLightBg
-  }
-  return sideTheme.value === 'theme-dark' ? variables.menuBg : variables.menuLightBg
-})
-
-// 获取Logo文字颜色
-const getLogoTextColor = computed(() => {
-  if (settingsStore.isDark) {
-    return 'var(--sidebar-logo-text)'
-  }
-  if (settingsStore.navType == 3) {
-    return variables.menuLightText
-  }
-  return sideTheme.value === 'theme-dark' ? '#fff' : variables.menuLightText
-})
 </script>
 
 <style lang="scss" scoped>
-.sidebarLogoFade-enter-active {
-  transition: opacity 1.5s;
-}
-
-.sidebarLogoFade-enter,
-.sidebarLogoFade-leave-to {
-  opacity: 0;
-}
-
+/* 外层容器 */
 .sidebar-logo-container {
-  position: relative;
-  height: 72px;
-  line-height: 72px;
-  background: v-bind(getLogoBackground);
-  text-align: left;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
   overflow: hidden;
-  padding: 12px;
+  background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.94),
+      rgba(255, 255, 255, 0.76));
+  border-bottom: 1px solid rgba(112, 115, 145, 0.08);
+}
 
-  & .sidebar-logo-link {
-    height: 100%;
-    width: 100%;
+/* 核心布局：强制一行 */
+.sidebar-logo-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  /* 防止换行 */
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 160px;
+}
 
-    & .sidebar-logo {
-      width: 38px;
-      height: 38px;
-      vertical-align: middle;
-      margin-right: 10px;
-      border-radius: 12px;
-      box-shadow: 0 12px 22px rgba(108, 92, 231, 0.22);
-    }
+/* LOGO 容器 */
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    & .sidebar-title {
-      display: inline-block;
-      margin: 0;
-      color: v-bind(getLogoTextColor);
-      font-weight: 750;
-      line-height: 38px;
-      font-size: 15px;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      vertical-align: middle;
-      letter-spacing: 0;
-    }
+/* LOGO 图片 */
+.brand-mark-img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
+}
+
+/* 文字区域 */
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.12;
+
+  strong {
+    font-size: 15px;
+    font-weight: 850;
+    color: #202437;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  &.collapse {
-    padding: 12px 13px;
+  small {
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 750;
+    color: #8a91a6;
 
-    .sidebar-logo {
-      margin-right: 0px;
-    }
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* collapse 模式 */
+.sidebar-logo-container.collapse {
+  justify-content: center;
+  padding: 10px 0;
+
+  .sidebar-logo-link {
+    justify-content: center;
+    min-width: unset;
+  }
+
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand-mark-img {
+    width: 28px;
+    height: 28px;
   }
 }
 </style>

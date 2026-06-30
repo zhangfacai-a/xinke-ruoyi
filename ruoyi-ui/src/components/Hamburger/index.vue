@@ -1,17 +1,18 @@
 <template>
-  <div style="padding: 0 15px;" @click="toggleClick">
-    <svg
-      :class="{'is-active':isActive}"
-      class="hamburger"
-      viewBox="0 0 1024 1024"
-      xmlns="http://www.w3.org/2000/svg"
-      width="64"
-      height="64"
-      fill="currentColor"
-    >
-      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM142.4 642.1L298.7 519a8.84 8.84 0 0 0 0-13.9L142.4 381.9c-5.8-4.6-14.4-.5-14.4 6.9v246.3a8.9 8.9 0 0 0 14.4 7z" />
+  <button
+    class="sidebar-toggle"
+    :class="{ 'is-open': isActive }"
+    type="button"
+    :aria-label="isActive ? '收起侧边栏' : '展开侧边栏'"
+    @click="toggleClick"
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.75 6.75h14.5" />
+      <path d="M4.75 12h10.5" />
+      <path d="M4.75 17.25h14.5" />
+      <path class="chevron" d="m15.25 9.25 2.75 2.75-2.75 2.75" />
     </svg>
-  </div>
+  </button>
 </template>
 
 <script setup>
@@ -22,21 +23,52 @@ defineProps({
   }
 })
 
-const emit = defineEmits()
+const emit = defineEmits(['toggleClick'])
 const toggleClick = () => {
   emit('toggleClick')
 }
 </script>
 
 <style scoped>
-.hamburger {
-  display: inline-block;
-  vertical-align: middle;
-  width: 20px;
-  height: 20px;
+.sidebar-toggle {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(108, 92, 231, 0.10);
+  border-radius: 13px;
+  color: #6c5ce7;
+  background: rgba(108, 92, 231, 0.075);
+  cursor: pointer;
+  transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.hamburger.is-active {
+.sidebar-toggle:hover {
+  border-color: rgba(108, 92, 231, 0.18);
+  background: rgba(108, 92, 231, 0.12);
+  box-shadow: 0 8px 18px rgba(108, 92, 231, 0.12);
+  transform: translateY(-1px);
+}
+
+.sidebar-toggle svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.sidebar-toggle .chevron {
+  opacity: 0.8;
+  transform-origin: center;
+  transition: transform 0.18s ease;
+}
+
+.sidebar-toggle.is-open .chevron {
   transform: rotate(180deg);
 }
 </style>

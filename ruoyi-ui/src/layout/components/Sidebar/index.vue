@@ -95,7 +95,7 @@ const activeMenu = computed(() => {
         color: #6c5ce7 !important;
         border-color: rgba(108, 92, 231, 0.14);
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 247, 255, 0.94)) !important;
-        box-shadow: 0 10px 22px rgba(55, 62, 97, 0.08);
+        box-shadow: 0 7px 16px rgba(55, 62, 97, 0.07);
       }
     }
 

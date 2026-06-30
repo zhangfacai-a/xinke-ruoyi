@@ -64,13 +64,13 @@
          :default-expand-all="isExpandAll"
          :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
       >
-         <el-table-column prop="menuName" label="菜单名称" :show-overflow-tooltip="true" width="220">
+         <el-table-column prop="menuName" label="菜单名称" :show-overflow-tooltip="true" width="200">
             <template #default="scope">
                <svg-icon :icon-class="scope.row.icon" />
                <span class="ml5">{{ scope.row.menuName }}</span>
             </template>
          </el-table-column>
-         <el-table-column prop="menuName" label="类型" :show-overflow-tooltip="true" width="100">
+         <el-table-column prop="menuName" label="类型" :show-overflow-tooltip="true" width="82">
             <template #default="scope">
                <el-tag v-if="scope.row.menuType === 'M' && scope.row.isFrame === '0'" type="danger" size="small">外链</el-tag>
                <el-tag v-else-if="scope.row.menuType === 'M'" type="primary" size="small">目录</el-tag>
@@ -79,9 +79,9 @@
                <el-tag v-else-if="scope.row.menuType === 'F'" type="warning" size="small">按钮</el-tag>
             </template>
          </el-table-column>
-         <el-table-column prop="orderNum" label="排序" width="200">
+         <el-table-column prop="orderNum" label="排序" width="120">
             <template #default="scope">
-               <el-input-number v-model="scope.row.orderNum" controls-position="right" :min="0" style="width: 88px" />
+               <el-input-number v-model="scope.row.orderNum" controls-position="right" :min="0" style="width: 76px" />
             </template>
          </el-table-column>
          <el-table-column prop="perms" label="权限标识" :show-overflow-tooltip="true" />
@@ -91,7 +91,7 @@
                <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
             </template>
          </el-table-column>
-         <el-table-column label="操作" align="center" width="210" class-name="small-padding fixed-width">
+         <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
             <template #default="scope">
                <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:menu:edit']">修改</el-button>
                <el-button link type="primary" icon="Plus" @click="handleAdd(scope.row)" v-hasPermi="['system:menu:add']">新增</el-button>

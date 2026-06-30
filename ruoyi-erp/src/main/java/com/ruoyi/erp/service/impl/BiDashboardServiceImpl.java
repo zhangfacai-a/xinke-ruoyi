@@ -37,4 +37,8 @@ public class BiDashboardServiceImpl implements IBiDashboardService
     public List<FinanceDayProfit> selectDailyProfitList(FinanceDayProfit query) { return dashboardMapper.selectDailyProfitList(query); }
     @Override
     public List<FinanceDayProfit> selectMonthlyProfitList(FinanceDayProfit query) { return dashboardMapper.selectMonthlyProfitList(query); }
+    @Override
+    public List<FinanceDayProfit> selectOperatorDailyProfitList(FinanceDayProfit query) { return dashboardMapper.selectOperatorDailyProfitList(query); }
+    @Override
+    public List<FinanceDayProfit> selectOperatorMonthlyProfitList(FinanceDayProfit query) { return dashboardMapper.selectOperatorMonthlyProfitList(query); }
 }

@@ -20,6 +20,9 @@ public class ErpEtlServiceImpl implements IErpEtlService
         etlMapper.deleteDwdOrderItems(dt);
         int rows = etlMapper.buildDwdOrderItems(dt);
         etlMapper.rebuildDwsFinanceDayProfit(dt);
+        etlMapper.deleteOrderProfitAttribution(dt);
+        etlMapper.buildOrderProfitAttribution(dt);
+        etlMapper.rebuildOperatorProfitDay(dt);
         return rows;
     }
 }

@@ -8,7 +8,7 @@
     <insert id="buildDwdOrderItems">
         insert into dwd_order_item(
             order_id, shop_id, shop_name, product_id, product_name, sku_id, sku_name, quantity,
-            pay_amount, product_cost, platform_fee, ad_cost, freight_fee, refund_cost,
+            channel_code, channel_name, pay_amount, product_cost, platform_fee, ad_cost, freight_fee, refund_cost,
             profit_amount, order_status, pay_time, dt
         )
         select o.order_id,
@@ -19,6 +19,8 @@
                jt.sku_id,
                jt.sku_name,
                jt.quantity,
+               coalesce(jt.channel_code, o.channel_code),
+               coalesce(jt.channel_name, o.channel_name),
                jt.pay_amount,
                coalesce(jt.product_cost, 0),
                coalesce(o.platform_fee, 0),
@@ -37,6 +39,8 @@
             sku_id bigint path '$.skuId',
             sku_name varchar(128) path '$.skuName',
             quantity int path '$.quantity',
+            channel_code varchar(64) path '$.channelCode',
+            channel_name varchar(128) path '$.channelName',
             pay_amount decimal(12,2) path '$.payAmount',
             product_cost decimal(12,2) path '$.productCost'
         )) jt
@@ -63,5 +67,100 @@
         from dwd_order_item
         where dt = date(#{dt})
         group by dt, shop_id
+    </insert>
+
+    <delete id="deleteOrderProfitAttribution">
+        delete from fin_order_profit_attribution where profit_date = date(#{dt})
+    </delete>
+
+    <insert id="buildOrderProfitAttribution">
+        insert into fin_order_profit_attribution(
+            sales_no, order_id, order_item_id, shop_id, shop_name, product_id, product_name,
+            sku_id, sku_name, channel_code, channel_name, operator_id, operator_name,
+            attribution_rule_id, attribution_rule_code, share_rate, pay_amount, net_amount,
+            product_cost, platform_fee, promotion_fee, freight_fee, after_sale_cost,
+            profit_amount, share_profit_amount, profit_date, period_code, create_time
+        )
+        select cast(d.order_id as char),
+               d.order_id,
+               d.order_item_id,
+               d.shop_id,
+               d.shop_name,
+               d.product_id,
+               d.product_name,
+               d.sku_id,
+               d.sku_name,
+               coalesce(d.channel_code, ''),
+               coalesce(d.channel_name, ''),
+               r.operator_id,
+               r.operator_name,
+               r.rule_id,
+               r.rule_code,
+               coalesce(r.share_rate, 1),
+               d.pay_amount,
+               d.pay_amount - coalesce(d.refund_cost, 0),
+               d.product_cost,
+               d.platform_fee,
+               d.ad_cost,
+               d.freight_fee,
+               d.refund_cost,
+               d.profit_amount,
+               round(d.profit_amount * coalesce(r.share_rate, 1), 2),
+               d.dt,
+               date_format(d.dt, '%Y-%m'),
+               sysdate()
+        from dwd_order_item d
+        join erp_operator_attribution_rule r
+          on r.rule_id = (
+            select rr.rule_id
+            from erp_operator_attribution_rule rr
+            where rr.status in ('0', 'enabled', 'approved')
+              and (rr.effective_start is null or rr.effective_start &lt;= d.dt)
+              and (rr.effective_end is null or rr.effective_end &gt;= d.dt)
+              and (rr.shop_id is null or rr.shop_id = d.shop_id)
+              and (rr.product_id is null or rr.product_id = d.product_id)
+              and (rr.sku_id is null or rr.sku_id = d.sku_id)
+              and (rr.channel_code is null or rr.channel_code = coalesce(d.channel_code, ''))
+            order by
+              (case when rr.sku_id is not null then 8 else 0 end
+               + case when rr.product_id is not null then 4 else 0 end
+               + case when rr.channel_code is not null then 2 else 0 end
+               + case when rr.shop_id is not null then 1 else 0 end) desc,
+              rr.priority asc,
+              rr.rule_id desc
+            limit 1
+          )
+        where d.dt = date(#{dt})
+    </insert>
+
+    <insert id="rebuildOperatorProfitDay">
+        replace into fin_operator_profit_day(
+            dt, period_code, shop_id, shop_name, operator_id, operator_name, channel_code, channel_name,
+            order_count, gmv, net_amount, product_cost, platform_fee, ad_cost, freight_fee,
+            after_sale_cost, profit_amount, share_profit_amount, settlement_amount, update_time
+        )
+        select profit_date,
+               max(period_code),
+               shop_id,
+               max(shop_name),
+               operator_id,
+               max(operator_name),
+               coalesce(channel_code, ''),
+               max(channel_name),
+               count(distinct sales_no),
+               sum(pay_amount),
+               sum(net_amount),
+               sum(product_cost),
+               sum(platform_fee),
+               sum(promotion_fee),
+               sum(freight_fee),
+               sum(after_sale_cost),
+               sum(profit_amount),
+               sum(share_profit_amount),
+               sum(settlement_amount),
+               sysdate()
+        from fin_order_profit_attribution
+        where profit_date = date(#{dt})
+        group by profit_date, shop_id, operator_id, coalesce(channel_code, '')
     </insert>
 </mapper>

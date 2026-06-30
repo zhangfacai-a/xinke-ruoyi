@@ -35,4 +35,22 @@ public class FinanceReportController extends BaseController
         List<FinanceDayProfit> list = dashboardService.selectMonthlyProfitList(query);
         return getDataTable(list);
     }
+
+    @PreAuthorize("@ss.hasPermi('finance:profit:daily')")
+    @GetMapping("/operator/daily")
+    public TableDataInfo operatorDaily(FinanceDayProfit query)
+    {
+        startPage();
+        List<FinanceDayProfit> list = dashboardService.selectOperatorDailyProfitList(query);
+        return getDataTable(list);
+    }
+
+    @PreAuthorize("@ss.hasPermi('finance:profit:monthly')")
+    @GetMapping("/operator/monthly")
+    public TableDataInfo operatorMonthly(FinanceDayProfit query)
+    {
+        startPage();
+        List<FinanceDayProfit> list = dashboardService.selectOperatorMonthlyProfitList(query);
+        return getDataTable(list);
+    }
 }

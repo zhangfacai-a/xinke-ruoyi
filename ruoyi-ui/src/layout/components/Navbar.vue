@@ -1,52 +1,46 @@
 <template>
   <div class="navbar" :class="'nav' + settingsStore.navType">
-    <hamburger id="hamburger-container" :is-active="appStore.sidebar.opened" class="hamburger-container" @toggleClick="toggleSideBar" />
-    <div class="toolbar-context" v-if="settingsStore.navType == 1">
-      <div class="toolbar-title">Crucible Analytics</div>
+    <div class="sidebar-toggle-wrap">
+      <hamburger :is-active="appStore.sidebar.opened" @toggleClick="toggleSideBar" />
+    </div>
+
+    <div v-if="settingsStore.navType == 1" class="toolbar-context">
+      <div class="toolbar-row">
+        <div class="toolbar-title">经营工作台</div>
+        <span class="live-pill">在线</span>
+      </div>
       <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
     </div>
+
     <top-nav v-if="settingsStore.navType == 2" id="topmenu-container" class="topmenu-container" />
     <template v-if="settingsStore.navType == 3">
-      <logo v-show="settingsStore.sidebarLogo" :collapse="false"></logo>
+      <logo v-show="settingsStore.sidebarLogo" :collapse="false" />
       <top-bar id="topbar-container" class="topbar-container" />
     </template>
 
     <div class="right-menu">
       <template v-if="appStore.device !== 'mobile'">
-        <header-search id="header-search" class="right-menu-item" />
-        <screenfull id="screenfull" class="right-menu-item hover-effect" />
-
-        <el-tooltip content="主题模式" effect="dark" placement="bottom">
-          <div class="right-menu-item hover-effect theme-switch-wrapper" @click="toggleTheme">
-            <svg-icon v-if="settingsStore.isDark" icon-class="sunny" />
-            <svg-icon v-if="!settingsStore.isDark" icon-class="moon" />
-          </div>
-        </el-tooltip>
-
-        <el-tooltip content="布局大小" effect="dark" placement="bottom">
-          <size-select id="size-select" class="right-menu-item hover-effect" />
-        </el-tooltip>
+        <div class="today-chip">{{ todayText }}</div>
+        <!-- <header-search id="header-search" class="right-menu-item" />
+        <screenfull id="screenfull" class="right-menu-item hover-effect" /> -->
 
         <el-tooltip content="消息通知" effect="dark" placement="bottom">
           <header-notice id="header-notice" class="right-menu-item hover-effect" />
         </el-tooltip>
       </template>
 
-      <el-dropdown @command="handleCommand" class="avatar-container right-menu-item hover-effect" trigger="hover">
+      <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="hover" @command="handleCommand">
         <div class="avatar-wrapper">
           <img :src="userStore.avatar" class="user-avatar" />
-          <span class="user-nickname"> {{ userStore.nickName }} </span>
+          <span class="user-nickname">{{ userStore.nickName }}</span>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
             <router-link to="/user/profile">
               <el-dropdown-item>个人中心</el-dropdown-item>
             </router-link>
-            <el-dropdown-item command="setLayout" v-if="settingsStore.showSettings">
-                <span>布局设置</span>
-            </el-dropdown-item>
             <el-dropdown-item command="lockScreen">
-                <span>锁定屏幕</span>
+              <span>锁定屏幕</span>
             </el-dropdown-item>
             <el-dropdown-item divided command="logout">
               <span>退出登录</span>
@@ -66,13 +60,12 @@ import TopBar from './TopBar'
 import Logo from './Sidebar/Logo'
 import Hamburger from '@/components/Hamburger'
 import Screenfull from '@/components/Screenfull'
-import SizeSelect from '@/components/SizeSelect'
 import HeaderSearch from '@/components/HeaderSearch'
+import HeaderNotice from './HeaderNotice'
 import useAppStore from '@/store/modules/app'
 import useUserStore from '@/store/modules/user'
 import useLockStore from '@/store/modules/lock'
 import useSettingsStore from '@/store/modules/settings'
-import HeaderNotice from './HeaderNotice'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,19 +74,21 @@ const userStore = useUserStore()
 const lockStore = useLockStore()
 const settingsStore = useSettingsStore()
 
+const todayText = computed(() => {
+  const now = new Date()
+  return `${now.getMonth() + 1}月${now.getDate()}日`
+})
+
 function toggleSideBar() {
   appStore.toggleSideBar()
 }
 
 function handleCommand(command) {
   switch (command) {
-    case "setLayout":
-      setLayout()
-      break
-    case "lockScreen":
+    case 'lockScreen':
       lockScreen()
       break
-    case "logout":
+    case 'logout':
       logout()
       break
     default:
@@ -110,99 +105,40 @@ function logout() {
     userStore.logOut().then(() => {
       location.href = '/index'
     })
-  }).catch(() => { })
-}
-
-const emits = defineEmits(['setLayout'])
-function setLayout() {
-  emits('setLayout')
+  }).catch(() => {})
 }
 
 function lockScreen() {
-  const currentPath = route.fullPath
-  lockStore.lockScreen(currentPath)
+  lockStore.lockScreen(route.fullPath)
   router.push('/lock')
-}
-
-async function toggleTheme(event) {
-  const x = event?.clientX || window.innerWidth / 2
-  const y = event?.clientY || window.innerHeight / 2
-  const wasDark = settingsStore.isDark
-
-  const isReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  const isSupported = document.startViewTransition && !isReducedMotion
-
-  if (!isSupported) {
-    settingsStore.toggleTheme()
-    return
-  }
-
-  try {
-    const transition = document.startViewTransition(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      settingsStore.toggleTheme()
-      await nextTick()
-    })
-    await transition.ready
-
-    const endRadius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
-    const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`]
-    document.documentElement.animate(
-      {
-        clipPath: !wasDark ? [...clipPath].reverse() : clipPath
-      }, {
-        duration: 650,
-        easing: "cubic-bezier(0.4, 0, 0.2, 1)",
-        fill: "forwards",
-        pseudoElement: !wasDark ? "::view-transition-old(root)" : "::view-transition-new(root)"
-      }
-    )
-    await transition.finished
-  } catch (error) {
-    console.warn("View transition failed, falling back to immediate toggle:", error)
-    settingsStore.toggleTheme()
-  }
 }
 </script>
 
-<style lang='scss' scoped>
+<style lang="scss" scoped>
 .navbar.nav3 {
-  .hamburger-container {
+  .sidebar-toggle-wrap {
     display: none !important;
   }
 }
 
 .navbar {
-  height: var(--navbar-height, 64px);
-  overflow: hidden;
+  height: var(--navbar-height, 54px);
   position: relative;
-  background: var(--navbar-bg);
-  box-shadow: none;
+  overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   box-sizing: border-box;
+  background: var(--navbar-bg);
+  box-shadow: none;
 
-  .hamburger-container {
+  .sidebar-toggle-wrap {
     width: 38px;
     height: 38px;
-    line-height: 38px;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.2s;
-    -webkit-tap-highlight-color: transparent;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    margin-right: 0;
-    border-radius: 12px;
-    background: rgba(108, 92, 231, 0.08);
-    color: #6c5ce7;
-
-    &:hover {
-      background: rgba(108, 92, 231, 0.14);
-      transform: translateY(-1px);
-    }
+    flex: 0 0 38px;
   }
 
   .toolbar-context {
@@ -213,11 +149,45 @@ async function toggleTheme(event) {
     gap: 2px;
   }
 
+  .toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+
   .toolbar-title {
+    max-width: 180px;
+    overflow: hidden;
     color: #1f2433;
-    font-size: 17px;
-    font-weight: 750;
+    font-size: 15px;
+    font-weight: 850;
     letter-spacing: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-pill {
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    border-radius: 999px;
+    color: #00a783;
+    background: rgba(0, 184, 148, 0.10);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+
+    &::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #00b894;
+      box-shadow: 0 0 0 4px rgba(0, 184, 148, 0.12);
+    }
   }
 
   .breadcrumb-container {
@@ -235,31 +205,45 @@ async function toggleTheme(event) {
     display: flex;
     align-items: center;
     overflow: hidden;
-    margin-left: 8px;
+    margin-left: 4px;
   }
 
   .right-menu {
     height: 100%;
-    line-height: var(--navbar-height, 64px);
+    line-height: var(--navbar-height, 54px);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     margin-left: auto;
 
     &:focus {
       outline: none;
     }
 
+    .today-chip {
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      border-radius: 999px;
+      color: #6c5ce7;
+      background: rgba(108, 92, 231, 0.08);
+      font-size: 12px;
+      font-weight: 750;
+      white-space: nowrap;
+      box-shadow: inset 0 0 0 1px rgba(108, 92, 231, 0.08);
+    }
+
     .right-menu-item {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      width: 34px;
+      height: 34px;
       padding: 0;
-      width: 38px;
-      height: 38px;
       border-radius: 12px;
-      font-size: 18px;
       color: #697189;
+      font-size: 17px;
       vertical-align: text-bottom;
 
       &.hover-effect {
@@ -272,62 +256,60 @@ async function toggleTheme(event) {
           transform: translateY(-1px);
         }
       }
-
-      &.theme-switch-wrapper {
-        display: flex;
-        align-items: center;
-
-        svg {
-          transition: transform 0.3s;
-          
-          &:hover {
-            transform: scale(1.15);
-          }
-        }
-      }
     }
 
     .avatar-container {
       width: auto;
+      max-width: 132px;
       margin-right: 0;
-      padding: 0 10px 0 8px;
+      padding: 0 9px 0 7px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.76);
-      box-shadow: inset 0 0 0 1px rgba(112, 115, 145, 0.12);
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: inset 0 0 0 1px rgba(112, 115, 145, 0.12), 0 7px 18px rgba(55, 62, 97, 0.05);
 
       .avatar-wrapper {
-        margin-top: 0;
-        right: 0;
+        height: 34px;
+        min-width: 0;
         position: relative;
+        right: 0;
         display: flex;
         align-items: center;
-        height: 38px;
+        margin-top: 0;
 
         .user-avatar {
-          cursor: pointer;
-          width: 28px;
-          height: 28px;
-          margin-right: 8px;
+          width: 26px;
+          height: 26px;
+          flex: 0 0 26px;
+          margin-right: 7px;
           border-radius: 50%;
+          cursor: pointer;
         }
 
-        .user-nickname{
+        .user-nickname {
+          min-width: 0;
+          overflow: hidden;
           position: relative;
           left: 0;
           bottom: 0;
-          font-size: 14px;
-          font-weight: 650;
           color: #2f3548;
-        }
-
-        i {
-          cursor: pointer;
-          position: absolute;
-          right: -20px;
-          top: 25px;
-          font-size: 12px;
+          font-size: 13px;
+          font-weight: 700;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
       }
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .navbar {
+    .toolbar-title {
+      max-width: 120px;
+    }
+
+    .today-chip {
+      display: none !important;
     }
   }
 }

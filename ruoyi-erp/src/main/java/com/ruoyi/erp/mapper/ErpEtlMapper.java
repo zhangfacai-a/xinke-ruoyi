@@ -10,4 +10,7 @@ public interface ErpEtlMapper
     int deleteDwdOrderItems(@Param("dt") Date dt);
     int buildDwdOrderItems(@Param("dt") Date dt);
     int rebuildDwsFinanceDayProfit(@Param("dt") Date dt);
+    int deleteOrderProfitAttribution(@Param("dt") Date dt);
+    int buildOrderProfitAttribution(@Param("dt") Date dt);
+    int rebuildOperatorProfitDay(@Param("dt") Date dt);
 }

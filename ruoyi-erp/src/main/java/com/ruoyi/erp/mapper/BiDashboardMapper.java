@@ -14,4 +14,6 @@ public interface BiDashboardMapper
     List<BiMetric> selectTopProducts(FinanceDayProfit query);
     List<FinanceDayProfit> selectDailyProfitList(FinanceDayProfit query);
     List<FinanceDayProfit> selectMonthlyProfitList(FinanceDayProfit query);
+    List<FinanceDayProfit> selectOperatorDailyProfitList(FinanceDayProfit query);
+    List<FinanceDayProfit> selectOperatorMonthlyProfitList(FinanceDayProfit query);
 }

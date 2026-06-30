@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.erp.mapper.ErpFlowMapper">
+
+    <select id="selectFlowList" resultType="java.util.HashMap">
+        select *
+        from ${tableName}
+        <where>
+            <if test="query.keyword != null and query.keyword != ''">
+                and ${noColumn} like concat('%', #{query.keyword}, '%')
+            </if>
+            <if test="query.bizNo != null and query.bizNo != ''">
+                and ${noColumn} = #{query.bizNo}
+            </if>
+            <if test="query.status != null and query.status != '' and statusColumn != null and statusColumn != ''">
+                and ${statusColumn} = #{query.status}
+            </if>
+        </where>
+        order by
+        <choose>
+            <when test="noColumn != null and noColumn != ''">${noColumn} desc</when>
+            <otherwise>1 desc</otherwise>
+        </choose>
+    </select>
+
+    <select id="selectFlowById" resultType="java.util.HashMap">
+        select *
+        from ${tableName}
+        where ${pkColumn} = #{id}
+    </select>
+
+    <select id="selectFlowByNo" resultType="java.util.HashMap">
+        select *
+        from ${tableName}
+        where ${noColumn} = #{bizNo}
+        limit 1
+    </select>
+
+    <insert id="insertFlow">
+        insert into ${tableName}
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <foreach collection="data" index="key" item="value">
+                ${key},
+            </foreach>
+        </trim>
+        values
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <foreach collection="data" index="key" item="value">
+                #{value},
+            </foreach>
+        </trim>
+    </insert>
+
+    <update id="updateFlow">
+        update ${tableName}
+        <set>
+            <foreach collection="data" index="key" item="value">
+                ${key} = #{value},
+            </foreach>
+        </set>
+        where ${pkColumn} = #{id}
+    </update>
+
+    <update id="updateFlowStatus">
+        update ${tableName}
+        set ${statusColumn} = #{status},
+            update_by = #{username},
+            update_time = sysdate()
+        where ${noColumn} = #{bizNo}
+    </update>
+
+    <delete id="deleteFlowByIds">
+        delete from ${tableName}
+        where ${pkColumn} in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectInventoryBalance" resultType="java.util.HashMap">
+        select *
+        from erp_inventory_balance
+        where warehouse_id = #{warehouseId}
+          and sku_id = #{skuId}
+        limit 1
+    </select>
+
+    <insert id="insertInventoryBalance">
+        insert into erp_inventory_balance(
+            warehouse_id, warehouse_name, sku_id, sku_code, sku_name,
+            available_qty, locked_qty, inbound_qty, defective_qty, safety_qty,
+            cost_price, create_time, update_time
+        )
+        values(
+            #{warehouseId}, #{warehouseName}, #{skuId}, #{skuCode}, #{skuName},
+            #{availableQty}, 0, 0, #{defectiveQty}, #{safetyQty},
+            #{costPrice}, sysdate(), sysdate()
+        )
+    </insert>
+
+    <update id="updateInventoryBalance">
+        update erp_inventory_balance
+        set available_qty = #{availableQty},
+            defective_qty = #{defectiveQty},
+            cost_price = #{costPrice},
+            update_time = sysdate()
+        where warehouse_id = #{warehouseId}
+          and sku_id = #{skuId}
+    </update>
+
+    <insert id="insertInventoryMovement">
+        insert into erp_inventory_movement(
+            movement_no, warehouse_id, sku_id, movement_type, source_type, source_no,
+            quantity, before_qty, after_qty, cost_price, operator_name,
+            movement_time, create_by, create_time, remark
+        )
+        values(
+            #{movementNo}, #{warehouseId}, #{skuId}, #{movementType}, #{sourceType}, #{sourceNo},
+            #{quantity}, #{beforeQty}, #{afterQty}, #{costPrice}, #{operatorName},
+            sysdate(), #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertCostLayer">
+        insert into erp_inventory_cost_layer(
+            warehouse_id, sku_id, batch_no, source_type, source_no,
+            remain_qty, cost_price, inbound_date, create_time
+        )
+        values(
+            #{warehouseId}, #{skuId}, #{batchNo}, #{sourceType}, #{sourceNo},
+            #{remainQty}, #{costPrice}, #{inboundDate}, sysdate()
+        )
+    </insert>
+</mapper>

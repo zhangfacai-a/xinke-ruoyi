@@ -33,6 +33,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
         require(form, "billStartDate", "账单开始日期不能为空");
         require(form, "billEndDate", "账单结束日期不能为空");
 
+        assertPeriodOpen(text(form.get("periodCode")));
         defaultString(form, "settlementNo", nextNo("SET"));
         if (financeCoreMapper.selectSettlementByNo(text(form.get("settlementNo"))) != null)
         {
@@ -62,6 +63,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
     public int approveSettlement(String settlementNo, String username)
     {
         Map<String, Object> settlement = getSettlement(settlementNo);
+        assertPeriodOpen(settlement.get("periodCode"));
         if ("confirmed".equals(text(settlement.get("settlementStatus"))))
         {
             return 1;
@@ -100,6 +102,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
     public int createSettlementVoucher(String settlementNo, String username)
     {
         Map<String, Object> settlement = getSettlement(settlementNo);
+        assertPeriodOpen(settlement.get("periodCode"));
         if (financeCoreMapper.selectVoucherBySource("settlement", settlementNo) != null)
         {
             throw new ServiceException("该结算单已生成凭证");
@@ -166,6 +169,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
         {
             form.put("businessDate", text(form.get("flowTime")).substring(0, 10));
         }
+        assertPeriodOpen(periodFromDate(text(form.get("businessDate"))));
         form.put("feeAmount", decimal(form.get("feeAmount")));
         form.put("matchStatus", defaultText(form.get("matchStatus"), "unmatched"));
         form.put("createBy", username);
@@ -208,6 +212,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
         }
         form.put("feeTypeName", defaultText(form.get("feeTypeName"), text(feeType.get("feeName"))));
         form.put("periodCode", defaultText(form.get("periodCode"), periodFromDate(text(form.get("occurredDate")))));
+        assertPeriodOpen(form.get("periodCode"));
         BigDecimal expenseAmount = decimal(form.get("expenseAmount"));
         BigDecimal taxAmount = decimal(form.get("taxAmount"));
         form.put("taxAmount", taxAmount);
@@ -223,6 +228,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
     public int approveExpense(String expenseNo, String username)
     {
         Map<String, Object> expense = getExpense(expenseNo);
+        assertPeriodOpen(expense.get("periodCode"));
         if ("approved".equals(text(expense.get("expenseStatus"))))
         {
             return 1;
@@ -259,6 +265,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
     public int createExpenseVoucher(String expenseNo, String username)
     {
         Map<String, Object> expense = getExpense(expenseNo);
+        assertPeriodOpen(expense.get("periodCode"));
         if (financeCoreMapper.selectVoucherBySource("expense", expenseNo) != null)
         {
             throw new ServiceException("该费用单已生成凭证");
@@ -301,6 +308,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
     public Map<String, Object> runReconcile(Map<String, Object> form, String username)
     {
         require(form, "periodCode", "期间不能为空");
+        assertPeriodOpen(form.get("periodCode"));
         form.put("reconcileType", defaultText(form.get("reconcileType"), "settlement_cash"));
         form.put("taskNo", nextNo("REC"));
         form.put("createBy", username);
@@ -362,10 +370,12 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
     @Transactional(rollbackFor = Exception.class)
     public int auditVoucher(String voucherNo, String username)
     {
-        if (financeCoreMapper.selectVoucherByNo(voucherNo) == null)
+        Map<String, Object> voucher = financeCoreMapper.selectVoucherByNo(voucherNo);
+        if (voucher == null)
         {
             throw new ServiceException("凭证不存在");
         }
+        assertPeriodOpen(voucher.get("periodCode"));
         Map<String, Object> update = new HashMap<>();
         update.put("voucherNo", voucherNo);
         update.put("updateBy", username);
@@ -448,6 +458,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
     private int writeoffBill(String billType, String billNo, Map<String, Object> bill, Map<String, Object> form, String username)
     {
         require(form, "cashFlowNo", "流水号不能为空");
+        assertPeriodOpen(bill.get("periodCode"));
         BigDecimal amount = decimal(form.get("writeoffAmount"));
         if (!isPositive(amount))
         {
@@ -459,6 +470,7 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
         {
             throw new ServiceException("流水不存在");
         }
+        assertPeriodOpen(periodFromDate(text(cashFlow.get("businessDate"))));
         if ("matched".equals(text(cashFlow.get("matchStatus"))))
         {
             throw new ServiceException("流水已匹配，不能重复核销");
@@ -587,6 +599,19 @@ public class FinanceWorkflowServiceImpl implements IFinanceWorkflowService
         if (debitAmount.subtract(creditAmount).abs().compareTo(new BigDecimal("0.01")) > 0)
         {
             throw new ServiceException("借贷不平衡，不能生成凭证");
+        }
+    }
+
+    private void assertPeriodOpen(Object periodCode)
+    {
+        if (isBlank(periodCode))
+        {
+            return;
+        }
+        Map<String, Object> close = financeCoreMapper.selectPeriodCloseByCode(text(periodCode), "company");
+        if (close != null && "closed".equals(text(close.get("closeStatus"))))
+        {
+            throw new ServiceException("当前会计期间已结账，不能继续修改：" + text(periodCode));
         }
     }
 
