@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.erp.mapper.DyViewerLeadMapper">
+
+    <insert id="insertCaptureBatch" useGeneratedKeys="true" keyProperty="batchId">
+        insert ignore into dy_capture_batch(
+            batch_no, room_key, douyin_user_id, payload_type, source, live_room_name,
+            page_url, request_url, queue_size, item_count, raw_payload, report_time
+        )
+        values(
+            #{batchNo}, #{roomKey}, #{douyinUserId}, #{payloadType}, #{source}, #{liveRoomName},
+            #{pageUrl}, #{requestUrl}, #{queueSize}, #{itemCount}, #{rawPayload}, sysdate()
+        )
+    </insert>
+
+    <insert id="upsertLiveRoom">
+        insert into dy_live_room(
+            room_key, room_name, source, last_report_time, create_time, update_time
+        )
+        values(
+            #{roomKey}, #{roomName}, #{source}, sysdate(), sysdate(), sysdate()
+        )
+        on duplicate key update
+            room_name = if(values(room_name) is null or values(room_name) = '', room_name, values(room_name)),
+            source = ifnull(values(source), source),
+            last_report_time = sysdate(),
+            update_time = sysdate()
+    </insert>
+
+    <select id="selectLiveRoomList" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select room_id, room_key, room_name, source, status, remark, last_report_time, create_time, update_time
+        from dy_live_room
+        <where>
+            <if test="roomKey != null and roomKey != ''">
+                and room_key like concat('%', #{roomKey}, '%')
+            </if>
+            <if test="roomName != null and roomName != ''">
+                and room_name like concat('%', #{roomName}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+        </where>
+        order by update_time desc, room_id desc
+    </select>
+
+    <select id="selectLiveRoomByKey" resultType="java.util.HashMap">
+        select room_id, room_key, room_name, source, status, remark, last_report_time, create_time, update_time
+        from dy_live_room
+        where room_key = #{roomKey}
+        limit 1
+    </select>
+
+    <insert id="insertLiveRoom">
+        insert into dy_live_room(room_key, room_name, source, status, remark, create_time, update_time)
+        values(#{roomKey}, #{roomName}, #{source}, ifnull(#{status}, '0'), #{remark}, sysdate(), sysdate())
+    </insert>
+
+    <update id="updateLiveRoom">
+        update dy_live_room
+        <set>
+            <if test="roomName != null">room_name = #{roomName},</if>
+            <if test="source != null">source = #{source},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where room_key = #{roomKey}
+    </update>
+
+    <delete id="deleteLiveRoomByKey">
+        delete from dy_live_room where room_key = #{roomKey}
+    </delete>
+
+    <select id="selectViewerIdBySecUid" resultType="java.lang.Long">
+        select viewer_id
+        from dy_viewer
+        where sec_uid = #{secUid}
+        limit 1
+    </select>
+
+    <insert id="insertViewer" useGeneratedKeys="true" keyProperty="viewerId">
+        insert into dy_viewer(
+            sec_uid, nickname, avatar, gender, first_seen_date, last_seen_date, create_time, update_time
+        )
+        values(
+            #{secUid}, #{nickname}, #{avatar}, #{gender}, #{leadDate}, #{leadDate}, sysdate(), sysdate()
+        )
+        on duplicate key update
+            nickname = values(nickname),
+            avatar = values(avatar),
+            gender = values(gender),
+            last_seen_date = values(last_seen_date),
+            update_time = sysdate()
+    </insert>
+
+    <update id="updateViewerSeen">
+        update dy_viewer
+        set nickname = #{nickname},
+            avatar = #{avatar},
+            gender = #{gender},
+            last_seen_date = #{leadDate},
+            update_time = sysdate()
+        where sec_uid = #{secUid}
+    </update>
+
+    <select id="selectLeadId" resultType="java.lang.Long">
+        select lead_id
+        from dy_viewer_daily_lead
+        where lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and sec_uid = #{secUid}
+        limit 1
+    </select>
+
+    <insert id="insertDailyLead" useGeneratedKeys="true" keyProperty="leadId">
+        insert into dy_viewer_daily_lead(
+            lead_date, room_key, douyin_user_id, live_room_name, viewer_id, sec_uid,
+            nickname, avatar, create_time, update_time
+        )
+        values(
+            #{leadDate}, #{roomKey}, #{douyinUserId}, #{liveRoomName}, #{viewerId}, #{secUid},
+            #{nickname}, #{avatar}, sysdate(), sysdate()
+        )
+        on duplicate key update
+            douyin_user_id = values(douyin_user_id),
+            live_room_name = values(live_room_name),
+            viewer_id = values(viewer_id),
+            nickname = values(nickname),
+            avatar = values(avatar),
+            update_time = sysdate()
+    </insert>
+
+    <update id="updateDailyLeadSeen">
+        update dy_viewer_daily_lead
+        set douyin_user_id = #{douyinUserId},
+            live_room_name = #{liveRoomName},
+            viewer_id = #{viewerId},
+            nickname = #{nickname},
+            avatar = #{avatar},
+            update_time = sysdate()
+        where lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and sec_uid = #{secUid}
+    </update>
+
+    <select id="selectLeadByNickname" resultType="java.util.HashMap">
+        select lead_id, viewer_id, sec_uid
+        from dy_viewer_daily_lead
+        where lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and nickname = #{nickname}
+        order by update_time desc
+        limit 1
+    </select>
+
+    <insert id="insertComment">
+        insert ignore into dy_viewer_comment(
+            lead_id, viewer_id, lead_date, room_key, douyin_user_id, sec_uid, nickname,
+            content, dedupe_key, match_type, source, page_url, captured_at, create_time
+        )
+        values(
+            #{leadId}, #{viewerId}, #{leadDate}, #{roomKey}, #{douyinUserId}, #{secUid}, #{nickname},
+            #{content}, #{dedupeKey}, #{matchType}, #{source}, #{pageUrl}, #{capturedAt}, sysdate()
+        )
+    </insert>
+
+    <update id="updateLeadCommentStats">
+        update dy_viewer_daily_lead
+        set has_comment = 1,
+            comment_count = comment_count + 1,
+            first_comment_time = ifnull(first_comment_time, #{capturedAt}),
+            last_comment_time = #{capturedAt},
+            last_comment_content = #{content},
+            update_time = sysdate()
+        where lead_id = #{leadId}
+    </update>
+
+    <update id="bindUnmatchedComments">
+        update dy_viewer_comment
+        set lead_id = #{leadId},
+            viewer_id = #{viewerId},
+            match_type = 'nickname'
+        where lead_id is null
+          and lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and nickname = #{nickname}
+    </update>
+
+    <update id="refreshLeadCommentStats">
+        update dy_viewer_daily_lead l
+        set has_comment = if((select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}) > 0, 1, 0),
+            comment_count = (select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            first_comment_time = (select min(c.captured_at) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            last_comment_time = (select max(c.captured_at) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            last_comment_content = (
+                select c.content
+                from dy_viewer_comment c
+                where c.lead_id = #{leadId}
+                order by c.captured_at desc, c.comment_id desc
+                limit 1
+            ),
+            update_time = sysdate()
+        where l.lead_id = #{leadId}
+    </update>
+
+    <update id="releaseExpiredOwners">
+        update dy_viewer_daily_lead
+        set owner_id = null,
+            owner_name = null,
+            owner_assigned_time = null,
+            update_time = sysdate()
+        where owner_name is not null
+          and owner_name != ''
+          and status != 'ordered'
+          and owner_assigned_time is not null
+          and owner_assigned_time &lt; date_sub(sysdate(), interval 24 hour)
+    </update>
+
+    <select id="selectLeadList" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            l.lead_id, l.lead_date, l.room_key, l.douyin_user_id,
+            coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as live_room_name,
+            l.viewer_id, l.sec_uid, l.nickname, l.avatar, l.has_comment, l.comment_count,
+            l.first_comment_time, l.last_comment_time, l.last_comment_content, l.status,
+            l.intent, l.owner_id, l.owner_name, l.owner_assigned_time, l.order_no, l.remark,
+            l.last_follow_time, l.next_follow_time, l.manual_update_time, l.create_time, l.update_time
+        from dy_viewer_daily_lead l
+        left join dy_live_room r on r.room_key = l.room_key
+        <where>
+            <if test="leadDate != null and leadDate != ''">
+                and l.lead_date = #{leadDate}
+            </if>
+            <if test="roomKey != null and roomKey != ''">
+                and l.room_key = #{roomKey}
+            </if>
+            <if test="roomName != null and roomName != ''">
+                and coalesce(r.room_name, l.live_room_name, l.room_key) like concat('%', #{roomName}, '%')
+            </if>
+            <if test="nickname != null and nickname != ''">
+                and l.nickname like concat('%', #{nickname}, '%')
+            </if>
+            <if test="hasComment != null and hasComment != ''">
+                and l.has_comment = #{hasComment}
+            </if>
+            <if test="status != null and status != ''">
+                and l.status = #{status}
+            </if>
+            <if test="intent != null and intent != ''">
+                and l.intent = #{intent}
+            </if>
+            <if test="ownerId != null and ownerId != ''">
+                and l.owner_id = #{ownerId}
+            </if>
+            <if test="orderNo != null and orderNo != ''">
+                and l.order_no like concat('%', #{orderNo}, '%')
+            </if>
+        </where>
+        order by l.has_comment desc, l.last_comment_time desc, l.update_time desc
+    </select>
+
+    <select id="selectLeadById" resultType="java.util.HashMap">
+        select l.*,
+               coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as display_room_name
+        from dy_viewer_daily_lead l
+        left join dy_live_room r on r.room_key = l.room_key
+        where l.lead_id = #{leadId}
+    </select>
+
+    <select id="selectCommentsByLeadId" resultType="java.util.HashMap">
+        select *
+        from dy_viewer_comment
+        where lead_id = #{leadId}
+        order by captured_at desc
+    </select>
+
+    <select id="selectFollowRecordsByLeadId" resultType="java.util.HashMap">
+        select *
+        from dy_viewer_follow_record
+        where lead_id = #{leadId}
+        order by create_time desc
+    </select>
+
+    <update id="updateLead">
+        update dy_viewer_daily_lead
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="intent != null">intent = #{intent},</if>
+            <if test="ownerId != null">owner_id = #{ownerId},</if>
+            <if test="ownerNameTouched != null and ownerNameTouched">owner_name = nullif(#{ownerName}, ''),</if>
+            <if test="ownerNameTouched != null and ownerNameTouched">owner_assigned_time = #{ownerAssignedTime},</if>
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            manual_update_time = sysdate(),
+            update_time = sysdate()
+        </set>
+        where lead_id = #{leadId}
+    </update>
+
+    <insert id="insertFollowRecord">
+        insert into dy_viewer_follow_record(
+            lead_id, viewer_id, follow_content, follow_result, next_follow_time,
+            operator_id, operator_name, create_time
+        )
+        values(
+            #{leadId}, #{viewerId}, #{followContent}, #{followResult}, #{nextFollowTime},
+            #{operatorId}, #{operatorName}, sysdate()
+        )
+    </insert>
+
+    <select id="selectSummary" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            count(1) as totalCount,
+            sum(case when l.has_comment = 1 then 1 else 0 end) as commentLeadCount,
+            sum(case when l.status = 'new' then 1 else 0 end) as newCount,
+            sum(case when l.status = 'following' then 1 else 0 end) as followingCount,
+            sum(case when l.status = 'ordered' then 1 else 0 end) as orderedCount,
+            max(l.update_time) as lastUpdateTime
+        from dy_viewer_daily_lead l
+        left join dy_live_room r on r.room_key = l.room_key
+        <where>
+            <if test="leadDate != null and leadDate != ''">
+                and l.lead_date = #{leadDate}
+            </if>
+            <if test="roomKey != null and roomKey != ''">
+                and l.room_key = #{roomKey}
+            </if>
+            <if test="roomName != null and roomName != ''">
+                and coalesce(r.room_name, l.live_room_name, l.room_key) like concat('%', #{roomName}, '%')
+            </if>
+        </where>
+    </select>
+</mapper>
