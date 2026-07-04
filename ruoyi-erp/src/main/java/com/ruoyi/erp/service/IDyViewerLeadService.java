@@ -3,6 +3,7 @@ package com.ruoyi.erp.service;
 import java.util.List;
 import java.util.Map;
 import com.ruoyi.erp.domain.DyCaptureReport;
+import com.ruoyi.erp.domain.DyViewerLeadExport;
 
 public interface IDyViewerLeadService
 {
@@ -20,6 +21,12 @@ public interface IDyViewerLeadService
 
     List<Map<String, Object>> listLeads(Map<String, Object> query);
 
+    List<DyViewerLeadExport> exportLeads(Map<String, Object> query);
+
+    List<String> listRoomSuggestions(String keyword);
+
+    List<String> listOwnerSuggestions(String keyword);
+
     Map<String, Object> getLeadDetail(Long leadId);
 
     int updateLead(Long leadId, Map<String, Object> form);
@@ -27,4 +34,6 @@ public interface IDyViewerLeadService
     int addFollowRecord(Long leadId, Map<String, Object> form, Long operatorId, String operatorName);
 
     Map<String, Object> summary(Map<String, Object> query);
+
+    Map<String, Object> biDashboard(Map<String, Object> query);
 }

@@ -39,6 +39,30 @@ export function getViewerSummary(query) {
   })
 }
 
+export function getViewerBi(query) {
+  return request({
+    url: '/live/viewer/bi',
+    method: 'get',
+    params: query
+  })
+}
+
+export function listViewerRoomSuggestions(query) {
+  return request({
+    url: '/live/viewer/room/suggestions',
+    method: 'get',
+    params: query
+  })
+}
+
+export function listViewerOwnerSuggestions(query) {
+  return request({
+    url: '/live/viewer/owner/suggestions',
+    method: 'get',
+    params: query
+  })
+}
+
 export function listLiveRooms(query) {
   return request({
     url: '/live/room/list',

@@ -90,7 +90,9 @@ public class SecurityConfig
             .csrf(csrf -> csrf.disable())
             // 禁用HTTP响应标头
             .headers((headersCustomizer) -> {
-                headersCustomizer.cacheControl(cache -> cache.disable()).frameOptions(options -> options.sameOrigin());
+                headersCustomizer.cacheControl(cache -> cache.disable())
+                    .frameOptions(options -> options.disable())
+                    .contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'self' http://39.96.157.230"));
             })
             // 认证失败处理类
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))

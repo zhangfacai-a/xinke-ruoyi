@@ -2,7 +2,7 @@ import router from './router'
 import { ElMessage } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-import { getToken } from '@/utils/auth'
+import { getToken, setToken } from '@/utils/auth'
 import { isHttp, isPathMatch } from '@/utils/validate'
 import { isRelogin } from '@/utils/request'
 import useUserStore from '@/store/modules/user'
@@ -20,7 +20,13 @@ const isWhiteList = (path) => {
 
 router.beforeEach(async (to, from) => {
   NProgress.start()
-  if (getToken()) {
+  const queryToken = to.query.token || to.query.accessToken
+  const embedToken = queryToken ? String(queryToken).replace(/^Bearer\s+/i, '') : ''
+  if (queryToken) {
+    setToken(embedToken)
+    useUserStore().token = embedToken
+  }
+  if (embedToken || getToken()) {
     to.meta.title && useSettingsStore().setTitle(to.meta.title)
     const isLock = useLockStore().isLock
     if (to.path === '/login') {

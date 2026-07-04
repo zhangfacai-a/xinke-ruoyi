@@ -10,11 +10,29 @@ CREATE TABLE IF NOT EXISTS dy_viewer (
   gender TINYINT DEFAULT 0 COMMENT 'Gender from Douyin',
   first_seen_date DATE DEFAULT NULL COMMENT 'First seen date',
   last_seen_date DATE DEFAULT NULL COMMENT 'Last seen date',
+  has_comment TINYINT DEFAULT 0 COMMENT 'Has comments',
+  comment_count INT DEFAULT 0 COMMENT 'Comment count',
+  first_comment_time DATETIME DEFAULT NULL COMMENT 'First comment time',
+  last_comment_time DATETIME DEFAULT NULL COMMENT 'Last comment time',
+  last_comment_content VARCHAR(1000) DEFAULT NULL COMMENT 'Last comment content',
+  status VARCHAR(32) DEFAULT 'new' COMMENT 'new/following/ordered/invalid',
+  intent VARCHAR(32) DEFAULT 'unknown' COMMENT 'unknown/low/medium/high',
+  owner_id BIGINT DEFAULT NULL COMMENT 'Owner user ID',
+  owner_name VARCHAR(50) DEFAULT NULL COMMENT 'Owner name',
+  owner_assigned_time DATETIME DEFAULT NULL COMMENT 'Owner assigned time',
+  order_no VARCHAR(64) DEFAULT NULL COMMENT 'Matched order number',
+  remark VARCHAR(500) DEFAULT NULL COMMENT 'Remark',
+  last_follow_time DATETIME DEFAULT NULL COMMENT 'Last follow time',
+  manual_update_time DATETIME DEFAULT NULL COMMENT 'Manual update time',
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Create time',
   update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Update time',
   PRIMARY KEY (viewer_id),
   UNIQUE KEY uk_sec_uid (sec_uid),
-  KEY idx_nickname (nickname)
+  KEY idx_nickname (nickname),
+  KEY idx_owner_status (owner_id, status),
+  KEY idx_status_seen (status, last_seen_date),
+  KEY idx_has_comment (has_comment),
+  KEY idx_order_no (order_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Douyin viewer profile';
 
 CREATE TABLE IF NOT EXISTS dy_viewer_daily_lead (

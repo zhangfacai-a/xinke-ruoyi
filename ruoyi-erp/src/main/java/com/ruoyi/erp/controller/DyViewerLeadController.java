@@ -2,6 +2,7 @@ package com.ruoyi.erp.controller;
 
 import java.util.List;
 import java.util.Map;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +19,9 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.erp.domain.DyCaptureReport;
+import com.ruoyi.erp.domain.DyViewerLeadExport;
 import com.ruoyi.erp.service.IDyViewerLeadService;
 
 @RestController
@@ -83,6 +86,30 @@ public class DyViewerLeadController extends BaseController
         return getDataTable(list);
     }
 
+    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @Log(title = "Douyin viewer lead", businessType = BusinessType.EXPORT)
+    @PostMapping("/live/viewer/lead/export")
+    public void export(HttpServletResponse response, @RequestParam Map<String, Object> query)
+    {
+        List<DyViewerLeadExport> list = dyViewerLeadService.exportLeads(query);
+        ExcelUtil<DyViewerLeadExport> util = new ExcelUtil<>(DyViewerLeadExport.class);
+        util.exportExcel(response, list, "直播追单明细");
+    }
+
+    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @GetMapping("/live/viewer/room/suggestions")
+    public AjaxResult roomSuggestions(@RequestParam(value = "keyword", required = false) String keyword)
+    {
+        return success(dyViewerLeadService.listRoomSuggestions(keyword));
+    }
+
+    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @GetMapping("/live/viewer/owner/suggestions")
+    public AjaxResult ownerSuggestions(@RequestParam(value = "keyword", required = false) String keyword)
+    {
+        return success(dyViewerLeadService.listOwnerSuggestions(keyword));
+    }
+
     @PreAuthorize("@ss.hasPermi('live:viewer:query')")
     @GetMapping("/live/viewer/lead/{leadId}")
     public AjaxResult getInfo(@PathVariable Long leadId)
@@ -111,5 +138,12 @@ public class DyViewerLeadController extends BaseController
     public AjaxResult summary(@RequestParam Map<String, Object> query)
     {
         return success(dyViewerLeadService.summary(query));
+    }
+
+    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @GetMapping("/live/viewer/bi")
+    public AjaxResult bi(@RequestParam Map<String, Object> query)
+    {
+        return success(dyViewerLeadService.biDashboard(query));
     }
 }

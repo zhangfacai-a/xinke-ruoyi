@@ -56,8 +56,8 @@ const router = useRouter()
 const { proxy } = getCurrentInstance()
 
 const loginForm = ref({
-  username: "admin",
-  password: "admin123",
+  username: "小小鑫",
+  password: "a123456",
   rememberMe: false
 })
 

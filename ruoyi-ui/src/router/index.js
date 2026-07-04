@@ -48,6 +48,12 @@ export const constantRoutes = [
     hidden: true
   },
   {
+    path: '/live-bi-embed',
+    component: () => import('@/views/live/bi/index'),
+    hidden: true,
+    meta: { title: '直播追单BI' }
+  },
+  {
     path: "/:pathMatch(.*)*",
     component: () => import('@/views/error/404'),
     hidden: true

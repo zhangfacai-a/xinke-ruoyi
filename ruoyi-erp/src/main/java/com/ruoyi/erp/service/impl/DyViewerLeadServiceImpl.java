@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import org.springframework.util.StringUtils;
 import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.erp.domain.DyCaptureReport;
+import com.ruoyi.erp.domain.DyViewerLeadExport;
 import com.ruoyi.erp.domain.DyViewerCommentPayload;
 import com.ruoyi.erp.domain.DyViewerPayload;
 import com.ruoyi.erp.mapper.DyViewerLeadMapper;
@@ -146,16 +148,57 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
     @Override
     public List<Map<String, Object>> listLeads(Map<String, Object> query)
     {
-        dyViewerLeadMapper.releaseExpiredOwners();
+        refreshLeadRules();
         return dyViewerLeadMapper.selectLeadList(query);
+    }
+
+    @Override
+    public List<DyViewerLeadExport> exportLeads(Map<String, Object> query)
+    {
+        refreshLeadRules();
+        List<Map<String, Object>> leads = dyViewerLeadMapper.selectLeadList(query);
+        List<DyViewerLeadExport> rows = new ArrayList<>();
+        for (Map<String, Object> lead : leads)
+        {
+            DyViewerLeadExport row = new DyViewerLeadExport();
+            Long leadId = asLong(lead.get("lead_id"));
+            row.setLeadDate(str(lead.get("lead_date")));
+            row.setLiveRoomName(str(lead.get("live_room_name")));
+            row.setNickname(str(lead.get("nickname")));
+            row.setProfileUrl(profileUrl(lead.get("sec_uid")));
+            row.setCommentCount(asInteger(lead.get("comment_count")));
+            row.setComments(joinComments(leadId));
+            row.setIntent(intentLabel(str(lead.get("intent"))));
+            row.setStatus(statusLabel(str(lead.get("status"))));
+            row.setOwnerName(str(lead.get("owner_name")));
+            row.setOrderNo(str(lead.get("order_no")));
+            row.setRemark(str(lead.get("remark")));
+            row.setUpdateTime(str(lead.get("update_time")));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    @Override
+    public List<String> listRoomSuggestions(String keyword)
+    {
+        return dyViewerLeadMapper.selectRoomNames(trim(keyword, 100));
+    }
+
+    @Override
+    public List<String> listOwnerSuggestions(String keyword)
+    {
+        return dyViewerLeadMapper.selectOwnerNames(trim(keyword, 50));
     }
 
     @Override
     public Map<String, Object> getLeadDetail(Long leadId)
     {
+        refreshLeadRules();
         Map<String, Object> data = new HashMap<>();
         data.put("lead", dyViewerLeadMapper.selectLeadById(leadId));
         data.put("comments", dyViewerLeadMapper.selectCommentsByLeadId(leadId));
+        data.put("visits", dyViewerLeadMapper.selectVisitsByLeadId(leadId));
         data.put("followRecords", dyViewerLeadMapper.selectFollowRecordsByLeadId(leadId));
         return data;
     }
@@ -163,7 +206,7 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
     @Override
     public int updateLead(Long leadId, Map<String, Object> form)
     {
-        dyViewerLeadMapper.releaseExpiredOwners();
+        refreshLeadRules();
         Map<String, Object> current = dyViewerLeadMapper.selectLeadById(leadId);
         if (current == null)
         {
@@ -172,24 +215,21 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
 
         Map<String, Object> data = new HashMap<>();
         data.put("leadId", leadId);
-        copy(data, form, "status");
-        copy(data, form, "intent");
         copy(data, form, "ownerId");
         copy(data, form, "orderNo");
         copy(data, form, "remark");
 
-        String nextStatus = hasText(str(form == null ? null : form.get("status"))) ? str(form.get("status")) : str(current.get("status"));
         String nextOrderNo = form != null && form.containsKey("orderNo") ? str(form.get("orderNo")) : str(current.get("order_no"));
-        if ("ordered".equals(nextStatus) && !hasText(nextOrderNo))
-        {
-            throw new ServiceException("Ordered leads must have orderNo");
-        }
+        String requestedStatus = form != null && form.containsKey("status") ? str(form.get("status")) : str(current.get("status"));
+        String nextOwnerName = str(current.get("owner_name"));
 
         if (form != null && form.containsKey("ownerName"))
         {
-            applyOwnerRule(data, current, str(form.get("ownerName")), nextStatus);
+            nextOwnerName = str(form.get("ownerName"));
+            applyOwnerRule(data, current, nextOwnerName);
         }
-        return dyViewerLeadMapper.updateLead(data);
+        data.put("status", resolveLeadStatus(current, nextOwnerName, nextOrderNo, requestedStatus));
+        return dyViewerLeadMapper.updateViewerLead(data);
     }
 
     @Override
@@ -214,21 +254,43 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         data.put("followResult", str(form.get("followResult")));
         data.put("nextFollowTime", null);
         data.put("operatorId", operatorId);
-        data.put("operatorName", operatorName);
+        String leadOwnerName = str(lead.get("owner_name"));
+        data.put("operatorName", hasText(leadOwnerName) ? leadOwnerName : operatorName);
         int rows = dyViewerLeadMapper.insertFollowRecord(data);
 
         Map<String, Object> leadUpdate = new HashMap<>();
         leadUpdate.put("leadId", leadId);
-        leadUpdate.put("status", hasText(str(form.get("status"))) ? str(form.get("status")) : "following");
-        dyViewerLeadMapper.updateLead(leadUpdate);
+        dyViewerLeadMapper.updateViewerLead(leadUpdate);
+        dyViewerLeadMapper.syncLeadStatusRules();
+        dyViewerLeadMapper.syncViewerLeadRules();
         return rows;
     }
 
     @Override
     public Map<String, Object> summary(Map<String, Object> query)
     {
-        dyViewerLeadMapper.releaseExpiredOwners();
+        refreshLeadRules();
         return dyViewerLeadMapper.selectSummary(query);
+    }
+
+    @Override
+    public Map<String, Object> biDashboard(Map<String, Object> query)
+    {
+        refreshLeadRules();
+        Map<String, Object> safeQuery = normalizeBiQuery(query);
+        Map<String, Object> data = new HashMap<>();
+        Map<String, Object> overview = dyViewerLeadMapper.selectBiOverview(safeQuery);
+        data.put("query", safeQuery);
+        data.put("overview", overview == null ? new HashMap<>() : overview);
+        data.put("trend", dyViewerLeadMapper.selectBiDailyTrend(safeQuery));
+        data.put("roomRank", dyViewerLeadMapper.selectBiRoomRank(safeQuery));
+        data.put("shopRank", dyViewerLeadMapper.selectBiShopRank(safeQuery));
+        data.put("ownerRank", dyViewerLeadMapper.selectBiOwnerRank(safeQuery));
+        data.put("hourHeat", dyViewerLeadMapper.selectBiHourHeat(safeQuery));
+        data.put("keywords", dyViewerLeadMapper.selectBiCommentKeywords(safeQuery));
+        data.put("signalWords", dyViewerLeadMapper.selectBiSignalWords(safeQuery));
+        data.put("quality", dyViewerLeadMapper.selectBiDataQuality(safeQuery));
+        return data;
     }
 
     private void validateReport(DyCaptureReport report)
@@ -245,6 +307,22 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         {
             throw new ServiceException("payloadType is required");
         }
+    }
+
+    private Map<String, Object> normalizeBiQuery(Map<String, Object> query)
+    {
+        Map<String, Object> data = query == null ? new HashMap<>() : new HashMap<>(query);
+        if (!hasText(str(data.get("beginLeadDate"))) && !hasText(str(data.get("leadDate"))))
+        {
+            data.put("beginLeadDate", LocalDate.now().minusDays(6).format(DATE_FMT));
+        }
+        if (!hasText(str(data.get("endLeadDate"))) && !hasText(str(data.get("leadDate"))))
+        {
+            data.put("endLeadDate", LocalDate.now().format(DATE_FMT));
+        }
+        data.put("roomName", trim(data.get("roomName"), 100));
+        data.put("ownerName", trim(data.get("ownerName"), 50));
+        return data;
     }
 
     private Long insertBatch(DyCaptureReport report, String payloadType, int itemCount)
@@ -298,6 +376,7 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         {
             dyViewerLeadMapper.bindUnmatchedComments(leadId, viewerId, leadDate, roomKey, audience.getNickname());
             dyViewerLeadMapper.refreshLeadCommentStats(leadId);
+            dyViewerLeadMapper.updateViewerCommentStats(viewerId);
         }
     }
 
@@ -324,12 +403,16 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         if (leadId == null && hasText(comment.getNickname()))
         {
             Map<String, Object> lead = dyViewerLeadMapper.selectLeadByNickname(leadDate, roomKey, comment.getNickname());
+            if (lead == null)
+            {
+                lead = dyViewerLeadMapper.selectLeadByNicknameAnyRoom(leadDate, comment.getNickname());
+            }
             if (lead != null)
             {
                 leadId = asLong(lead.get("lead_id"));
                 viewerId = asLong(lead.get("viewer_id"));
                 secUid = str(lead.get("sec_uid"));
-                matchType = "nickname";
+                matchType = roomKey.equals(str(lead.get("room_key"))) ? "nickname" : "nickname_any_room";
             }
         }
 
@@ -351,6 +434,10 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         if (inserted > 0 && leadId != null)
         {
             dyViewerLeadMapper.updateLeadCommentStats(leadId, trim(comment.getContent(), 1000), capturedAt);
+            if (viewerId != null)
+            {
+                dyViewerLeadMapper.updateViewerCommentStats(viewerId);
+            }
         }
         return inserted;
     }
@@ -370,44 +457,79 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
 
     private String captureRoomKey(DyCaptureReport report, DyViewerPayload audience)
     {
-        if (audience != null && hasText(audience.getRoomId()))
+        if (report != null && hasText(report.getRoomKey()))
         {
-            return trim(audience.getRoomId(), 64);
+            return trim(report.getRoomKey(), 64);
         }
-        return trim(report.getRoomKey(), 64);
+        return audience == null ? "" : trim(audience.getRoomId(), 64);
     }
 
-    private void applyOwnerRule(Map<String, Object> data, Map<String, Object> current, String nextOwnerName, String nextStatus)
+    private void applyOwnerRule(Map<String, Object> data, Map<String, Object> current, String nextOwnerName)
     {
         String currentStatus = str(current.get("status"));
         String currentOwner = str(current.get("owner_name"));
-        if (("ordered".equals(currentStatus) || "ordered".equals(nextStatus)) && hasText(nextOwnerName) && !nextOwnerName.equals(currentOwner))
+        if ((isSoldStatus(currentStatus) || hasText(str(current.get("order_no")))) && hasText(nextOwnerName) && !nextOwnerName.equals(currentOwner))
         {
             throw new ServiceException("Ordered leads cannot assign owner");
         }
-        if (hasText(currentOwner) && hasText(nextOwnerName) && !nextOwnerName.equals(currentOwner) && !ownerExpired(current))
+        if (hasText(currentOwner) && !nextOwnerName.equals(currentOwner))
         {
-            throw new ServiceException("Owner is locked for 24 hours");
+            throw new ServiceException("Lead already has owner");
         }
         data.put("ownerNameTouched", true);
         data.put("ownerName", trim(nextOwnerName, 50));
-        data.put("ownerAssignedTime", hasText(nextOwnerName) ? LocalDateTime.now().format(DATE_TIME_FMT) : null);
+        if (!hasText(nextOwnerName))
+        {
+            data.put("ownerAssignedTime", null);
+        }
+        else if (nextOwnerName.equals(currentOwner))
+        {
+            data.put("ownerAssignedTime", current.get("owner_assigned_time"));
+        }
+        else
+        {
+            data.put("ownerAssignedTime", LocalDateTime.now().format(DATE_TIME_FMT));
+        }
     }
 
-    private boolean ownerExpired(Map<String, Object> current)
+    private void refreshLeadRules()
     {
-        Object value = current.get("owner_assigned_time");
-        if (value == null)
+        dyViewerLeadMapper.releaseExpiredOwners();
+        dyViewerLeadMapper.syncLeadStatusRules();
+        dyViewerLeadMapper.syncViewerLeadRules();
+    }
+
+    private String resolveLeadStatus(Map<String, Object> current, String ownerName, String orderNo, String requestedStatus)
+    {
+        if (hasText(orderNo))
+        {
+            return "pre_ordered".equals(requestedStatus) ? "pre_ordered" : "ordered";
+        }
+        String leadDateText = hasText(str(current.get("last_seen_date"))) ? str(current.get("last_seen_date")) : str(current.get("lead_date"));
+        if (isOlderThanOneMonth(leadDateText))
+        {
+            return "invalid";
+        }
+        if (hasText(ownerName))
+        {
+            return "following";
+        }
+        return "new";
+    }
+
+    private boolean isSoldStatus(String status)
+    {
+        return "ordered".equals(status) || "pre_ordered".equals(status);
+    }
+
+    private boolean isOlderThanOneMonth(String leadDateText)
+    {
+        if (!hasText(leadDateText) || leadDateText.length() < 10)
         {
             return false;
         }
-        String text = String.valueOf(value);
-        if (!hasText(text) || text.length() < 19)
-        {
-            return false;
-        }
-        LocalDateTime assigned = LocalDateTime.parse(text.substring(0, 19), DATE_TIME_FMT);
-        return assigned.plusHours(24).isBefore(LocalDateTime.now());
+        LocalDate leadDate = LocalDate.parse(leadDateText.substring(0, 10), DATE_FMT);
+        return leadDate.isBefore(LocalDate.now().minusMonths(1));
     }
 
     private int itemCount(String payloadType, DyCaptureReport report)
@@ -493,5 +615,77 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         }
         String text = String.valueOf(value);
         return hasText(text) ? Long.valueOf(text) : null;
+    }
+
+    private Integer asInteger(Object value)
+    {
+        if (value == null)
+        {
+            return 0;
+        }
+        if (value instanceof Number number)
+        {
+            return number.intValue();
+        }
+        String text = String.valueOf(value);
+        return hasText(text) ? Integer.valueOf(text) : 0;
+    }
+
+    private String joinComments(Long leadId)
+    {
+        if (leadId == null)
+        {
+            return "";
+        }
+        List<Map<String, Object>> comments = dyViewerLeadMapper.selectCommentsByLeadId(leadId);
+        StringBuilder text = new StringBuilder();
+        for (Map<String, Object> comment : comments)
+        {
+            String content = str(comment.get("content")).trim();
+            if (!hasText(content))
+            {
+                continue;
+            }
+            if (text.length() > 0)
+            {
+                text.append('\n');
+            }
+            String capturedAt = str(comment.get("captured_at"));
+            if (hasText(capturedAt))
+            {
+                text.append(capturedAt).append("  ");
+            }
+            text.append(content);
+        }
+        return text.toString();
+    }
+
+    private String profileUrl(Object secUid)
+    {
+        String value = str(secUid).trim();
+        return hasText(value) ? "https://www.douyin.com/user/" + value : "";
+    }
+
+    private String intentLabel(String value)
+    {
+        return switch (value)
+        {
+            case "low" -> "低意向";
+            case "medium" -> "中意向";
+            case "high" -> "高意向";
+            default -> "未知";
+        };
+    }
+
+    private String statusLabel(String value)
+    {
+        return switch (value)
+        {
+            case "following" -> "跟进中";
+            case "pre_ordered" -> "追单前已下单";
+            case "ordered" -> "追单后已下单";
+            case "invalid" -> "无效";
+            default -> "新线索";
+        };
     }
 }
