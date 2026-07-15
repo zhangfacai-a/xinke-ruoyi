@@ -56,7 +56,6 @@ LEFT JOIN (
     ) picked ON picked.lead_id = l.lead_id
 ) latest ON latest.viewer_id = v.viewer_id
 SET v.nickname = COALESCE(NULLIF(v.nickname, ''), latest.nickname),
-    v.avatar = COALESCE(NULLIF(v.avatar, ''), latest.avatar),
     v.has_comment = IF(IFNULL(cs.comment_count, 0) > 0, 1, 0),
     v.comment_count = IFNULL(cs.comment_count, 0),
     v.first_comment_time = cs.first_comment_time,

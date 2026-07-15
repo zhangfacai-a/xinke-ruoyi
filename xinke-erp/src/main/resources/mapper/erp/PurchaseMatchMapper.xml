@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.PurchaseMatchMapper">
+
+    <sql id="supplierCols">
+        supplier_id, supplier_id supplierId, supplier_name, supplier_name supplierName, supplier_code, supplier_code supplierCode,
+        status, sort_order, sort_order sortOrder, create_by, create_time, update_by, update_time, remark, del_flag
+    </sql>
+
+    <select id="selectSuppliers" parameterType="map" resultType="java.util.HashMap">
+        select <include refid="supplierCols"/>
+        from purchase_supplier
+        where del_flag = '0'
+        <if test="supplierName != null and supplierName != ''">and supplier_name like concat('%', #{supplierName}, '%')</if>
+        <if test="status != null and status != ''">and status = #{status}</if>
+        order by sort_order asc, supplier_id desc
+    </select>
+
+    <select id="selectSupplierById" resultType="java.util.HashMap">
+        select <include refid="supplierCols"/>
+        from purchase_supplier where supplier_id = #{supplierId} and del_flag = '0'
+    </select>
+
+    <select id="selectSupplierByName" resultType="java.util.HashMap">
+        select <include refid="supplierCols"/>
+        from purchase_supplier where supplier_name = #{supplierName} and status = '0' and del_flag = '0' limit 1
+    </select>
+
+    <select id="selectSupplierByAlias" resultType="java.util.HashMap">
+        select s.supplier_id, s.supplier_id supplierId, s.supplier_name, s.supplier_name supplierName, s.supplier_code, s.supplier_code supplierCode
+        from purchase_supplier_alias a
+        inner join purchase_supplier s on s.supplier_id = a.supplier_id and s.del_flag = '0'
+        where a.alias_name = #{aliasName} and a.status = '0' and a.del_flag = '0'
+        limit 1
+    </select>
+
+    <insert id="insertSupplier" parameterType="map" useGeneratedKeys="true" keyProperty="supplierId">
+        insert into purchase_supplier(supplier_name, supplier_code, status, sort_order, create_by, create_time, remark)
+        values(#{supplierName}, #{supplierCode}, ifnull(#{status}, '0'), ifnull(#{sortOrder}, 0), #{createBy}, sysdate(), #{remark})
+    </insert>
+
+    <update id="updateSupplier" parameterType="map">
+        update purchase_supplier
+        <set>
+            <if test="supplierName != null">supplier_name = #{supplierName},</if>
+            <if test="supplierCode != null">supplier_code = #{supplierCode},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where supplier_id = #{supplierId}
+    </update>
+
+    <update id="deleteSupplierByIds">
+        update purchase_supplier set del_flag='2', update_by=#{updateBy}, update_time=sysdate()
+        where supplier_id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <select id="selectAliases" parameterType="map" resultType="java.util.HashMap">
+        select a.alias_id, a.alias_id aliasId, a.supplier_id, a.supplier_id supplierId, s.supplier_name, s.supplier_name supplierName,
+               a.alias_name, a.alias_name aliasName, a.status, a.create_by, a.create_time, a.update_by, a.update_time, a.remark
+        from purchase_supplier_alias a
+        left join purchase_supplier s on s.supplier_id = a.supplier_id
+        where a.del_flag='0'
+        <if test="supplierId != null">and a.supplier_id = #{supplierId}</if>
+        <if test="aliasName != null and aliasName != ''">and a.alias_name like concat('%', #{aliasName}, '%')</if>
+        order by a.alias_id desc
+    </select>
+
+    <insert id="insertAlias" parameterType="map" useGeneratedKeys="true" keyProperty="aliasId">
+        insert into purchase_supplier_alias(supplier_id, alias_name, status, create_by, create_time, remark)
+        values(#{supplierId}, #{aliasName}, ifnull(#{status}, '0'), #{createBy}, sysdate(), #{remark})
+    </insert>
+
+    <update id="updateAlias" parameterType="map">
+        update purchase_supplier_alias
+        <set>
+            <if test="supplierId != null">supplier_id = #{supplierId},</if>
+            <if test="aliasName != null">alias_name = #{aliasName},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where alias_id = #{aliasId}
+    </update>
+
+    <update id="deleteAliasByIds">
+        update purchase_supplier_alias set del_flag='2', update_by=#{updateBy}, update_time=sysdate()
+        where alias_id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <sql id="manualCols">
+        manual_order_id, manual_order_id manualOrderId, supplier_id, supplier_id supplierId, supplier_name_snapshot,
+        supplier_name_snapshot supplierNameSnapshot, active_unique_key, active_unique_key activeUniqueKey,
+        order_date, order_date orderDate, order_no, order_no orderNo, product_model, product_model productModel,
+        unit_price, unit_price unitPrice, quantity, total_amount, total_amount totalAmount,
+        customer_name, customer_name customerName, customer_phone, customer_phone customerPhone,
+        customer_address, customer_address customerAddress, order_remark, order_remark orderRemark,
+        logistics_no, logistics_no logisticsNo, after_sale_flag, after_sale_flag afterSaleFlag,
+        after_sale_request, after_sale_request afterSaleRequest, balance_amount, balance_amount balanceAmount,
+        receipt_status, receipt_status receiptStatus, payment_amount, payment_amount paymentAmount,
+        invoice_status, invoice_status invoiceStatus, reconciliation_status, reconciliation_status reconciliationStatus,
+        amount_check_status, amount_check_status amountCheckStatus, data_status, data_status dataStatus,
+        upload_user_id, upload_user_id uploadUserId, upload_user_name, upload_user_name uploadUserName,
+        upload_time, upload_time uploadTime, latest_upload_user_id, latest_upload_user_id latestUploadUserId,
+        latest_upload_user_name, latest_upload_user_name latestUploadUserName, latest_upload_time, latest_upload_time latestUploadTime,
+        source_file_name, source_file_name sourceFileName, latest_source_file_name, latest_source_file_name latestSourceFileName,
+        import_batch_id, import_batch_id importBatchId, latest_import_batch_id, latest_import_batch_id latestImportBatchId,
+        source_row_number, source_row_number sourceRowNumber, latest_source_row_number, latest_source_row_number latestSourceRowNumber,
+        create_by, create_by createBy, create_time, create_time createTime, update_by, update_by updateBy, update_time, update_time updateTime,
+        remark, del_flag, del_flag delFlag
+    </sql>
+
+    <select id="selectManualOrders" parameterType="map" resultType="java.util.HashMap">
+        select <include refid="manualCols"/>
+        from purchase_manual_order
+        where del_flag='0'
+        <if test="supplierId != null">and supplier_id = #{supplierId}</if>
+        <if test="orderNo != null and orderNo != ''">and order_no like concat('%', #{orderNo}, '%')</if>
+        <if test="productModel != null and productModel != ''">and product_model like concat('%', #{productModel}, '%')</if>
+        <if test="logisticsNo != null and logisticsNo != ''">and logistics_no like concat('%', #{logisticsNo}, '%')</if>
+        <if test="afterSaleFlag != null and afterSaleFlag != ''">and after_sale_flag = #{afterSaleFlag}</if>
+        <if test="invoiceStatus != null and invoiceStatus != ''">and invoice_status = #{invoiceStatus}</if>
+        <if test="reconciliationStatus != null and reconciliationStatus != ''">and reconciliation_status = #{reconciliationStatus}</if>
+        <if test="uploadUserName != null and uploadUserName != ''">and upload_user_name like concat('%', #{uploadUserName}, '%')</if>
+        <if test="dataStatus != null and dataStatus != ''">and data_status = #{dataStatus}</if>
+        <if test="beginDate != null and beginDate != ''">and order_date &gt;= #{beginDate}</if>
+        <if test="endDate != null and endDate != ''">and order_date &lt;= #{endDate}</if>
+        order by manual_order_id desc
+    </select>
+
+    <select id="selectManualById" resultType="java.util.HashMap">
+        select <include refid="manualCols"/>
+        from purchase_manual_order where manual_order_id=#{manualOrderId} and del_flag='0'
+    </select>
+
+    <select id="selectManualByActiveKey" resultType="java.util.HashMap">
+        select <include refid="manualCols"/>
+        from purchase_manual_order where active_unique_key=#{activeUniqueKey} and del_flag='0' limit 1
+    </select>
+
+    <select id="selectManualByBusinessKey" resultType="java.util.HashMap">
+        select <include refid="manualCols"/>
+        from purchase_manual_order
+        where supplier_id=#{supplierId} and order_no=#{orderNo} and del_flag='0'
+    </select>
+
+    <insert id="insertManual" parameterType="map" useGeneratedKeys="true" keyProperty="manualOrderId">
+        insert into purchase_manual_order(
+            supplier_id, supplier_name_snapshot, active_unique_key, order_date, order_no, product_model, unit_price, quantity,
+            total_amount, customer_name, customer_phone, customer_address, order_remark, logistics_no, after_sale_flag,
+            after_sale_request, balance_amount, receipt_status, payment_amount, invoice_status, reconciliation_status,
+            amount_check_status, data_status, upload_user_id, upload_user_name, upload_time, latest_upload_user_id,
+            latest_upload_user_name, latest_upload_time, source_file_name, latest_source_file_name, import_batch_id,
+            latest_import_batch_id, source_row_number, latest_source_row_number, create_by, create_time, remark
+        ) values (
+            #{supplierId}, #{supplierNameSnapshot}, #{activeUniqueKey}, #{orderDate}, #{orderNo}, #{productModel}, #{unitPrice}, #{quantity},
+            #{totalAmount}, #{customerName}, #{customerPhone}, #{customerAddress}, #{orderRemark}, #{logisticsNo}, #{afterSaleFlag},
+            #{afterSaleRequest}, #{balanceAmount}, #{receiptStatus}, #{paymentAmount}, #{invoiceStatus}, #{reconciliationStatus},
+            #{amountCheckStatus}, #{dataStatus}, #{uploadUserId}, #{uploadUserName}, sysdate(), #{latestUploadUserId},
+            #{latestUploadUserName}, sysdate(), #{sourceFileName}, #{latestSourceFileName}, #{importBatchId},
+            #{latestImportBatchId}, #{sourceRowNumber}, #{latestSourceRowNumber}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateManual" parameterType="map">
+        update purchase_manual_order
+        <set>
+            <if test="supplierId != null">supplier_id=#{supplierId},</if>
+            <if test="supplierNameSnapshot != null">supplier_name_snapshot=#{supplierNameSnapshot},</if>
+            <if test="activeUniqueKey != null">active_unique_key=#{activeUniqueKey},</if>
+            <if test="orderDate != null">order_date=#{orderDate},</if>
+            <if test="orderNo != null">order_no=#{orderNo},</if>
+            <if test="productModel != null">product_model=#{productModel},</if>
+            <if test="unitPrice != null">unit_price=#{unitPrice},</if>
+            <if test="quantity != null">quantity=#{quantity},</if>
+            <if test="totalAmount != null">total_amount=#{totalAmount},</if>
+            <if test="customerName != null">customer_name=#{customerName},</if>
+            <if test="customerPhone != null">customer_phone=#{customerPhone},</if>
+            <if test="customerAddress != null">customer_address=#{customerAddress},</if>
+            <if test="orderRemark != null">order_remark=#{orderRemark},</if>
+            <if test="logisticsNo != null">logistics_no=#{logisticsNo},</if>
+            <if test="afterSaleFlag != null">after_sale_flag=#{afterSaleFlag},</if>
+            <if test="afterSaleRequest != null">after_sale_request=#{afterSaleRequest},</if>
+            <if test="balanceAmount != null">balance_amount=#{balanceAmount},</if>
+            <if test="receiptStatus != null">receipt_status=#{receiptStatus},</if>
+            <if test="paymentAmount != null">payment_amount=#{paymentAmount},</if>
+            <if test="invoiceStatus != null">invoice_status=#{invoiceStatus},</if>
+            <if test="reconciliationStatus != null">reconciliation_status=#{reconciliationStatus},</if>
+            <if test="amountCheckStatus != null">amount_check_status=#{amountCheckStatus},</if>
+            <if test="dataStatus != null">data_status=#{dataStatus},</if>
+            <if test="latestUploadUserId != null">latest_upload_user_id=#{latestUploadUserId}, latest_upload_user_name=#{latestUploadUserName}, latest_upload_time=sysdate(),</if>
+            <if test="latestSourceFileName != null">latest_source_file_name=#{latestSourceFileName},</if>
+            <if test="latestImportBatchId != null">latest_import_batch_id=#{latestImportBatchId},</if>
+            <if test="latestSourceRowNumber != null">latest_source_row_number=#{latestSourceRowNumber},</if>
+            <if test="remark != null">remark=#{remark},</if>
+            update_by=#{updateBy}, update_time=sysdate()
+        </set>
+        where manual_order_id=#{manualOrderId}
+    </update>
+
+    <update id="fillManualEmptyFields" parameterType="map">
+        update purchase_manual_order
+        set product_model=if(product_model is null or product_model='', #{productModel}, product_model),
+            logistics_no=if(logistics_no is null or logistics_no='', #{logisticsNo}, logistics_no),
+            customer_phone=if(customer_phone is null or customer_phone='', #{customerPhone}, customer_phone),
+            latest_upload_user_id=#{latestUploadUserId}, latest_upload_user_name=#{latestUploadUserName}, latest_upload_time=sysdate(),
+            latest_source_file_name=#{latestSourceFileName}, latest_import_batch_id=#{latestImportBatchId}, latest_source_row_number=#{latestSourceRowNumber},
+            update_by=#{updateBy}, update_time=sysdate()
+        where manual_order_id=#{manualOrderId}
+    </update>
+
+    <update id="deleteManualByIds">
+        update purchase_manual_order set del_flag='2', active_unique_key=concat(active_unique_key, '|DEL|', manual_order_id), update_by=#{updateBy}, update_time=sysdate()
+        where manual_order_id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <sql id="summaryCols">
+        summary_id, summary_id summaryId, document_supplier_id, document_supplier_id documentSupplierId, document_supplier_name,
+        document_supplier_name documentSupplierName, active_unique_key, active_unique_key activeUniqueKey,
+        purchase_order_remark, purchase_order_remark purchaseOrderRemark, contract_remark, contract_remark contractRemark,
+        merchant_code, merchant_code merchantCode, purchase_quantity, purchase_quantity purchaseQuantity,
+        matched_logistics_no, matched_logistics_no matchedLogisticsNo, original_logistics_no, original_logistics_no originalLogisticsNo,
+        shipping_check_status, shipping_check_status shippingCheckStatus, exception_reason, exception_reason exceptionReason,
+        purchaser_remark, purchaser_remark purchaserRemark, matched_order_id, matched_order_id matchedOrderId,
+        match_status, match_status matchStatus, match_time, match_time matchTime, match_type, match_type matchType,
+        match_message, match_message matchMessage, last_match_time, last_match_time lastMatchTime,
+        data_status, data_status dataStatus, upload_user_id, upload_user_id uploadUserId,
+        upload_user_name, upload_user_name uploadUserName, upload_time, upload_time uploadTime,
+        latest_upload_user_id, latest_upload_user_id latestUploadUserId, latest_upload_user_name, latest_upload_user_name latestUploadUserName,
+        latest_upload_time, latest_upload_time latestUploadTime, source_file_name, source_file_name sourceFileName,
+        latest_source_file_name, latest_source_file_name latestSourceFileName, import_batch_id, import_batch_id importBatchId,
+        latest_import_batch_id, latest_import_batch_id latestImportBatchId, source_row_number, source_row_number sourceRowNumber,
+        latest_source_row_number, latest_source_row_number latestSourceRowNumber, create_by, create_by createBy,
+        create_time, create_time createTime, update_by, update_by updateBy, update_time, update_time updateTime,
+        remark, del_flag, del_flag delFlag
+    </sql>
+
+    <select id="selectSummaries" parameterType="map" resultType="java.util.HashMap">
+        select <include refid="summaryCols"/>
+        from purchase_summary
+        where del_flag='0'
+        <if test="documentSupplierId != null">and document_supplier_id=#{documentSupplierId}</if>
+        <if test="documentSupplierName != null and documentSupplierName != ''">and document_supplier_name like concat('%', #{documentSupplierName}, '%')</if>
+        <if test="purchaseOrderRemark != null and purchaseOrderRemark != ''">and purchase_order_remark like concat('%', #{purchaseOrderRemark}, '%')</if>
+        <if test="contractRemark != null and contractRemark != ''">and contract_remark like concat('%', #{contractRemark}, '%')</if>
+        <if test="merchantCode != null and merchantCode != ''">and merchant_code like concat('%', #{merchantCode}, '%')</if>
+        <if test="matchedLogisticsNo != null and matchedLogisticsNo != ''">and matched_logistics_no like concat('%', #{matchedLogisticsNo}, '%')</if>
+        <if test="originalLogisticsNo != null and originalLogisticsNo != ''">and original_logistics_no like concat('%', #{originalLogisticsNo}, '%')</if>
+        <if test="matchStatus != null and matchStatus != ''">and match_status=#{matchStatus}</if>
+        <if test="dataStatus != null and dataStatus != ''">and data_status=#{dataStatus}</if>
+        order by summary_id desc
+    </select>
+
+    <select id="selectSummaryById" resultType="java.util.HashMap">
+        select <include refid="summaryCols"/>
+        from purchase_summary where summary_id=#{summaryId} and del_flag='0'
+    </select>
+
+    <select id="selectSummaryByActiveKey" resultType="java.util.HashMap">
+        select <include refid="summaryCols"/>
+        from purchase_summary where active_unique_key=#{activeUniqueKey} and del_flag='0' limit 1
+    </select>
+
+    <select id="selectSummariesByBusinessKey" resultType="java.util.HashMap">
+        select <include refid="summaryCols"/>
+        from purchase_summary
+        where del_flag='0' and document_supplier_id=#{supplierId}
+        <if test="orderNo != null and orderNo != ''">and purchase_order_remark=#{orderNo}</if>
+    </select>
+
+    <select id="selectFailedSummaries" parameterType="map" resultType="java.util.HashMap">
+        select <include refid="summaryCols"/>
+        from purchase_summary where del_flag='0' and match_status != 'SUCCESS'
+        <if test="matchStatus != null and matchStatus != ''">and match_status=#{matchStatus}</if>
+    </select>
+
+    <select id="selectSummaryStats" parameterType="map" resultType="java.util.HashMap">
+        select count(1) totalCount,
+               sum(match_status='SUCCESS') successCount,
+               sum(match_status='NOT_FOUND') notFoundCount,
+               sum(match_status='LOGISTICS_EMPTY') logisticsEmptyCount,
+               sum(match_status='LOGISTICS_EMPTY') emptyCount,
+               sum(match_status='SUPPLIER_NOT_FOUND') supplierNotFoundCount,
+               sum(match_status='CONFLICT') conflictCount
+        from purchase_summary where del_flag='0'
+    </select>
+
+    <insert id="insertSummary" parameterType="map" useGeneratedKeys="true" keyProperty="summaryId">
+        insert into purchase_summary(
+            document_supplier_id, document_supplier_name, active_unique_key, purchase_order_remark, contract_remark,
+            merchant_code, purchase_quantity, matched_logistics_no, original_logistics_no, shipping_check_status,
+            exception_reason, purchaser_remark, match_status, match_message, data_status, upload_user_id, upload_user_name,
+            upload_time, latest_upload_user_id, latest_upload_user_name, latest_upload_time, source_file_name,
+            latest_source_file_name, import_batch_id, latest_import_batch_id, source_row_number, latest_source_row_number,
+            create_by, create_time, remark
+        ) values (
+            #{documentSupplierId}, #{documentSupplierName}, #{activeUniqueKey}, #{purchaseOrderRemark}, #{contractRemark},
+            #{merchantCode}, #{purchaseQuantity}, #{matchedLogisticsNo}, #{originalLogisticsNo}, #{shippingCheckStatus},
+            #{exceptionReason}, #{purchaserRemark}, #{matchStatus}, #{matchMessage}, #{dataStatus}, #{uploadUserId}, #{uploadUserName},
+            sysdate(), #{latestUploadUserId}, #{latestUploadUserName}, sysdate(), #{sourceFileName},
+            #{latestSourceFileName}, #{importBatchId}, #{latestImportBatchId}, #{sourceRowNumber}, #{latestSourceRowNumber},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateSummary" parameterType="map">
+        update purchase_summary
+        <set>
+            <if test="documentSupplierId != null">document_supplier_id=#{documentSupplierId},</if>
+            <if test="documentSupplierName != null">document_supplier_name=#{documentSupplierName},</if>
+            <if test="purchaseOrderRemark != null">purchase_order_remark=#{purchaseOrderRemark},</if>
+            <if test="contractRemark != null">contract_remark=#{contractRemark},</if>
+            <if test="merchantCode != null">merchant_code=#{merchantCode},</if>
+            <if test="purchaseQuantity != null">purchase_quantity=#{purchaseQuantity},</if>
+            <if test="originalLogisticsNo != null">original_logistics_no=#{originalLogisticsNo},</if>
+            <if test="shippingCheckStatus != null">shipping_check_status=#{shippingCheckStatus},</if>
+            <if test="exceptionReason != null">exception_reason=#{exceptionReason},</if>
+            <if test="purchaserRemark != null">purchaser_remark=#{purchaserRemark},</if>
+            <if test="dataStatus != null">data_status=#{dataStatus},</if>
+            <if test="latestUploadUserId != null">latest_upload_user_id=#{latestUploadUserId}, latest_upload_user_name=#{latestUploadUserName}, latest_upload_time=sysdate(),</if>
+            <if test="latestSourceFileName != null">latest_source_file_name=#{latestSourceFileName},</if>
+            <if test="latestImportBatchId != null">latest_import_batch_id=#{latestImportBatchId},</if>
+            <if test="latestSourceRowNumber != null">latest_source_row_number=#{latestSourceRowNumber},</if>
+            <if test="remark != null">remark=#{remark},</if>
+            update_by=#{updateBy}, update_time=sysdate()
+        </set>
+        where summary_id=#{summaryId}
+    </update>
+
+    <update id="fillSummaryEmptyFields" parameterType="map">
+        update purchase_summary
+        set contract_remark=if(contract_remark is null or contract_remark='', #{contractRemark}, contract_remark),
+            original_logistics_no=if(original_logistics_no is null or original_logistics_no='', #{originalLogisticsNo}, original_logistics_no),
+            shipping_check_status=if(shipping_check_status is null or shipping_check_status='', #{shippingCheckStatus}, shipping_check_status),
+            exception_reason=if(exception_reason is null or exception_reason='', #{exceptionReason}, exception_reason),
+            purchaser_remark=if(purchaser_remark is null or purchaser_remark='', #{purchaserRemark}, purchaser_remark),
+            latest_upload_user_id=#{latestUploadUserId}, latest_upload_user_name=#{latestUploadUserName}, latest_upload_time=sysdate(),
+            latest_source_file_name=#{latestSourceFileName}, latest_import_batch_id=#{latestImportBatchId}, latest_source_row_number=#{latestSourceRowNumber},
+            update_by=#{updateBy}, update_time=sysdate()
+        where summary_id=#{summaryId}
+    </update>
+
+    <update id="updateSummaryMatch" parameterType="map">
+        update purchase_summary
+        set matched_order_id=#{matchedOrderId},
+            matched_logistics_no=#{matchedLogisticsNo},
+            match_status=#{matchStatus},
+            match_type=#{matchType},
+            match_message=#{matchMessage},
+            match_time=if(#{matchStatus}='SUCCESS', sysdate(), match_time),
+            last_match_time=sysdate(),
+            update_by=#{updateBy},
+            update_time=sysdate()
+        where summary_id=#{summaryId}
+    </update>
+
+    <update id="deleteSummaryByIds">
+        update purchase_summary set del_flag='2', active_unique_key=concat(active_unique_key, '|DEL|', summary_id), update_by=#{updateBy}, update_time=sysdate()
+        where summary_id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <insert id="insertImportBatch" parameterType="map" useGeneratedKeys="true" keyProperty="batchId">
+        insert into purchase_import_batch(batch_no, import_type, supplier_id, original_file_name, file_hash,
+            sheet_name, batch_status, upload_user_id, upload_user_name, upload_time, create_time)
+        values(#{batchNo}, #{importType}, #{supplierId}, #{originalFileName}, #{fileHash},
+            #{sheetName}, 'PROCESSING', #{uploadUserId}, #{uploadUserName}, sysdate(), sysdate())
+    </insert>
+
+    <update id="updateImportBatch" parameterType="map">
+        update purchase_import_batch
+        set sheet_name=#{sheetName}, total_rows=#{totalRows}, success_rows=#{successRows}, duplicate_rows=#{duplicateRows},
+            updated_rows=#{updatedRows}, conflict_rows=#{conflictRows}, failed_rows=#{failedRows}, match_success_rows=#{matchSuccessRows},
+            batch_status=#{batchStatus}, error_message=#{errorMessage}, finish_time=sysdate()
+        where batch_id=#{batchId}
+    </update>
+
+    <select id="selectImportBatches" parameterType="map" resultType="java.util.HashMap">
+        select b.*,
+               b.batch_id batchId,
+               b.batch_no batchNo,
+               b.import_type importType,
+               b.supplier_id supplierId,
+               b.original_file_name originalFileName,
+               b.file_hash fileHash,
+               b.sheet_name sheetName,
+               b.total_rows totalRows,
+               b.success_rows successRows,
+               b.duplicate_rows duplicateRows,
+               b.updated_rows updatedRows,
+               b.conflict_rows conflictRows,
+               b.failed_rows failedRows,
+               b.match_success_rows matchSuccessRows,
+               b.batch_status batchStatus,
+               b.error_message errorMessage,
+               b.upload_user_id uploadUserId,
+               b.upload_user_name uploadUserName,
+               b.upload_time uploadTime,
+               b.finish_time finishTime,
+               s.supplier_name supplierName
+        from purchase_import_batch b
+        left join purchase_supplier s on s.supplier_id=b.supplier_id
+        <where>
+            <if test="importType != null and importType != ''">and b.import_type=#{importType}</if>
+            <if test="batchStatus != null and batchStatus != ''">and b.batch_status=#{batchStatus}</if>
+        </where>
+        order by b.batch_id desc
+    </select>
+
+    <select id="selectImportBatchById" resultType="java.util.HashMap">
+        select * from purchase_import_batch where batch_id=#{batchId}
+    </select>
+
+    <insert id="insertImportDetail" parameterType="map" useGeneratedKeys="true" keyProperty="detailId">
+        insert into purchase_import_detail(batch_id, source_row_number, business_key, raw_data_json, target_table, target_record_id,
+            check_status, process_result, error_code, error_message, before_data_json, after_data_json, upload_user_id, upload_user_name, upload_time, create_time)
+        values(#{batchId}, #{sourceRowNumber}, #{businessKey}, #{rawDataJson}, #{targetTable}, #{targetRecordId},
+            #{checkStatus}, #{processResult}, #{errorCode}, #{errorMessage}, #{beforeDataJson}, #{afterDataJson}, #{uploadUserId}, #{uploadUserName}, sysdate(), sysdate())
+    </insert>
+
+    <select id="selectImportDetails" parameterType="map" resultType="java.util.HashMap">
+        select *,
+               detail_id detailId,
+               batch_id batchId,
+               source_row_number sourceRowNumber,
+               business_key businessKey,
+               raw_data_json rawDataJson,
+               target_table targetTable,
+               target_record_id targetRecordId,
+               check_status checkStatus,
+               process_result processResult,
+               error_code errorCode,
+               error_message errorMessage,
+               before_data_json beforeDataJson,
+               after_data_json afterDataJson,
+               upload_user_id uploadUserId,
+               upload_user_name uploadUserName,
+               upload_time uploadTime,
+               create_time createTime
+        from purchase_import_detail
+        where batch_id=#{batchId}
+        <if test="processResult != null and processResult != ''">and process_result=#{processResult}</if>
+        order by source_row_number asc, detail_id asc
+    </select>
+
+    <insert id="insertConflict" parameterType="map" useGeneratedKeys="true" keyProperty="conflictId">
+        insert into purchase_data_conflict(conflict_type, target_table, target_record_id, batch_id, detail_id, business_key,
+            old_data_json, new_data_json, conflict_fields, conflict_status, create_by, create_time, remark)
+        values(#{conflictType}, #{targetTable}, #{targetRecordId}, #{batchId}, #{detailId}, #{businessKey},
+            #{oldDataJson}, #{newDataJson}, #{conflictFields}, 'PENDING', #{createBy}, sysdate(), #{remark})
+    </insert>
+
+    <select id="selectConflicts" parameterType="map" resultType="java.util.HashMap">
+        select c.*,
+               c.conflict_id conflictId,
+               c.conflict_type conflictType,
+               c.target_table targetTable,
+               c.target_record_id targetRecordId,
+               c.batch_id batchId,
+               c.detail_id detailId,
+               c.business_key businessKey,
+               c.old_data_json oldDataJson,
+               c.new_data_json newDataJson,
+               c.conflict_fields conflictFields,
+               c.conflict_status conflictStatus,
+               c.resolve_result resolveResult,
+               c.resolve_user_id resolveUserId,
+               c.resolve_user_name resolveUserName,
+               c.resolve_time resolveTime,
+               c.create_by createBy,
+               c.create_time createTime,
+               c.update_by updateBy,
+               c.update_time updateTime,
+               b.original_file_name sourceFileName,
+               b.upload_user_name uploadUserName,
+               b.upload_time uploadTime
+        from purchase_data_conflict c
+        left join purchase_import_batch b on b.batch_id=c.batch_id
+        where 1=1
+        <if test="conflictStatus != null and conflictStatus != ''">and c.conflict_status=#{conflictStatus}</if>
+        <if test="targetTable != null and targetTable != ''">and c.target_table=#{targetTable}</if>
+        order by c.conflict_id desc
+    </select>
+
+    <select id="selectConflictById" resultType="java.util.HashMap">
+        select c.*,
+               c.conflict_id conflictId,
+               c.conflict_type conflictType,
+               c.target_table targetTable,
+               c.target_record_id targetRecordId,
+               c.batch_id batchId,
+               c.detail_id detailId,
+               c.business_key businessKey,
+               c.old_data_json oldDataJson,
+               c.new_data_json newDataJson,
+               c.conflict_fields conflictFields,
+               c.conflict_status conflictStatus,
+               c.resolve_result resolveResult,
+               c.resolve_user_id resolveUserId,
+               c.resolve_user_name resolveUserName,
+               c.resolve_time resolveTime,
+               c.create_by createBy,
+               c.create_time createTime,
+               c.update_by updateBy,
+               c.update_time updateTime
+        from purchase_data_conflict c where c.conflict_id=#{conflictId}
+    </select>
+
+    <update id="updateConflictResolved" parameterType="map">
+        update purchase_data_conflict
+        set conflict_status='RESOLVED', resolve_result=#{resolveResult}, resolve_user_id=#{resolveUserId},
+            resolve_user_name=#{resolveUserName}, resolve_time=sysdate(), update_by=#{updateBy}, update_time=sysdate()
+        where conflict_id=#{conflictId}
+    </update>
+
+    <insert id="insertMatchLog" parameterType="map">
+        insert into purchase_match_log(summary_id, manual_order_id, supplier_id, order_no, old_logistics_no, new_logistics_no,
+            match_status, match_type, match_message, operator_id, operator_name, create_time)
+        values(#{summaryId}, #{manualOrderId}, #{supplierId}, #{orderNo}, #{oldLogisticsNo}, #{newLogisticsNo},
+            #{matchStatus}, #{matchType}, #{matchMessage}, #{operatorId}, #{operatorName}, sysdate())
+    </insert>
+
+    <select id="selectMatchLogs" parameterType="map" resultType="java.util.HashMap">
+        select * from purchase_match_log
+        where 1=1
+        <if test="summaryId != null">and summary_id=#{summaryId}</if>
+        <if test="orderNo != null and orderNo != ''">and order_no like concat('%', #{orderNo}, '%')</if>
+        <if test="matchStatus != null and matchStatus != ''">and match_status=#{matchStatus}</if>
+        order by log_id desc
+    </select>
+
+    <insert id="insertFieldChangeLog" parameterType="map">
+        insert into purchase_field_change_log(target_table, target_record_id, field_name, old_value, new_value, change_type,
+            batch_id, operator_id, operator_name, create_time)
+        values(#{targetTable}, #{targetRecordId}, #{fieldName}, #{oldValue}, #{newValue}, 'UPDATE',
+            #{batchId}, #{operatorId}, #{operatorName}, sysdate())
+    </insert>
+</mapper>

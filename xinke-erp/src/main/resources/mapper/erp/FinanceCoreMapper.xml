@@ -1,0 +1,582 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.FinanceCoreMapper">
+    <select id="selectPeriodList" parameterType="map" resultType="java.util.HashMap">
+        select period_id periodId, period_code periodCode, start_date startDate, end_date endDate,
+               close_status closeStatus, close_by closeBy, close_time closeTime, create_time createTime, remark
+        from fin_account_period
+        <where>
+            <if test="periodCode != null and periodCode != ''">and period_code like concat('%', #{periodCode}, '%')</if>
+            <if test="closeStatus != null and closeStatus != ''">and close_status = #{closeStatus}</if>
+        </where>
+        order by period_code desc
+    </select>
+
+    <select id="selectSubjectList" parameterType="map" resultType="java.util.HashMap">
+        select subject_id subjectId, subject_code subjectCode, subject_name subjectName, subject_type subjectType,
+               parent_code parentCode, balance_direction balanceDirection, status, create_time createTime, remark
+        from fin_account_subject
+        <where>
+            <if test="subjectCode != null and subjectCode != ''">and subject_code like concat('%', #{subjectCode}, '%')</if>
+            <if test="subjectName != null and subjectName != ''">and subject_name like concat('%', #{subjectName}, '%')</if>
+            <if test="subjectType != null and subjectType != ''">and subject_type = #{subjectType}</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+        </where>
+        order by subject_code
+    </select>
+
+    <select id="selectFeeTypeList" parameterType="map" resultType="java.util.HashMap">
+        select fee_type_id feeTypeId, fee_code feeCode, fee_name feeName, fee_category feeCategory,
+               default_subject_code defaultSubjectCode, allocate_rule allocateRule, status, create_time createTime, remark
+        from fin_fee_type
+        <where>
+            <if test="feeCode != null and feeCode != ''">and fee_code like concat('%', #{feeCode}, '%')</if>
+            <if test="feeName != null and feeName != ''">and fee_name like concat('%', #{feeName}, '%')</if>
+            <if test="feeCategory != null and feeCategory != ''">and fee_category = #{feeCategory}</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+        </where>
+        order by fee_type_id desc
+    </select>
+
+    <select id="selectPlatformAccountList" parameterType="map" resultType="java.util.HashMap">
+        select platform_account_id platformAccountId, platform_code platformCode, platform_name platformName,
+               shop_id shopId, shop_name shopName, account_no accountNo, currency, status, create_time createTime, remark
+        from fin_platform_account
+        <where>
+            <if test="platformCode != null and platformCode != ''">and platform_code = #{platformCode}</if>
+            <if test="shopName != null and shopName != ''">and shop_name like concat('%', #{shopName}, '%')</if>
+            <if test="accountNo != null and accountNo != ''">and account_no like concat('%', #{accountNo}, '%')</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+        </where>
+        order by platform_account_id desc
+    </select>
+
+    <select id="selectBankAccountList" parameterType="map" resultType="java.util.HashMap">
+        select bank_account_id bankAccountId, account_name accountName, bank_name bankName, bank_no bankNo,
+               currency, opening_balance openingBalance, status, create_time createTime, remark
+        from fin_bank_account
+        <where>
+            <if test="accountName != null and accountName != ''">and account_name like concat('%', #{accountName}, '%')</if>
+            <if test="bankName != null and bankName != ''">and bank_name like concat('%', #{bankName}, '%')</if>
+            <if test="bankNo != null and bankNo != ''">and bank_no like concat('%', #{bankNo}, '%')</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+        </where>
+        order by bank_account_id desc
+    </select>
+
+    <select id="selectSettlementList" parameterType="map" resultType="java.util.HashMap">
+        select settlement_id settlementId, settlement_no settlementNo, platform_code platformCode,
+               platform_name platformName, shop_id shopId, shop_name shopName, period_code periodCode,
+               bill_start_date billStartDate, bill_end_date billEndDate, income_amount incomeAmount,
+               refund_amount refundAmount, commission_fee commissionFee, payment_fee paymentFee,
+               ad_fee adFee, service_fee serviceFee, freight_fee freightFee, other_fee otherFee,
+               receivable_amount receivableAmount, received_amount receivedAmount, diff_amount diffAmount,
+               settlement_status settlementStatus, reconcile_status reconcileStatus, source_file sourceFile,
+               create_time createTime, remark
+        from fin_platform_settlement
+        <where>
+            <if test="settlementNo != null and settlementNo != ''">and settlement_no like concat('%', #{settlementNo}, '%')</if>
+            <if test="periodCode != null and periodCode != ''">and period_code = #{periodCode}</if>
+            <if test="shopName != null and shopName != ''">and shop_name like concat('%', #{shopName}, '%')</if>
+            <if test="settlementStatus != null and settlementStatus != ''">and settlement_status = #{settlementStatus}</if>
+            <if test="reconcileStatus != null and reconcileStatus != ''">and reconcile_status = #{reconcileStatus}</if>
+        </where>
+        order by settlement_id desc
+    </select>
+
+    <select id="selectReceivableList" parameterType="map" resultType="java.util.HashMap">
+        select receivable_id receivableId, receivable_no receivableNo, source_type sourceType, source_no sourceNo,
+               counterparty_type counterpartyType, counterparty_id counterpartyId, counterparty_name counterpartyName,
+               shop_id shopId, shop_name shopName, period_code periodCode, bill_amount billAmount,
+               writeoff_amount writeoffAmount, remain_amount remainAmount, due_date dueDate,
+               bill_status billStatus, create_time createTime, remark
+        from fin_receivable_bill
+        <where>
+            <if test="receivableNo != null and receivableNo != ''">and receivable_no like concat('%', #{receivableNo}, '%')</if>
+            <if test="periodCode != null and periodCode != ''">and period_code = #{periodCode}</if>
+            <if test="counterpartyName != null and counterpartyName != ''">and counterparty_name like concat('%', #{counterpartyName}, '%')</if>
+            <if test="shopName != null and shopName != ''">and shop_name like concat('%', #{shopName}, '%')</if>
+            <if test="billStatus != null and billStatus != ''">and bill_status = #{billStatus}</if>
+        </where>
+        order by receivable_id desc
+    </select>
+
+    <select id="selectPayableList" parameterType="map" resultType="java.util.HashMap">
+        select payable_id payableId, payable_no payableNo, source_type sourceType, source_no sourceNo,
+               counterparty_type counterpartyType, counterparty_id counterpartyId, counterparty_name counterpartyName,
+               period_code periodCode, bill_amount billAmount, writeoff_amount writeoffAmount,
+               remain_amount remainAmount, due_date dueDate, bill_status billStatus, create_time createTime, remark
+        from fin_payable_bill
+        <where>
+            <if test="payableNo != null and payableNo != ''">and payable_no like concat('%', #{payableNo}, '%')</if>
+            <if test="periodCode != null and periodCode != ''">and period_code = #{periodCode}</if>
+            <if test="counterpartyName != null and counterpartyName != ''">and counterparty_name like concat('%', #{counterpartyName}, '%')</if>
+            <if test="billStatus != null and billStatus != ''">and bill_status = #{billStatus}</if>
+        </where>
+        order by payable_id desc
+    </select>
+
+    <select id="selectCashFlowList" parameterType="map" resultType="java.util.HashMap">
+        select cash_flow_id cashFlowId, flow_no flowNo, flow_type flowType, bank_account_id bankAccountId,
+               platform_account_id platformAccountId, counterparty_name counterpartyName, source_type sourceType,
+               source_no sourceNo, amount, fee_amount feeAmount, flow_time flowTime, business_date businessDate,
+               match_status matchStatus, create_time createTime, remark
+        from fin_cash_flow
+        <where>
+            <if test="flowNo != null and flowNo != ''">and flow_no like concat('%', #{flowNo}, '%')</if>
+            <if test="flowType != null and flowType != ''">and flow_type = #{flowType}</if>
+            <if test="counterpartyName != null and counterpartyName != ''">and counterparty_name like concat('%', #{counterpartyName}, '%')</if>
+            <if test="sourceNo != null and sourceNo != ''">and source_no like concat('%', #{sourceNo}, '%')</if>
+            <if test="matchStatus != null and matchStatus != ''">and match_status = #{matchStatus}</if>
+        </where>
+        order by cash_flow_id desc
+    </select>
+
+    <select id="selectExpenseList" parameterType="map" resultType="java.util.HashMap">
+        select expense_id expenseId, expense_no expenseNo, fee_type_code feeTypeCode, fee_type_name feeTypeName,
+               shop_id shopId, shop_name shopName, sku_id skuId, sku_code skuCode, order_no orderNo,
+               supplier_id supplierId, supplier_name supplierName, period_code periodCode,
+               expense_amount expenseAmount, tax_amount taxAmount, total_amount totalAmount,
+               allocation_dimension allocationDimension, expense_status expenseStatus,
+               occurred_date occurredDate, create_time createTime, remark
+        from fin_expense_bill
+        <where>
+            <if test="expenseNo != null and expenseNo != ''">and expense_no like concat('%', #{expenseNo}, '%')</if>
+            <if test="periodCode != null and periodCode != ''">and period_code = #{periodCode}</if>
+            <if test="feeTypeCode != null and feeTypeCode != ''">and fee_type_code = #{feeTypeCode}</if>
+            <if test="shopName != null and shopName != ''">and shop_name like concat('%', #{shopName}, '%')</if>
+            <if test="expenseStatus != null and expenseStatus != ''">and expense_status = #{expenseStatus}</if>
+        </where>
+        order by expense_id desc
+    </select>
+
+    <select id="selectVoucherList" parameterType="map" resultType="java.util.HashMap">
+        select voucher_id voucherId, voucher_no voucherNo, period_code periodCode, voucher_date voucherDate,
+               source_type sourceType, source_no sourceNo, summary, debit_amount debitAmount,
+               credit_amount creditAmount, voucher_status voucherStatus, create_time createTime, remark
+        from fin_voucher
+        <where>
+            <if test="voucherNo != null and voucherNo != ''">and voucher_no like concat('%', #{voucherNo}, '%')</if>
+            <if test="periodCode != null and periodCode != ''">and period_code = #{periodCode}</if>
+            <if test="sourceNo != null and sourceNo != ''">and source_no like concat('%', #{sourceNo}, '%')</if>
+            <if test="voucherStatus != null and voucherStatus != ''">and voucher_status = #{voucherStatus}</if>
+        </where>
+        order by voucher_id desc
+    </select>
+
+    <select id="selectReconcileTaskList" parameterType="map" resultType="java.util.HashMap">
+        select task_id taskId, task_no taskNo, reconcile_type reconcileType, period_code periodCode,
+               shop_id shopId, shop_name shopName, task_status taskStatus, total_count totalCount,
+               diff_count diffCount, start_time startTime, finish_time finishTime, create_time createTime, remark
+        from fin_reconciliation_task
+        <where>
+            <if test="taskNo != null and taskNo != ''">and task_no like concat('%', #{taskNo}, '%')</if>
+            <if test="periodCode != null and periodCode != ''">and period_code = #{periodCode}</if>
+            <if test="reconcileType != null and reconcileType != ''">and reconcile_type = #{reconcileType}</if>
+            <if test="taskStatus != null and taskStatus != ''">and task_status = #{taskStatus}</if>
+        </where>
+        order by task_id desc
+    </select>
+
+    <select id="selectReconcileDiffList" parameterType="map" resultType="java.util.HashMap">
+        select diff_id diffId, task_id taskId, diff_no diffNo, diff_type diffType, source_type sourceType,
+               source_no sourceNo, expected_amount expectedAmount, actual_amount actualAmount,
+               diff_amount diffAmount, diff_status diffStatus, handle_result handleResult,
+               create_time createTime, remark
+        from fin_reconciliation_diff
+        <where>
+            <if test="diffNo != null and diffNo != ''">and diff_no like concat('%', #{diffNo}, '%')</if>
+            <if test="diffType != null and diffType != ''">and diff_type = #{diffType}</if>
+            <if test="sourceNo != null and sourceNo != ''">and source_no like concat('%', #{sourceNo}, '%')</if>
+            <if test="diffStatus != null and diffStatus != ''">and diff_status = #{diffStatus}</if>
+        </where>
+        order by diff_id desc
+    </select>
+
+    <select id="selectPeriodCloseList" parameterType="map" resultType="java.util.HashMap">
+        select close_id closeId, period_code periodCode, close_scope closeScope, check_status checkStatus,
+               close_status closeStatus, order_complete orderComplete, settlement_complete settlementComplete,
+               bank_complete bankComplete, voucher_complete voucherComplete, close_by closeBy,
+               close_time closeTime, create_time createTime, remark
+        from fin_period_close
+        <where>
+            <if test="periodCode != null and periodCode != ''">and period_code like concat('%', #{periodCode}, '%')</if>
+            <if test="closeStatus != null and closeStatus != ''">and close_status = #{closeStatus}</if>
+            <if test="checkStatus != null and checkStatus != ''">and check_status = #{checkStatus}</if>
+        </where>
+        order by period_code desc, close_id desc
+    </select>
+
+    <select id="selectSettlementByNo" resultType="java.util.HashMap">
+        select settlement_id settlementId, settlement_no settlementNo, platform_code platformCode,
+               platform_name platformName, shop_id shopId, shop_name shopName, period_code periodCode,
+               bill_start_date billStartDate, bill_end_date billEndDate, income_amount incomeAmount,
+               refund_amount refundAmount, commission_fee commissionFee, payment_fee paymentFee,
+               ad_fee adFee, service_fee serviceFee, freight_fee freightFee, other_fee otherFee,
+               receivable_amount receivableAmount, received_amount receivedAmount, diff_amount diffAmount,
+               settlement_status settlementStatus, reconcile_status reconcileStatus
+        from fin_platform_settlement
+        where settlement_no = #{settlementNo}
+    </select>
+
+    <select id="selectReceivableByNo" resultType="java.util.HashMap">
+        select receivable_id receivableId, receivable_no receivableNo, source_type sourceType, source_no sourceNo,
+               counterparty_name counterpartyName, shop_id shopId, shop_name shopName, period_code periodCode,
+               bill_amount billAmount, writeoff_amount writeoffAmount, remain_amount remainAmount,
+               due_date dueDate, bill_status billStatus
+        from fin_receivable_bill
+        where receivable_no = #{receivableNo}
+    </select>
+
+    <select id="selectPayableByNo" resultType="java.util.HashMap">
+        select payable_id payableId, payable_no payableNo, source_type sourceType, source_no sourceNo,
+               counterparty_name counterpartyName, period_code periodCode, bill_amount billAmount,
+               writeoff_amount writeoffAmount, remain_amount remainAmount, due_date dueDate, bill_status billStatus
+        from fin_payable_bill
+        where payable_no = #{payableNo}
+    </select>
+
+    <select id="selectCashFlowByNo" resultType="java.util.HashMap">
+        select cash_flow_id cashFlowId, flow_no flowNo, flow_type flowType, amount, fee_amount feeAmount,
+               source_type sourceType, source_no sourceNo, match_status matchStatus
+        from fin_cash_flow
+        where flow_no = #{flowNo}
+    </select>
+
+    <select id="selectExpenseByNo" resultType="java.util.HashMap">
+        select expense_id expenseId, expense_no expenseNo, fee_type_code feeTypeCode, fee_type_name feeTypeName,
+               shop_id shopId, shop_name shopName, sku_id skuId, sku_code skuCode, order_no orderNo,
+               supplier_id supplierId, supplier_name supplierName, period_code periodCode,
+               expense_amount expenseAmount, tax_amount taxAmount, total_amount totalAmount,
+               allocation_dimension allocationDimension, expense_status expenseStatus, occurred_date occurredDate
+        from fin_expense_bill
+        where expense_no = #{expenseNo}
+    </select>
+
+    <select id="selectFeeTypeByCode" resultType="java.util.HashMap">
+        select fee_type_id feeTypeId, fee_code feeCode, fee_name feeName, fee_category feeCategory,
+               default_subject_code defaultSubjectCode, allocate_rule allocateRule
+        from fin_fee_type
+        where fee_code = #{feeCode}
+    </select>
+
+    <select id="selectVoucherByNo" resultType="java.util.HashMap">
+        select voucher_id voucherId, voucher_no voucherNo, period_code periodCode, source_type sourceType,
+               source_no sourceNo, debit_amount debitAmount, credit_amount creditAmount,
+               voucher_status voucherStatus
+        from fin_voucher
+        where voucher_no = #{voucherNo}
+    </select>
+
+    <select id="selectVoucherBySource" resultType="java.util.HashMap">
+        select voucher_id voucherId, voucher_no voucherNo, period_code periodCode, source_type sourceType,
+               source_no sourceNo, debit_amount debitAmount, credit_amount creditAmount,
+               voucher_status voucherStatus
+        from fin_voucher
+        where source_type = #{sourceType}
+          and source_no = #{sourceNo}
+        limit 1
+    </select>
+
+    <select id="selectVoucherEntryList" resultType="java.util.HashMap">
+        select entry_id entryId, voucher_id voucherId, voucher_no voucherNo, entry_seq entrySeq,
+               subject_code subjectCode, subject_name subjectName, direction, amount,
+               shop_id shopId, sku_id skuId, counterparty_name counterpartyName, summary
+        from fin_voucher_entry
+        where voucher_no = #{voucherNo}
+        order by entry_seq
+    </select>
+
+    <select id="selectSettlementReconcileRows" parameterType="map" resultType="java.util.HashMap">
+        select s.settlement_no settlementNo,
+               s.receivable_amount expectedAmount,
+               coalesce(sum(case when cf.cash_flow_id is null then 0 else cf.amount end), 0.00) actualAmount
+        from fin_platform_settlement s
+        left join fin_receivable_bill rb
+               on rb.source_type = 'settlement'
+              and rb.source_no = s.settlement_no
+        left join fin_cash_flow cf
+               on (cf.source_type = 'settlement' and cf.source_no = s.settlement_no)
+               or (cf.source_type = 'receivable' and cf.source_no = rb.receivable_no)
+        where s.period_code = #{periodCode}
+        <if test="shopId != null and shopId != ''">and s.shop_id = #{shopId}</if>
+        group by s.settlement_no, s.receivable_amount
+        order by s.settlement_no
+    </select>
+
+    <select id="selectCloseCheckSummary" resultType="java.util.HashMap">
+        select
+            (select count(1) from fin_platform_settlement where period_code = #{periodCode} and settlement_status = 'draft') draftSettlementCount,
+            (select count(1) from fin_platform_settlement where period_code = #{periodCode} and reconcile_status != 'matched') unmatchedSettlementCount,
+            (select count(1) from fin_cash_flow where date_format(business_date, '%Y-%m') = #{periodCode} and match_status = 'unmatched') unmatchedCashCount,
+            (select count(1) from fin_voucher where period_code = #{periodCode} and voucher_status != 'posted') draftVoucherCount,
+            (select count(1) from fin_receivable_bill where period_code = #{periodCode} and bill_status != 'settled') openReceivableCount,
+            (select count(1) from fin_payable_bill where period_code = #{periodCode} and bill_status != 'settled') openPayableCount
+    </select>
+
+    <select id="selectPeriodCloseByCode" resultType="java.util.HashMap">
+        select close_id closeId, period_code periodCode, close_scope closeScope, check_status checkStatus,
+               close_status closeStatus
+        from fin_period_close
+        where period_code = #{periodCode}
+          and close_scope = #{closeScope}
+    </select>
+
+    <insert id="insertSettlement" parameterType="map">
+        insert into fin_platform_settlement(
+            settlement_no, platform_code, platform_name, shop_id, shop_name, period_code,
+            bill_start_date, bill_end_date, income_amount, refund_amount, commission_fee,
+            payment_fee, ad_fee, service_fee, freight_fee, other_fee, receivable_amount,
+            received_amount, diff_amount, settlement_status, reconcile_status, source_file,
+            create_by, create_time, remark
+        ) values (
+            #{settlementNo}, #{platformCode}, #{platformName}, #{shopId}, #{shopName}, #{periodCode},
+            #{billStartDate}, #{billEndDate}, coalesce(#{incomeAmount}, 0.00), coalesce(#{refundAmount}, 0.00),
+            coalesce(#{commissionFee}, 0.00), coalesce(#{paymentFee}, 0.00), coalesce(#{adFee}, 0.00),
+            coalesce(#{serviceFee}, 0.00), coalesce(#{freightFee}, 0.00), coalesce(#{otherFee}, 0.00),
+            #{receivableAmount}, #{receivedAmount}, #{diffAmount}, #{settlementStatus}, #{reconcileStatus},
+            #{sourceFile}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateSettlementApproved" parameterType="map">
+        update fin_platform_settlement
+        set settlement_status = 'confirmed',
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where settlement_no = #{settlementNo}
+    </update>
+
+    <update id="updateSettlementReconcileResult" parameterType="map">
+        update fin_platform_settlement
+        set received_amount = #{receivedAmount},
+            diff_amount = #{diffAmount},
+            reconcile_status = #{reconcileStatus},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where settlement_no = #{settlementNo}
+    </update>
+
+    <insert id="insertReceivable" parameterType="map">
+        insert into fin_receivable_bill(
+            receivable_no, source_type, source_no, counterparty_type, counterparty_id,
+            counterparty_name, shop_id, shop_name, period_code, bill_amount, writeoff_amount,
+            remain_amount, due_date, bill_status, create_by, create_time, remark
+        ) values (
+            #{receivableNo}, #{sourceType}, #{sourceNo}, #{counterpartyType}, #{counterpartyId},
+            #{counterpartyName}, #{shopId}, #{shopName}, #{periodCode}, #{billAmount}, #{writeoffAmount},
+            #{remainAmount}, #{dueDate}, #{billStatus}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateReceivableWriteoff" parameterType="map">
+        update fin_receivable_bill
+        set writeoff_amount = writeoff_amount + #{writeoffAmount},
+            remain_amount = #{remainAmount},
+            bill_status = #{billStatus},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where receivable_no = #{billNo}
+    </update>
+
+    <insert id="insertCashFlow" parameterType="map">
+        insert into fin_cash_flow(
+            flow_no, flow_type, bank_account_id, platform_account_id, counterparty_name,
+            source_type, source_no, amount, fee_amount, flow_time, business_date,
+            match_status, create_by, create_time, remark
+        ) values (
+            #{flowNo}, #{flowType}, #{bankAccountId}, #{platformAccountId}, #{counterpartyName},
+            #{sourceType}, #{sourceNo}, #{amount}, #{feeAmount}, #{flowTime}, #{businessDate},
+            #{matchStatus}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateCashFlowMatched" parameterType="map">
+        update fin_cash_flow
+        set source_type = #{sourceType},
+            source_no = #{sourceNo},
+            match_status = 'matched',
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where flow_no = #{flowNo}
+    </update>
+
+    <insert id="insertWriteoffRecord" parameterType="map">
+        insert into fin_writeoff_record(
+            writeoff_no, bill_type, bill_no, cash_flow_no, writeoff_amount,
+            writeoff_time, operator_name, create_by, create_time, remark
+        ) values (
+            #{writeoffNo}, #{billType}, #{billNo}, #{cashFlowNo}, #{writeoffAmount},
+            sysdate(), #{operatorName}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertExpense" parameterType="map">
+        insert into fin_expense_bill(
+            expense_no, fee_type_code, fee_type_name, shop_id, shop_name, sku_id, sku_code,
+            order_no, supplier_id, supplier_name, period_code, expense_amount, tax_amount,
+            total_amount, allocation_dimension, expense_status, occurred_date, create_by,
+            create_time, remark
+        ) values (
+            #{expenseNo}, #{feeTypeCode}, #{feeTypeName}, #{shopId}, #{shopName}, #{skuId}, #{skuCode},
+            #{orderNo}, #{supplierId}, #{supplierName}, #{periodCode}, #{expenseAmount}, #{taxAmount},
+            #{totalAmount}, #{allocationDimension}, #{expenseStatus}, #{occurredDate}, #{createBy},
+            sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateExpenseApproved" parameterType="map">
+        update fin_expense_bill
+        set expense_status = 'approved',
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where expense_no = #{expenseNo}
+    </update>
+
+    <insert id="insertPayable" parameterType="map">
+        insert into fin_payable_bill(
+            payable_no, source_type, source_no, counterparty_type, counterparty_id,
+            counterparty_name, period_code, bill_amount, writeoff_amount, remain_amount,
+            due_date, bill_status, create_by, create_time, remark
+        ) values (
+            #{payableNo}, #{sourceType}, #{sourceNo}, #{counterpartyType}, #{counterpartyId},
+            #{counterpartyName}, #{periodCode}, #{billAmount}, #{writeoffAmount}, #{remainAmount},
+            #{dueDate}, #{billStatus}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updatePayableWriteoff" parameterType="map">
+        update fin_payable_bill
+        set writeoff_amount = writeoff_amount + #{writeoffAmount},
+            remain_amount = #{remainAmount},
+            bill_status = #{billStatus},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where payable_no = #{billNo}
+    </update>
+
+    <insert id="insertVoucher" parameterType="map" useGeneratedKeys="true" keyProperty="voucherId">
+        insert into fin_voucher(
+            voucher_no, period_code, voucher_date, source_type, source_no, summary,
+            debit_amount, credit_amount, voucher_status, create_by, create_time, remark
+        ) values (
+            #{voucherNo}, #{periodCode}, #{voucherDate}, #{sourceType}, #{sourceNo}, #{summary},
+            #{debitAmount}, #{creditAmount}, #{voucherStatus}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertVoucherEntry" parameterType="map">
+        insert into fin_voucher_entry(
+            voucher_id, voucher_no, entry_seq, subject_code, subject_name, direction,
+            amount, shop_id, sku_id, counterparty_name, summary
+        ) values (
+            #{voucherId}, #{voucherNo}, #{entrySeq}, #{subjectCode}, #{subjectName}, #{direction},
+            #{amount}, #{shopId}, #{skuId}, #{counterpartyName}, #{summary}
+        )
+    </insert>
+
+    <update id="updateVoucherPosted" parameterType="map">
+        update fin_voucher
+        set voucher_status = 'posted',
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where voucher_no = #{voucherNo}
+    </update>
+
+    <insert id="insertReconcileTask" parameterType="map" useGeneratedKeys="true" keyProperty="taskId">
+        insert into fin_reconciliation_task(
+            task_no, reconcile_type, period_code, shop_id, shop_name, task_status,
+            start_time, create_by, create_time, remark
+        ) values (
+            #{taskNo}, #{reconcileType}, #{periodCode}, #{shopId}, #{shopName}, 'running',
+            sysdate(), #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertReconcileDiff" parameterType="map">
+        insert into fin_reconciliation_diff(
+            task_id, diff_no, diff_type, source_type, source_no, expected_amount,
+            actual_amount, diff_amount, diff_status, handle_result, create_by, create_time, remark
+        ) values (
+            #{taskId}, #{diffNo}, #{diffType}, #{sourceType}, #{sourceNo}, #{expectedAmount},
+            #{actualAmount}, #{diffAmount}, #{diffStatus}, #{handleResult}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateReconcileTaskResult" parameterType="map">
+        update fin_reconciliation_task
+        set task_status = #{taskStatus},
+            total_count = #{totalCount},
+            diff_count = #{diffCount},
+            finish_time = sysdate(),
+            update_by = #{createBy},
+            update_time = sysdate()
+        where task_id = #{taskId}
+    </update>
+
+    <insert id="insertPeriodClose" parameterType="map">
+        insert into fin_period_close(
+            period_code, close_scope, check_status, close_status, create_by, create_time
+        ) values (
+            #{periodCode}, #{closeScope}, 'unchecked', 'open', #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updatePeriodCloseCheck" parameterType="map">
+        update fin_period_close
+        set check_status = #{checkStatus},
+            order_complete = #{orderComplete},
+            settlement_complete = #{settlementComplete},
+            bank_complete = #{bankComplete},
+            voucher_complete = #{voucherComplete},
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        where period_code = #{periodCode}
+          and close_scope = #{closeScope}
+    </update>
+
+    <update id="updatePeriodClosed" parameterType="map">
+        update fin_period_close
+        set close_status = 'closed',
+            close_by = #{closeBy},
+            close_time = sysdate(),
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where period_code = #{periodCode}
+          and close_scope = #{closeScope}
+          and check_status = 'passed'
+    </update>
+
+    <update id="updatePeriodReopened" parameterType="map">
+        update fin_period_close
+        set close_status = 'open',
+            close_by = '',
+            close_time = null,
+            check_status = 'unchecked',
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where period_code = #{periodCode}
+          and close_scope = #{closeScope}
+    </update>
+
+    <update id="updateAccountPeriodClosed" parameterType="map">
+        update fin_account_period
+        set close_status = 'closed',
+            close_by = #{closeBy},
+            close_time = sysdate(),
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where period_code = #{periodCode}
+    </update>
+
+    <update id="updateAccountPeriodReopened" parameterType="map">
+        update fin_account_period
+        set close_status = 'open',
+            close_by = '',
+            close_time = null,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where period_code = #{periodCode}
+    </update>
+</mapper>

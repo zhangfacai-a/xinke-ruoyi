@@ -1,0 +1,155 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.BiDashboardMapper">
+    <resultMap id="FinanceDayProfitResult" type="FinanceDayProfit">
+        <result property="dt" column="dt"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="shopName" column="shop_name"/>
+        <result property="operatorId" column="operator_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="channelCode" column="channel_code"/>
+        <result property="channelName" column="channel_name"/>
+        <result property="gmv" column="gmv"/>
+        <result property="netAmount" column="net_amount"/>
+        <result property="productCost" column="product_cost"/>
+        <result property="platformFee" column="platform_fee"/>
+        <result property="adCost" column="ad_cost"/>
+        <result property="freightFee" column="freight_fee"/>
+        <result property="afterSaleCost" column="after_sale_cost"/>
+        <result property="profitAmount" column="profit_amount"/>
+        <result property="shareProfitAmount" column="share_profit_amount"/>
+        <result property="roi" column="roi"/>
+    </resultMap>
+
+    <sql id="financeWhere">
+        <where>
+            <if test="shopId != null">and shop_id = #{shopId}</if>
+            <if test="dt != null">and dt = #{dt}</if>
+        </where>
+    </sql>
+
+    <sql id="operatorProfitWhere">
+        <where>
+            <if test="shopId != null">and shop_id = #{shopId}</if>
+            <if test="operatorId != null">and operator_id = #{operatorId}</if>
+            <if test="operatorName != null and operatorName != ''">and operator_name like concat('%', #{operatorName}, '%')</if>
+            <if test="channelCode != null and channelCode != ''">and channel_code = #{channelCode}</if>
+            <if test="dt != null">and dt = #{dt}</if>
+        </where>
+    </sql>
+
+    <select id="selectProfitSummary" parameterType="FinanceDayProfit" resultType="BiMetric">
+        select 'gmv' name, coalesce(sum(gmv), 0) value from dws_finance_day_profit <include refid="financeWhere"/>
+        union all
+        select 'netAmount' name, coalesce(sum(net_amount), 0) value from dws_finance_day_profit <include refid="financeWhere"/>
+        union all
+        select 'profitAmount' name, coalesce(sum(profit_amount), 0) value from dws_finance_day_profit <include refid="financeWhere"/>
+        union all
+        select 'roi' name, coalesce(round(sum(net_amount) / nullif(sum(ad_cost), 0), 2), 0) value from dws_finance_day_profit <include refid="financeWhere"/>
+    </select>
+
+    <select id="selectGmvTrend" parameterType="FinanceDayProfit" resultType="BiMetric">
+        select date_format(dt, '%Y-%m-%d') name, coalesce(sum(gmv), 0) value
+        from dws_finance_day_profit
+        <include refid="financeWhere"/>
+        group by dt
+        order by dt
+    </select>
+
+    <select id="selectProfitTrend" parameterType="FinanceDayProfit" resultType="BiMetric">
+        select date_format(dt, '%Y-%m-%d') name, coalesce(sum(profit_amount), 0) value
+        from dws_finance_day_profit
+        <include refid="financeWhere"/>
+        group by dt
+        order by dt
+    </select>
+
+    <select id="selectTopProducts" parameterType="FinanceDayProfit" resultType="BiMetric">
+        select product_name name, coalesce(sum(pay_amount), 0) value
+        from dwd_order_item
+        <where>
+            <if test="shopId != null">and shop_id = #{shopId}</if>
+            <if test="dt != null">and dt = #{dt}</if>
+        </where>
+        group by product_name
+        order by value desc
+        limit 10
+    </select>
+
+    <select id="selectDailyProfitList" parameterType="FinanceDayProfit" resultMap="FinanceDayProfitResult">
+        select dt, shop_id, shop_name, gmv, net_amount, product_cost, platform_fee, ad_cost,
+               freight_fee, after_sale_cost, profit_amount, profit_amount share_profit_amount,
+               coalesce(round(net_amount / nullif(ad_cost, 0), 2), 0) roi
+        from dws_finance_day_profit
+        <include refid="financeWhere"/>
+        order by dt desc, profit_amount desc
+    </select>
+
+    <select id="selectMonthlyProfitList" parameterType="FinanceDayProfit" resultMap="FinanceDayProfitResult">
+        select str_to_date(date_format(dt, '%Y-%m-01'), '%Y-%m-%d') dt,
+               shop_id,
+               max(shop_name) shop_name,
+               sum(gmv) gmv,
+               sum(net_amount) net_amount,
+               sum(product_cost) product_cost,
+               sum(platform_fee) platform_fee,
+               sum(ad_cost) ad_cost,
+               sum(freight_fee) freight_fee,
+               sum(after_sale_cost) after_sale_cost,
+               sum(profit_amount) profit_amount,
+               sum(profit_amount) share_profit_amount,
+               coalesce(round(sum(net_amount) / nullif(sum(ad_cost), 0), 2), 0) roi
+        from dws_finance_day_profit
+        <include refid="financeWhere"/>
+        group by date_format(dt, '%Y-%m'), shop_id
+        order by dt desc, profit_amount desc
+    </select>
+
+    <select id="selectOperatorDailyProfitList" parameterType="FinanceDayProfit" resultMap="FinanceDayProfitResult">
+        select dt,
+               shop_id,
+               max(shop_name) shop_name,
+               operator_id,
+               max(operator_name) operator_name,
+               channel_code,
+               max(channel_name) channel_name,
+               sum(gmv) gmv,
+               sum(net_amount) net_amount,
+               sum(product_cost) product_cost,
+               sum(platform_fee) platform_fee,
+               sum(ad_cost) ad_cost,
+               sum(freight_fee) freight_fee,
+               sum(after_sale_cost) after_sale_cost,
+               sum(profit_amount) profit_amount,
+               sum(share_profit_amount) share_profit_amount,
+               coalesce(round(sum(net_amount) / nullif(sum(ad_cost), 0), 2), 0) roi
+        from fin_operator_profit_day
+        <include refid="operatorProfitWhere"/>
+        group by dt, shop_id, operator_id, channel_code
+        order by dt desc, profit_amount desc
+    </select>
+
+    <select id="selectOperatorMonthlyProfitList" parameterType="FinanceDayProfit" resultMap="FinanceDayProfitResult">
+        select str_to_date(date_format(dt, '%Y-%m-01'), '%Y-%m-%d') dt,
+               shop_id,
+               max(shop_name) shop_name,
+               operator_id,
+               max(operator_name) operator_name,
+               channel_code,
+               max(channel_name) channel_name,
+               sum(gmv) gmv,
+               sum(net_amount) net_amount,
+               sum(product_cost) product_cost,
+               sum(platform_fee) platform_fee,
+               sum(ad_cost) ad_cost,
+               sum(freight_fee) freight_fee,
+               sum(after_sale_cost) after_sale_cost,
+               sum(profit_amount) profit_amount,
+               sum(share_profit_amount) share_profit_amount,
+               coalesce(round(sum(net_amount) / nullif(sum(ad_cost), 0), 2), 0) roi
+        from fin_operator_profit_day
+        <include refid="operatorProfitWhere"/>
+        group by date_format(dt, '%Y-%m'), shop_id, operator_id, channel_code
+        order by dt desc, profit_amount desc
+    </select>
+</mapper>

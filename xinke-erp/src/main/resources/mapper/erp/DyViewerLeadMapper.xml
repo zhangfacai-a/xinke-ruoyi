@@ -1,0 +1,1081 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.DyViewerLeadMapper">
+
+    <insert id="insertCaptureBatch" useGeneratedKeys="true" keyProperty="batchId">
+        insert ignore into dy_capture_batch(
+            batch_no, room_key, douyin_user_id, payload_type, source, live_room_name,
+            queue_size, item_count, report_time
+        )
+        values(
+            #{batchNo}, #{roomKey}, #{douyinUserId}, #{payloadType}, #{source}, #{liveRoomName},
+            #{queueSize}, #{itemCount}, sysdate()
+        )
+    </insert>
+
+    <insert id="upsertLiveRoom">
+        insert into dy_live_room(
+            room_key, room_name, source, last_report_time, create_time, update_time
+        )
+        values(
+            #{roomKey}, #{roomName}, #{source}, sysdate(), sysdate(), sysdate()
+        )
+        on duplicate key update
+            room_name = if(values(room_name) is null or values(room_name) = '', room_name, values(room_name)),
+            source = ifnull(values(source), source),
+            last_report_time = sysdate(),
+            update_time = sysdate()
+    </insert>
+
+    <select id="selectLiveRoomList" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select room_id, room_key, room_name, source, status, remark, last_report_time, create_time, update_time
+        from dy_live_room
+        <where>
+            <if test="roomKey != null and roomKey != ''">
+                and room_key like concat('%', #{roomKey}, '%')
+            </if>
+            <if test="roomName != null and roomName != ''">
+                and room_name like concat('%', #{roomName}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+        </where>
+        order by update_time desc, room_id desc
+    </select>
+
+    <select id="selectLiveRoomByKey" resultType="java.util.HashMap">
+        select room_id, room_key, room_name, source, status, remark, last_report_time, create_time, update_time
+        from dy_live_room
+        where room_key = #{roomKey}
+        limit 1
+    </select>
+
+    <insert id="insertLiveRoom">
+        insert into dy_live_room(room_key, room_name, source, status, remark, create_time, update_time)
+        values(#{roomKey}, #{roomName}, #{source}, ifnull(#{status}, '0'), #{remark}, sysdate(), sysdate())
+    </insert>
+
+    <update id="updateLiveRoom">
+        update dy_live_room
+        <set>
+            <if test="roomName != null">room_name = #{roomName},</if>
+            <if test="source != null">source = #{source},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where room_key = #{roomKey}
+    </update>
+
+    <delete id="deleteLiveRoomByKey">
+        delete from dy_live_room where room_key = #{roomKey}
+    </delete>
+
+    <select id="selectViewerIdBySecUid" resultType="java.lang.Long">
+        select viewer_id
+        from dy_viewer
+        where sec_uid = #{secUid}
+        limit 1
+    </select>
+
+    <insert id="insertViewer" useGeneratedKeys="true" keyProperty="viewerId">
+        insert into dy_viewer(
+            sec_uid, nickname, gender, first_seen_date, last_seen_date, create_time, update_time
+        )
+        values(
+            #{secUid}, #{nickname}, #{gender}, #{leadDate}, #{leadDate}, sysdate(), sysdate()
+        )
+        on duplicate key update
+            nickname = values(nickname),
+            gender = values(gender),
+            last_seen_date = values(last_seen_date),
+            update_time = sysdate()
+    </insert>
+
+    <update id="updateViewerSeen">
+        update dy_viewer
+        set nickname = #{nickname},
+            gender = #{gender},
+            last_seen_date = #{leadDate},
+            update_time = sysdate()
+        where sec_uid = #{secUid}
+    </update>
+
+    <select id="selectLeadId" resultType="java.lang.Long">
+        select lead_id
+        from dy_viewer_daily_lead
+        where lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and sec_uid = #{secUid}
+        limit 1
+    </select>
+
+    <insert id="insertDailyLead" useGeneratedKeys="true" keyProperty="leadId">
+        insert into dy_viewer_daily_lead(
+            lead_date, room_key, douyin_user_id, live_room_name, viewer_id, sec_uid,
+            nickname, create_time, update_time
+        )
+        values(
+            #{leadDate}, #{roomKey}, #{douyinUserId}, #{liveRoomName}, #{viewerId}, #{secUid},
+            #{nickname}, sysdate(), sysdate()
+        )
+        on duplicate key update
+            douyin_user_id = values(douyin_user_id),
+            live_room_name = values(live_room_name),
+            viewer_id = values(viewer_id),
+            nickname = values(nickname),
+            update_time = sysdate()
+    </insert>
+
+    <update id="updateDailyLeadSeen">
+        update dy_viewer_daily_lead
+        set douyin_user_id = #{douyinUserId},
+            live_room_name = #{liveRoomName},
+            viewer_id = #{viewerId},
+            nickname = #{nickname},
+            update_time = sysdate()
+        where lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and sec_uid = #{secUid}
+    </update>
+
+    <select id="selectLeadByNickname" resultType="java.util.HashMap">
+        select lead_id, viewer_id, sec_uid, room_key
+        from dy_viewer_daily_lead
+        where lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and nickname = #{nickname}
+        order by update_time desc
+        limit 1
+    </select>
+
+    <select id="selectLeadByNicknameAnyRoom" resultType="java.util.HashMap">
+        select lead_id, viewer_id, sec_uid, room_key
+        from dy_viewer_daily_lead
+        where lead_date = #{leadDate}
+          and nickname = #{nickname}
+        order by update_time desc, lead_id desc
+        limit 1
+    </select>
+
+    <insert id="insertComment">
+        insert ignore into dy_viewer_comment(
+            lead_id, viewer_id, lead_date, room_key, douyin_user_id, sec_uid, nickname,
+            content, dedupe_key, match_type, source, captured_at, create_time
+        )
+        values(
+            #{leadId}, #{viewerId}, #{leadDate}, #{roomKey}, #{douyinUserId}, #{secUid}, #{nickname},
+            #{content}, #{dedupeKey}, #{matchType}, #{source}, #{capturedAt}, sysdate()
+        )
+    </insert>
+
+    <update id="updateLeadCommentStats">
+        update dy_viewer_daily_lead
+        set has_comment = 1,
+            comment_count = comment_count + 1,
+            intent = 'high',
+            first_comment_time = ifnull(first_comment_time, #{capturedAt}),
+            last_comment_time = #{capturedAt},
+            last_comment_content = #{content},
+            update_time = sysdate()
+        where lead_id = #{leadId}
+    </update>
+
+    <update id="updateViewerCommentStats">
+        update dy_viewer v
+        set intent = 'high',
+            has_comment = if((select count(1) from dy_viewer_comment c where c.viewer_id = #{viewerId}) > 0, 1, 0),
+            comment_count = (select count(1) from dy_viewer_comment c where c.viewer_id = #{viewerId}),
+            first_comment_time = (select min(c.captured_at) from dy_viewer_comment c where c.viewer_id = #{viewerId}),
+            last_comment_time = (select max(c.captured_at) from dy_viewer_comment c where c.viewer_id = #{viewerId}),
+            last_comment_content = (
+                select c.content
+                from dy_viewer_comment c
+                where c.viewer_id = #{viewerId}
+                order by c.captured_at desc, c.comment_id desc
+                limit 1
+            ),
+            update_time = sysdate()
+        where v.viewer_id = #{viewerId}
+    </update>
+
+    <update id="syncViewerCommentStats">
+        update dy_viewer v
+        left join (
+            select viewer_id,
+                   count(1) as comment_count,
+                   min(captured_at) as first_comment_time,
+                   max(captured_at) as last_comment_time
+            from dy_viewer_comment
+            where viewer_id is not null
+            group by viewer_id
+        ) s on s.viewer_id = v.viewer_id
+        left join (
+            select c.viewer_id, c.content
+            from dy_viewer_comment c
+            inner join (
+                select viewer_id, max(comment_id) as comment_id
+                from dy_viewer_comment
+                where viewer_id is not null
+                group by viewer_id
+            ) picked on picked.comment_id = c.comment_id
+        ) last_comment on last_comment.viewer_id = v.viewer_id
+        set v.has_comment = if(ifnull(s.comment_count, 0) > 0, 1, 0),
+            v.comment_count = ifnull(s.comment_count, 0),
+            v.intent = if(ifnull(s.comment_count, 0) > 0, 'high', v.intent),
+            v.first_comment_time = s.first_comment_time,
+            v.last_comment_time = s.last_comment_time,
+            v.last_comment_content = last_comment.content,
+            v.update_time = sysdate()
+        where ifnull(v.has_comment, 0) != if(ifnull(s.comment_count, 0) > 0, 1, 0)
+           or ifnull(v.comment_count, 0) != ifnull(s.comment_count, 0)
+           or ifnull(v.last_comment_content, '') != ifnull(last_comment.content, '')
+           or ifnull(v.last_comment_time, '1000-01-01') != ifnull(s.last_comment_time, '1000-01-01')
+    </update>
+
+    <update id="bindUnmatchedComments">
+        update dy_viewer_comment
+        set lead_id = #{leadId},
+            viewer_id = #{viewerId},
+            match_type = 'nickname'
+        where lead_id is null
+          and lead_date = #{leadDate}
+          and room_key = #{roomKey}
+          and nickname = #{nickname}
+    </update>
+
+    <update id="repairUnmatchedCommentBindings">
+        update dy_viewer_comment c
+        inner join (
+            select c.comment_id, l.lead_id, l.viewer_id
+            from dy_viewer_comment c
+            inner join (
+                select c.comment_id, max(l.lead_id) as lead_id
+                from dy_viewer_comment c
+                inner join dy_viewer_daily_lead l
+                    on l.lead_date = c.lead_date
+                   and l.nickname = c.nickname
+                where c.lead_id is null
+                  and c.viewer_id is null
+                  and c.nickname is not null
+                  and trim(c.nickname) != ''
+                group by c.comment_id
+            ) picked on picked.comment_id = c.comment_id
+            inner join dy_viewer_daily_lead l on l.lead_id = picked.lead_id
+        ) m on m.comment_id = c.comment_id
+        set c.lead_id = m.lead_id,
+            c.viewer_id = m.viewer_id,
+            c.match_type = 'nickname_any_room'
+    </update>
+
+    <update id="refreshLeadCommentStats">
+        update dy_viewer_daily_lead l
+        set has_comment = if((select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}) > 0, 1, 0),
+            comment_count = (select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            intent = if((select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}) > 0, 'high', intent),
+            first_comment_time = (select min(c.captured_at) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            last_comment_time = (select max(c.captured_at) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            last_comment_content = (
+                select c.content
+                from dy_viewer_comment c
+                where c.lead_id = #{leadId}
+                order by c.captured_at desc, c.comment_id desc
+                limit 1
+            ),
+            update_time = sysdate()
+        where l.lead_id = #{leadId}
+    </update>
+
+    <update id="syncDailyCommentStats">
+        update dy_viewer_daily_lead l
+        left join (
+            select lead_id,
+                   count(1) as comment_count,
+                   min(captured_at) as first_comment_time,
+                   max(captured_at) as last_comment_time
+            from dy_viewer_comment
+            where lead_id is not null
+            group by lead_id
+        ) s on s.lead_id = l.lead_id
+        left join (
+            select c.lead_id, c.content
+            from dy_viewer_comment c
+            inner join (
+                select lead_id, max(comment_id) as comment_id
+                from dy_viewer_comment
+                where lead_id is not null
+                group by lead_id
+            ) picked on picked.comment_id = c.comment_id
+        ) last_comment on last_comment.lead_id = l.lead_id
+        set l.has_comment = if(ifnull(s.comment_count, 0) > 0, 1, 0),
+            l.comment_count = ifnull(s.comment_count, 0),
+            l.intent = if(ifnull(s.comment_count, 0) > 0, 'high', l.intent),
+            l.first_comment_time = s.first_comment_time,
+            l.last_comment_time = s.last_comment_time,
+            l.last_comment_content = last_comment.content,
+            l.update_time = sysdate()
+        where ifnull(l.has_comment, 0) != if(ifnull(s.comment_count, 0) > 0, 1, 0)
+           or ifnull(l.comment_count, 0) != ifnull(s.comment_count, 0)
+           or ifnull(l.last_comment_content, '') != ifnull(last_comment.content, '')
+           or ifnull(l.last_comment_time, '1000-01-01') != ifnull(s.last_comment_time, '1000-01-01')
+    </update>
+
+    <update id="releaseExpiredOwners">
+        update dy_viewer
+        set owner_id = null,
+            owner_name = null,
+            owner_assigned_time = null,
+            update_time = sysdate()
+        where owner_name is not null
+          and owner_name != ''
+          and status not in ('ordered', 'pre_ordered')
+          and (order_no is null or trim(order_no) = '')
+          and owner_assigned_time is not null
+          and owner_assigned_time &lt; date_sub(sysdate(), interval 24 hour)
+    </update>
+
+    <update id="syncLeadStatusRules">
+        update dy_viewer_daily_lead
+        set status = case
+                when order_no is not null and trim(order_no) != '' and status = 'pre_ordered' then 'pre_ordered'
+                when order_no is not null and trim(order_no) != '' then 'ordered'
+                when lead_date &lt; date_sub(curdate(), interval 1 month) then 'invalid'
+                when owner_name is not null and trim(owner_name) != '' then 'following'
+                else 'new'
+            end,
+            intent = case
+                when has_comment = 1 then 'high'
+                else intent
+            end,
+            update_time = sysdate()
+        where lead_date &gt;= date_sub(curdate(), interval 40 day)
+          and (status != case
+                when order_no is not null and trim(order_no) != '' and status = 'pre_ordered' then 'pre_ordered'
+                when order_no is not null and trim(order_no) != '' then 'ordered'
+                when lead_date &lt; date_sub(curdate(), interval 1 month) then 'invalid'
+                when owner_name is not null and trim(owner_name) != '' then 'following'
+                else 'new'
+            end
+           or (has_comment = 1 and (intent is null or intent != 'high')))
+    </update>
+
+    <update id="syncViewerLeadRules">
+        update dy_viewer
+        set status = case
+                when order_no is not null and trim(order_no) != '' and status = 'pre_ordered' then 'pre_ordered'
+                when order_no is not null and trim(order_no) != '' then 'ordered'
+                when last_seen_date &lt; date_sub(curdate(), interval 1 month) then 'invalid'
+                when owner_name is not null and trim(owner_name) != '' then 'following'
+                else 'new'
+            end,
+            intent = case
+                when has_comment = 1 then 'high'
+                else intent
+            end,
+            update_time = sysdate()
+        where (last_seen_date is null or last_seen_date &gt;= date_sub(curdate(), interval 40 day))
+          and (status != case
+                when order_no is not null and trim(order_no) != '' and status = 'pre_ordered' then 'pre_ordered'
+                when order_no is not null and trim(order_no) != '' then 'ordered'
+                when last_seen_date &lt; date_sub(curdate(), interval 1 month) then 'invalid'
+                when owner_name is not null and trim(owner_name) != '' then 'following'
+                else 'new'
+            end
+           or (has_comment = 1 and (intent is null or intent != 'high')))
+    </update>
+
+    <select id="selectLeadList" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            latest.lead_id, latest.lead_date, latest.room_key, latest.douyin_user_id,
+            coalesce(nullif(r.room_name, ''), nullif(latest.live_room_name, ''), latest.room_key) as live_room_name,
+            v.viewer_id, v.sec_uid,
+            coalesce(nullif(v.nickname, ''), latest.nickname) as nickname,
+            ifnull(v.has_comment, 0) as has_comment,
+            ifnull(v.comment_count, 0) as comment_count,
+            v.first_comment_time, v.last_comment_time, v.last_comment_content,
+            ifnull(v.status, 'new') as status,
+            ifnull(v.intent, 'unknown') as intent,
+            v.owner_id, v.owner_name, v.owner_assigned_time, v.order_no, v.remark,
+            v.last_follow_time, null as next_follow_time, v.manual_update_time,
+            v.first_seen_date, v.last_seen_date,
+            visit.visit_count, visit.first_visit_date, visit.last_visit_date,
+            latest.create_time, greatest(ifnull(v.update_time, latest.update_time), latest.update_time) as update_time
+        from (
+            select l.*
+            from dy_viewer_daily_lead l
+            inner join (
+                select viewer_id, max(lead_id) as lead_id
+                from dy_viewer_daily_lead l
+                left join dy_live_room r on r.room_key = l.room_key
+                <where>
+                    <if test="leadDate != null and leadDate != ''">
+                        and l.lead_date = #{leadDate}
+                    </if>
+                    <if test="beginLeadDate != null and beginLeadDate != ''">
+                        and l.lead_date &gt;= #{beginLeadDate}
+                    </if>
+                    <if test="endLeadDate != null and endLeadDate != ''">
+                        and l.lead_date &lt;= #{endLeadDate}
+                    </if>
+                    <if test="roomKey != null and roomKey != ''">
+                        and l.room_key = #{roomKey}
+                    </if>
+                    <if test="roomName != null and roomName != ''">
+                        and coalesce(r.room_name, l.live_room_name, l.room_key) like concat('%', #{roomName}, '%')
+                    </if>
+                    <if test="nickname != null and nickname != ''">
+                        and l.nickname like concat('%', #{nickname}, '%')
+                    </if>
+                </where>
+                group by viewer_id
+            ) picked on picked.lead_id = l.lead_id
+        ) latest
+        inner join dy_viewer v on v.viewer_id = latest.viewer_id
+        left join dy_live_room r on r.room_key = latest.room_key
+        left join (
+            select l.viewer_id, count(distinct l.lead_date) as visit_count, min(l.lead_date) as first_visit_date, max(l.lead_date) as last_visit_date
+            from dy_viewer_daily_lead l
+            left join dy_live_room r on r.room_key = l.room_key
+            <where>
+                <if test="leadDate != null and leadDate != ''">
+                    and l.lead_date = #{leadDate}
+                </if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">
+                    and l.lead_date &gt;= #{beginLeadDate}
+                </if>
+                <if test="endLeadDate != null and endLeadDate != ''">
+                    and l.lead_date &lt;= #{endLeadDate}
+                </if>
+                <if test="roomKey != null and roomKey != ''">
+                    and l.room_key = #{roomKey}
+                </if>
+                <if test="roomName != null and roomName != ''">
+                    and coalesce(r.room_name, l.live_room_name, l.room_key) like concat('%', #{roomName}, '%')
+                </if>
+            </where>
+            group by l.viewer_id
+        ) visit on visit.viewer_id = latest.viewer_id
+        <where>
+            <if test="nickname != null and nickname != ''">
+                and coalesce(v.nickname, latest.nickname) like concat('%', #{nickname}, '%')
+            </if>
+            <if test="hasComment != null and hasComment != ''">
+                and ifnull(v.has_comment, 0) = #{hasComment}
+            </if>
+            <if test="status != null and status != ''">
+                and ifnull(v.status, 'new') = #{status}
+            </if>
+            <if test="excludeOrdered != null and excludeOrdered != '' and excludeOrdered != '0'">
+                and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered')
+            </if>
+            <if test="intent != null and intent != ''">
+                and ifnull(v.intent, 'unknown') = #{intent}
+            </if>
+            <if test="ownerId != null and ownerId != ''">
+                and v.owner_id = #{ownerId}
+            </if>
+            <if test="ownerName != null and ownerName != ''">
+                and v.owner_name like concat('%', #{ownerName}, '%')
+            </if>
+            <if test="orderNo != null and orderNo != ''">
+                and v.order_no like concat('%', #{orderNo}, '%')
+            </if>
+        </where>
+        order by ifnull(v.has_comment, 0) desc, v.last_comment_time desc, latest.update_time desc
+    </select>
+
+    <select id="selectRoomNames" resultType="java.lang.String">
+        select room_name
+        from (
+            select distinct coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as room_name
+            from dy_viewer_daily_lead l
+            left join dy_live_room r on r.room_key = l.room_key
+            where coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) is not null
+              and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) != ''
+            <if test="keyword != null and keyword != ''">
+              and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) like concat('%', #{keyword}, '%')
+            </if>
+        ) t
+        order by room_name asc
+        limit 20
+    </select>
+
+    <select id="selectOwnerNames" resultType="java.lang.String">
+        select distinct owner_name
+        from dy_viewer
+        where owner_name is not null
+          and owner_name != ''
+        <if test="keyword != null and keyword != ''">
+          and owner_name like concat('%', #{keyword}, '%')
+        </if>
+        order by owner_name asc
+        limit 20
+    </select>
+
+    <select id="selectLeadById" resultType="java.util.HashMap">
+        select l.lead_id, l.lead_date, l.room_key, l.douyin_user_id,
+               coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as display_room_name,
+               coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as live_room_name,
+               v.viewer_id, v.sec_uid,
+               coalesce(nullif(v.nickname, ''), l.nickname) as nickname,
+               ifnull(v.has_comment, 0) as has_comment,
+               ifnull(v.comment_count, 0) as comment_count,
+               v.first_comment_time, v.last_comment_time, v.last_comment_content,
+               ifnull(v.status, 'new') as status,
+               ifnull(v.intent, 'unknown') as intent,
+               v.owner_id, v.owner_name, v.owner_assigned_time, v.order_no, v.remark,
+               v.last_follow_time, v.manual_update_time, v.first_seen_date, v.last_seen_date,
+               l.create_time, greatest(ifnull(v.update_time, l.update_time), l.update_time) as update_time
+        from dy_viewer_daily_lead l
+        inner join dy_viewer v on v.viewer_id = l.viewer_id
+        left join dy_live_room r on r.room_key = l.room_key
+        where l.lead_id = #{leadId}
+    </select>
+
+    <select id="selectCommentsByLeadId" resultType="java.util.HashMap">
+        select c.*
+        from dy_viewer_comment c
+        inner join dy_viewer_daily_lead l on l.viewer_id = c.viewer_id
+        where l.lead_id = #{leadId}
+        order by c.captured_at desc
+    </select>
+
+    <select id="selectVisitsByLeadId" resultType="java.util.HashMap">
+        select max(l.lead_id) as lead_id,
+               l.lead_date,
+               group_concat(distinct l.room_key order by l.room_key separator ',') as room_key,
+               group_concat(distinct coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key)
+                            order by coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key)
+                            separator '、') as live_room_name,
+               max(ifnull(l.has_comment, 0)) as has_comment,
+               sum(ifnull(l.comment_count, 0)) as comment_count,
+               min(l.first_comment_time) as first_comment_time,
+               max(l.last_comment_time) as last_comment_time,
+               substring_index(
+                   group_concat(nullif(l.last_comment_content, '') order by l.last_comment_time desc, l.lead_id desc separator '\n'),
+                   '\n',
+                   1
+               ) as last_comment_content,
+               min(l.create_time) as create_time,
+               max(l.update_time) as update_time
+        from dy_viewer_daily_lead l
+        left join dy_live_room r on r.room_key = l.room_key
+        where l.viewer_id = (select viewer_id from dy_viewer_daily_lead where lead_id = #{leadId})
+        group by l.viewer_id, l.lead_date
+        order by l.lead_date desc, max(l.update_time) desc
+    </select>
+
+    <select id="selectFollowRecordsByLeadId" resultType="java.util.HashMap">
+        select f.*,
+               case
+                   when f.operator_name is null or trim(f.operator_name) = '' or f.operator_name in ('admin', 'ry', '负责人')
+                       then nullif(v.owner_name, '')
+                   else f.operator_name
+               end as display_owner_name
+        from dy_viewer_follow_record f
+        inner join dy_viewer_daily_lead l on l.viewer_id = f.viewer_id
+        left join dy_viewer v on v.viewer_id = f.viewer_id
+        where l.lead_id = #{leadId}
+        order by f.create_time desc
+    </select>
+
+    <update id="updateLead">
+        update dy_viewer_daily_lead
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="intent != null">intent = #{intent},</if>
+            <if test="ownerId != null">owner_id = #{ownerId},</if>
+            <if test="ownerNameTouched != null and ownerNameTouched">owner_name = nullif(#{ownerName}, ''),</if>
+            <if test="ownerNameTouched != null and ownerNameTouched">owner_assigned_time = #{ownerAssignedTime},</if>
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            manual_update_time = sysdate(),
+            update_time = sysdate()
+        </set>
+        where lead_id = #{leadId}
+    </update>
+
+    <update id="updateViewerLead">
+        update dy_viewer
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="intent != null">intent = #{intent},</if>
+            <if test="ownerId != null">owner_id = #{ownerId},</if>
+            <if test="ownerNameTouched != null and ownerNameTouched">owner_name = nullif(#{ownerName}, ''),</if>
+            <if test="ownerNameTouched != null and ownerNameTouched">owner_assigned_time = #{ownerAssignedTime},</if>
+            <if test="orderNo != null">order_no = #{orderNo},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            manual_update_time = sysdate(),
+            update_time = sysdate()
+        </set>
+        where viewer_id = (
+            select viewer_id
+            from dy_viewer_daily_lead
+            where lead_id = #{leadId}
+        )
+    </update>
+
+    <insert id="insertFollowRecord">
+        insert into dy_viewer_follow_record(
+            lead_id, viewer_id, follow_content, follow_result, next_follow_time,
+            operator_id, operator_name, create_time
+        )
+        values(
+            #{leadId}, #{viewerId}, #{followContent}, #{followResult}, #{nextFollowTime},
+            #{operatorId}, #{operatorName}, sysdate()
+        )
+    </insert>
+
+    <select id="selectSummary" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            count(1) as totalCount,
+            sum(case when ifnull(v.has_comment, 0) = 1 then 1 else 0 end) as commentLeadCount,
+            sum(case when ifnull(v.status, 'new') = 'new' then 1 else 0 end) as newCount,
+            sum(case when ifnull(v.status, 'new') = 'following' then 1 else 0 end) as followingCount,
+            sum(case when ifnull(v.status, 'new') = 'pre_ordered' then 1 else 0 end) as preOrderedCount,
+            sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) as orderedCount,
+            max(latest.update_time) as lastUpdateTime
+        from (
+            select l.viewer_id, max(l.update_time) as update_time
+            from dy_viewer_daily_lead l
+            left join dy_live_room r on r.room_key = l.room_key
+            <where>
+                <if test="leadDate != null and leadDate != ''">
+                    and l.lead_date = #{leadDate}
+                </if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">
+                    and l.lead_date &gt;= #{beginLeadDate}
+                </if>
+                <if test="endLeadDate != null and endLeadDate != ''">
+                    and l.lead_date &lt;= #{endLeadDate}
+                </if>
+                <if test="roomKey != null and roomKey != ''">
+                    and l.room_key = #{roomKey}
+                </if>
+                <if test="roomName != null and roomName != ''">
+                    and coalesce(r.room_name, l.live_room_name, l.room_key) like concat('%', #{roomName}, '%')
+                </if>
+                <if test="nickname != null and nickname != ''">
+                    and l.nickname like concat('%', #{nickname}, '%')
+                </if>
+            </where>
+            group by l.viewer_id
+        ) latest
+        inner join dy_viewer v on v.viewer_id = latest.viewer_id
+        <where>
+            <if test="nickname != null and nickname != ''">
+                and v.nickname like concat('%', #{nickname}, '%')
+            </if>
+            <if test="hasComment != null and hasComment != ''">
+                and ifnull(v.has_comment, 0) = #{hasComment}
+            </if>
+            <if test="status != null and status != ''">
+                and ifnull(v.status, 'new') = #{status}
+            </if>
+            <if test="excludeOrdered != null and excludeOrdered != '' and excludeOrdered != '0'">
+                and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered')
+            </if>
+            <if test="intent != null and intent != ''">
+                and ifnull(v.intent, 'unknown') = #{intent}
+            </if>
+            <if test="ownerId != null and ownerId != ''">
+                and v.owner_id = #{ownerId}
+            </if>
+            <if test="ownerName != null and ownerName != ''">
+                and v.owner_name like concat('%', #{ownerName}, '%')
+            </if>
+        </where>
+    </select>
+
+    <sql id="biLeadWhere">
+        <if test="leadDate != null and leadDate != ''">
+            and l.lead_date = #{leadDate}
+        </if>
+        <if test="beginLeadDate != null and beginLeadDate != ''">
+            and l.lead_date &gt;= #{beginLeadDate}
+        </if>
+        <if test="endLeadDate != null and endLeadDate != ''">
+            and l.lead_date &lt;= #{endLeadDate}
+        </if>
+        <if test="roomName != null and roomName != ''">
+            and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) like concat('%', #{roomName}, '%')
+        </if>
+        <if test="ownerName != null and ownerName != ''">
+            and v.owner_name like concat('%', #{ownerName}, '%')
+        </if>
+    </sql>
+
+    <select id="selectBiOverview" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            count(distinct l.viewer_id) as viewerCount,
+            count(distinct l.lead_id) as visitCount,
+            count(distinct coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key)) as shopCount,
+            sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end) as commentLeadCount,
+            sum(ifnull(l.comment_count, 0)) as commentCount,
+            sum(case when ifnull(v.status, 'new') = 'new' then 1 else 0 end) as newCount,
+            sum(case when ifnull(v.status, 'new') = 'following' then 1 else 0 end) as followingCount,
+            sum(case when ifnull(v.status, 'new') = 'pre_ordered' then 1 else 0 end) as preOrderedCount,
+            sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) as orderedCount,
+            count(distinct case when f.viewer_id is not null then l.viewer_id end) as followedViewerCount,
+            count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end) as assignedViewerCount,
+            sum(case when (ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1)
+                      and nullif(v.owner_name, '') is null
+                      and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered', 'invalid')
+                     then 1 else 0 end) as unassignedHighIntentCount,
+            sum(case when nullif(v.owner_name, '') is not null
+                      and f.viewer_id is null
+                      and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered', 'invalid')
+                     then 1 else 0 end) as pendingFollowCount,
+            round(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end) * 100 / nullif(count(distinct l.viewer_id), 0), 2) as commentRate,
+            round(count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end) * 100 / nullif(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end), 0), 2) as assignRate,
+            round(count(distinct case when f.viewer_id is not null then l.viewer_id end) * 100 / nullif(count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end), 0), 2) as followRate,
+            round(sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) * 100 / nullif(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end), 0), 2) as orderRate,
+            max(greatest(ifnull(l.update_time, '1000-01-01'), ifnull(v.update_time, '1000-01-01'))) as lastUpdateTime
+        from dy_viewer_daily_lead l
+        inner join dy_viewer v on v.viewer_id = l.viewer_id
+        left join dy_live_room r on r.room_key = l.room_key
+        left join (
+            select distinct viewer_id
+            from dy_viewer_follow_record
+        ) f on f.viewer_id = l.viewer_id
+        <where>
+            1 = 1
+            <include refid="biLeadWhere" />
+        </where>
+    </select>
+
+    <select id="selectBiDailyTrend" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            l.lead_date as statDate,
+            count(distinct l.viewer_id) as viewerCount,
+            count(1) as visitCount,
+            sum(case when ifnull(l.has_comment, 0) = 1 then 1 else 0 end) as commentLeadCount,
+            sum(ifnull(l.comment_count, 0)) as commentCount,
+            sum(case when ifnull(v.status, 'new') = 'following' then 1 else 0 end) as followingCount,
+            sum(case when ifnull(v.status, 'new') = 'pre_ordered' then 1 else 0 end) as preOrderedCount,
+            sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) as orderedCount,
+            sum(case when (ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1)
+                      and nullif(v.owner_name, '') is null
+                      and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered', 'invalid')
+                     then 1 else 0 end) as unassignedHighIntentCount
+        from dy_viewer_daily_lead l
+        inner join dy_viewer v on v.viewer_id = l.viewer_id
+        left join dy_live_room r on r.room_key = l.room_key
+        <where>
+            1 = 1
+            <include refid="biLeadWhere" />
+        </where>
+        group by l.lead_date
+        order by l.lead_date asc
+    </select>
+
+    <select id="selectBiRoomRank" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as roomName,
+            count(distinct l.viewer_id) as viewerCount,
+            count(1) as visitCount,
+            sum(case when ifnull(l.has_comment, 0) = 1 then 1 else 0 end) as commentLeadCount,
+            sum(ifnull(l.comment_count, 0)) as commentCount,
+            sum(case when ifnull(v.status, 'new') = 'following' then 1 else 0 end) as followingCount,
+            sum(case when ifnull(v.status, 'new') = 'pre_ordered' then 1 else 0 end) as preOrderedCount,
+            sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) as orderedCount,
+            sum(case when ifnull(l.has_comment, 0) = 1
+                      and nullif(v.owner_name, '') is null
+                      and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered', 'invalid')
+                     then 1 else 0 end) as unassignedHighIntentCount,
+            round(sum(case when ifnull(l.has_comment, 0) = 1 then 1 else 0 end) * 100 / nullif(count(distinct l.viewer_id), 0), 2) as commentRate,
+            round(sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) * 100 / nullif(sum(case when ifnull(l.has_comment, 0) = 1 then 1 else 0 end), 0), 2) as orderRate
+        from dy_viewer_daily_lead l
+        inner join dy_viewer v on v.viewer_id = l.viewer_id
+        left join dy_live_room r on r.room_key = l.room_key
+        <where>
+            1 = 1
+            <include refid="biLeadWhere" />
+        </where>
+        group by coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key)
+        order by commentLeadCount desc, viewerCount desc
+        limit 10
+    </select>
+
+    <select id="selectBiShopRank" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as shopName,
+            count(distinct l.viewer_id) as viewerCount,
+            count(1) as visitCount,
+            sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end) as highIntentCount,
+            count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end) as assignedViewerCount,
+            count(distinct case when f.viewer_id is not null then l.viewer_id end) as followedViewerCount,
+            sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) as orderedCount,
+            sum(case when (ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1)
+                      and nullif(v.owner_name, '') is null
+                      and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered', 'invalid')
+                     then 1 else 0 end) as unassignedHighIntentCount,
+            round(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end) * 100 / nullif(count(distinct l.viewer_id), 0), 2) as highIntentRate,
+            round(count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end) * 100 / nullif(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end), 0), 2) as assignRate,
+            round(count(distinct case when f.viewer_id is not null then l.viewer_id end) * 100 / nullif(count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end), 0), 2) as followRate,
+            round(sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) * 100 / nullif(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end), 0), 2) as orderRate,
+            round(
+                ifnull(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end) * 100 / nullif(count(distinct l.viewer_id), 0), 0) * 0.25
+                + ifnull(count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end) * 100 / nullif(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end), 0), 0) * 0.25
+                + ifnull(count(distinct case when f.viewer_id is not null then l.viewer_id end) * 100 / nullif(count(distinct case when nullif(v.owner_name, '') is not null then l.viewer_id end), 0), 0) * 0.25
+                + ifnull(sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) * 100 / nullif(sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end), 0), 0) * 0.25
+            , 2) as shopScore
+        from dy_viewer_daily_lead l
+        inner join dy_viewer v on v.viewer_id = l.viewer_id
+        left join dy_live_room r on r.room_key = l.room_key
+        left join (
+            select distinct viewer_id
+            from dy_viewer_follow_record
+        ) f on f.viewer_id = l.viewer_id
+        <where>
+            1 = 1
+            <include refid="biLeadWhere" />
+        </where>
+        group by coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key)
+        order by shopScore desc, orderedCount desc, highIntentCount desc
+        limit 20
+    </select>
+
+    <select id="selectBiOwnerRank" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            ifnull(nullif(v.owner_name, ''), '未分配') as ownerName,
+            count(distinct l.viewer_id) as viewerCount,
+            sum(case when ifnull(l.has_comment, 0) = 1 or ifnull(v.has_comment, 0) = 1 then 1 else 0 end) as commentLeadCount,
+            count(distinct case when f.viewer_id is not null then l.viewer_id end) as followedViewerCount,
+            sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) as orderedCount,
+            round(count(distinct case when f.viewer_id is not null then l.viewer_id end) * 100 / nullif(count(distinct l.viewer_id), 0), 2) as followRate,
+            round(sum(case when ifnull(v.status, 'new') = 'ordered' then 1 else 0 end) * 100 / nullif(count(distinct case when f.viewer_id is not null then l.viewer_id end), 0), 2) as orderRate,
+            max(v.last_follow_time) as lastFollowTime
+        from dy_viewer_daily_lead l
+        inner join dy_viewer v on v.viewer_id = l.viewer_id
+        left join dy_live_room r on r.room_key = l.room_key
+        left join (
+            select distinct viewer_id
+            from dy_viewer_follow_record
+        ) f on f.viewer_id = l.viewer_id
+        <where>
+            1 = 1
+            <include refid="biLeadWhere" />
+        </where>
+        group by ifnull(nullif(v.owner_name, ''), '未分配')
+        order by orderedCount desc, followedViewerCount desc, commentLeadCount desc
+        limit 12
+    </select>
+
+    <select id="selectBiHourHeat" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select
+            hour(c.captured_at) as statHour,
+            count(1) as commentCount,
+            count(distinct c.viewer_id) as commentViewerCount
+        from dy_viewer_comment c
+        left join dy_viewer_daily_lead l on l.lead_id = c.lead_id
+        left join dy_viewer v on v.viewer_id = c.viewer_id
+        left join dy_live_room r on r.room_key = c.room_key
+        <where>
+            1 = 1
+            and c.lead_id is not null
+            and c.viewer_id is not null
+            <if test="leadDate != null and leadDate != ''">
+                and c.lead_date = #{leadDate}
+            </if>
+            <if test="beginLeadDate != null and beginLeadDate != ''">
+                and c.lead_date &gt;= #{beginLeadDate}
+            </if>
+            <if test="endLeadDate != null and endLeadDate != ''">
+                and c.lead_date &lt;= #{endLeadDate}
+            </if>
+            <if test="roomName != null and roomName != ''">
+                and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), c.room_key) like concat('%', #{roomName}, '%')
+            </if>
+            <if test="ownerName != null and ownerName != ''">
+                and v.owner_name like concat('%', #{ownerName}, '%')
+            </if>
+        </where>
+        group by hour(c.captured_at)
+        order by statHour asc
+    </select>
+
+    <select id="selectBiCommentKeywords" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select keyword, count(1) as hitCount
+        from (
+            select '价格' as keyword from dy_viewer_comment c
+            left join dy_viewer_daily_lead l on l.lead_id = c.lead_id
+            left join dy_viewer v on v.viewer_id = c.viewer_id
+            left join dy_live_room r on r.room_key = c.room_key
+            <where>
+                1 = 1
+                and c.lead_id is not null
+                and c.viewer_id is not null
+                <if test="leadDate != null and leadDate != ''">and c.lead_date = #{leadDate}</if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">and c.lead_date &gt;= #{beginLeadDate}</if>
+                <if test="endLeadDate != null and endLeadDate != ''">and c.lead_date &lt;= #{endLeadDate}</if>
+                <if test="roomName != null and roomName != ''">and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), c.room_key) like concat('%', #{roomName}, '%')</if>
+                <if test="ownerName != null and ownerName != ''">and v.owner_name like concat('%', #{ownerName}, '%')</if>
+                and (c.content like '%价格%' or c.content like '%多少钱%' or c.content like '%价%' or c.content like '%便宜%')
+            </where>
+            union all
+            select '赠品' from dy_viewer_comment c
+            left join dy_viewer_daily_lead l on l.lead_id = c.lead_id
+            left join dy_viewer v on v.viewer_id = c.viewer_id
+            left join dy_live_room r on r.room_key = c.room_key
+            <where>
+                1 = 1
+                and c.lead_id is not null
+                and c.viewer_id is not null
+                <if test="leadDate != null and leadDate != ''">and c.lead_date = #{leadDate}</if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">and c.lead_date &gt;= #{beginLeadDate}</if>
+                <if test="endLeadDate != null and endLeadDate != ''">and c.lead_date &lt;= #{endLeadDate}</if>
+                <if test="roomName != null and roomName != ''">and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), c.room_key) like concat('%', #{roomName}, '%')</if>
+                <if test="ownerName != null and ownerName != ''">and v.owner_name like concat('%', #{ownerName}, '%')</if>
+                and (c.content like '%赠品%' or c.content like '%送%' or c.content like '%活动%')
+            </where>
+            union all
+            select '型号对比' from dy_viewer_comment c
+            left join dy_viewer_daily_lead l on l.lead_id = c.lead_id
+            left join dy_viewer v on v.viewer_id = c.viewer_id
+            left join dy_live_room r on r.room_key = c.room_key
+            <where>
+                1 = 1
+                and c.lead_id is not null
+                and c.viewer_id is not null
+                <if test="leadDate != null and leadDate != ''">and c.lead_date = #{leadDate}</if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">and c.lead_date &gt;= #{beginLeadDate}</if>
+                <if test="endLeadDate != null and endLeadDate != ''">and c.lead_date &lt;= #{endLeadDate}</if>
+                <if test="roomName != null and roomName != ''">and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), c.room_key) like concat('%', #{roomName}, '%')</if>
+                <if test="ownerName != null and ownerName != ''">and v.owner_name like concat('%', #{ownerName}, '%')</if>
+                and (c.content like '%区别%' or c.content like '%对比%' or c.content like '%型号%' or c.content like '%哪个好%')
+            </where>
+            union all
+            select '发货安装' from dy_viewer_comment c
+            left join dy_viewer_daily_lead l on l.lead_id = c.lead_id
+            left join dy_viewer v on v.viewer_id = c.viewer_id
+            left join dy_live_room r on r.room_key = c.room_key
+            <where>
+                1 = 1
+                and c.lead_id is not null
+                and c.viewer_id is not null
+                <if test="leadDate != null and leadDate != ''">and c.lead_date = #{leadDate}</if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">and c.lead_date &gt;= #{beginLeadDate}</if>
+                <if test="endLeadDate != null and endLeadDate != ''">and c.lead_date &lt;= #{endLeadDate}</if>
+                <if test="roomName != null and roomName != ''">and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), c.room_key) like concat('%', #{roomName}, '%')</if>
+                <if test="ownerName != null and ownerName != ''">and v.owner_name like concat('%', #{ownerName}, '%')</if>
+                and (c.content like '%发货%' or c.content like '%安装%' or c.content like '%上门%' or c.content like '%包邮%')
+            </where>
+            union all
+            select '售后保障' from dy_viewer_comment c
+            left join dy_viewer_daily_lead l on l.lead_id = c.lead_id
+            left join dy_viewer v on v.viewer_id = c.viewer_id
+            left join dy_live_room r on r.room_key = c.room_key
+            <where>
+                1 = 1
+                and c.lead_id is not null
+                and c.viewer_id is not null
+                <if test="leadDate != null and leadDate != ''">and c.lead_date = #{leadDate}</if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">and c.lead_date &gt;= #{beginLeadDate}</if>
+                <if test="endLeadDate != null and endLeadDate != ''">and c.lead_date &lt;= #{endLeadDate}</if>
+                <if test="roomName != null and roomName != ''">and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), c.room_key) like concat('%', #{roomName}, '%')</if>
+                <if test="ownerName != null and ownerName != ''">and v.owner_name like concat('%', #{ownerName}, '%')</if>
+                and (c.content like '%售后%' or c.content like '%保修%' or c.content like '%退%' or c.content like '%七天%')
+            </where>
+        ) k
+        group by keyword
+        order by hitCount desc
+    </select>
+
+    <select id="selectBiSignalWords" parameterType="java.util.Map" resultType="java.util.HashMap">
+        with filtered_comment as (
+            select c.content
+            from dy_viewer_comment c
+            left join dy_viewer_daily_lead l on l.lead_id = c.lead_id
+            left join dy_viewer v on v.viewer_id = c.viewer_id
+            left join dy_live_room r on r.room_key = c.room_key
+            <where>
+                c.lead_id is not null
+                and c.viewer_id is not null
+                and c.content is not null
+                and trim(c.content) != ''
+                <if test="leadDate != null and leadDate != ''">and c.lead_date = #{leadDate}</if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">and c.lead_date &gt;= #{beginLeadDate}</if>
+                <if test="endLeadDate != null and endLeadDate != ''">and c.lead_date &lt;= #{endLeadDate}</if>
+                <if test="roomName != null and roomName != ''">and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), c.room_key) like concat('%', #{roomName}, '%')</if>
+                <if test="ownerName != null and ownerName != ''">and v.owner_name like concat('%', #{ownerName}, '%')</if>
+            </where>
+        ),
+        signal_dict as (
+            select '下单' as word, '购买信号' as category, 10 as weight union all
+            select '订单', '购买信号', 9 union all
+            select '怎么买', '购买信号', 9 union all
+            select '链接', '购买信号', 8 union all
+            select '拍哪个', '购买信号', 8 union all
+            select '现在买', '购买信号', 9 union all
+            select '多少钱', '价格敏感', 8 union all
+            select '价格', '价格敏感', 7 union all
+            select '优惠', '价格敏感', 7 union all
+            select '便宜', '价格敏感', 5 union all
+            select '区别', '型号对比', 7 union all
+            select '对比', '型号对比', 6 union all
+            select '型号', '型号对比', 5 union all
+            select '哪个好', '型号对比', 7 union all
+            select '适合', '型号对比', 5 union all
+            select '赠品', '赠品活动', 6 union all
+            select '活动', '赠品活动', 5 union all
+            select '送什么', '赠品活动', 5 union all
+            select '安装', '安装售后', 7 union all
+            select '上门', '安装售后', 7 union all
+            select '发货', '安装售后', 6 union all
+            select '售后', '安装售后', 6 union all
+            select '保修', '安装售后', 5 union all
+            select '急用', '强需求', 9 union all
+            select '马上', '强需求', 6 union all
+            select '今天', '强需求', 5 union all
+            select '孩子', '使用场景', 4 union all
+            select '学习', '使用场景', 4 union all
+            select '一年级', '使用场景', 6 union all
+            select '二年级', '使用场景', 6 union all
+            select '三年级', '使用场景', 6
+        )
+        select
+            d.word,
+            d.category,
+            count(1) as hitCount,
+            count(distinct f.content) as commentCount,
+            count(1) * d.weight as score,
+            d.weight
+        from filtered_comment f
+        inner join signal_dict d on f.content like concat('%', d.word, '%')
+        group by d.word, d.category, d.weight
+        order by score desc, hitCount desc
+        limit 30
+    </select>
+
+    <select id="selectBiDataQuality" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select 'empty_nickname' as issueType, count(1) as issueCount
+        from dy_viewer_daily_lead l
+        where (l.nickname is null or trim(l.nickname) = '')
+        <if test="leadDate != null and leadDate != ''">and l.lead_date = #{leadDate}</if>
+        <if test="beginLeadDate != null and beginLeadDate != ''">and l.lead_date &gt;= #{beginLeadDate}</if>
+        <if test="endLeadDate != null and endLeadDate != ''">and l.lead_date &lt;= #{endLeadDate}</if>
+        union all
+        select 'empty_room_name' as issueType, count(1) as issueCount
+        from dy_viewer_daily_lead l
+        left join dy_live_room r on r.room_key = l.room_key
+        where coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, '')) is null
+        <if test="leadDate != null and leadDate != ''">and l.lead_date = #{leadDate}</if>
+        <if test="beginLeadDate != null and beginLeadDate != ''">and l.lead_date &gt;= #{beginLeadDate}</if>
+        <if test="endLeadDate != null and endLeadDate != ''">and l.lead_date &lt;= #{endLeadDate}</if>
+        union all
+        select 'unassigned_high_intent' as issueType, count(1) as issueCount
+        from dy_viewer_daily_lead l
+        inner join dy_viewer v on v.viewer_id = l.viewer_id
+        left join dy_live_room r on r.room_key = l.room_key
+        where ifnull(l.has_comment, 0) = 1
+          and nullif(v.owner_name, '') is null
+          and ifnull(v.status, 'new') not in ('ordered', 'pre_ordered', 'invalid')
+        <if test="leadDate != null and leadDate != ''">and l.lead_date = #{leadDate}</if>
+        <if test="beginLeadDate != null and beginLeadDate != ''">and l.lead_date &gt;= #{beginLeadDate}</if>
+        <if test="endLeadDate != null and endLeadDate != ''">and l.lead_date &lt;= #{endLeadDate}</if>
+        <if test="roomName != null and roomName != ''">and coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) like concat('%', #{roomName}, '%')</if>
+        <if test="ownerName != null and ownerName != ''">and v.owner_name like concat('%', #{ownerName}, '%')</if>
+    </select>
+</mapper>
