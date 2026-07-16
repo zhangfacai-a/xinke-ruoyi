@@ -50,11 +50,11 @@ node_modules/
 .pnpm-store/
 .yarn/cache/
 .yarn/install-state.gz
-ruoyi-ui/dist/
-ruoyi-ui/node_modules/
-ruoyi-ui/.vite/
-ruoyi-ui/.yarn/cache/
-ruoyi-ui/.yarn/install-state.gz
+xinke-ui/dist/
+xinke-ui/node_modules/
+xinke-ui/.vite/
+xinke-ui/.yarn/cache/
+xinke-ui/.yarn/install-state.gz
 
 !*/build/*.java
 !*/build/*.html
