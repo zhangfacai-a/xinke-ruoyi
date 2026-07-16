@@ -12,6 +12,9 @@ public class DyCaptureReport
     private String liveRoomName;
     private String pageUrl;
     private String requestUrl;
+    private String pluginVersion;
+    private String clientId;
+    private String clientName;
     private Integer queueSize;
     private Long clientTime;
     private List<DyViewerCommentPayload> comments;
@@ -33,6 +36,12 @@ public class DyCaptureReport
     public void setPageUrl(String pageUrl) { this.pageUrl = pageUrl; }
     public String getRequestUrl() { return requestUrl; }
     public void setRequestUrl(String requestUrl) { this.requestUrl = requestUrl; }
+    public String getPluginVersion() { return pluginVersion; }
+    public void setPluginVersion(String pluginVersion) { this.pluginVersion = pluginVersion; }
+    public String getClientId() { return clientId; }
+    public void setClientId(String clientId) { this.clientId = clientId; }
+    public String getClientName() { return clientName; }
+    public void setClientName(String clientName) { this.clientName = clientName; }
     public Integer getQueueSize() { return queueSize; }
     public void setQueueSize(Integer queueSize) { this.queueSize = queueSize; }
     public Long getClientTime() { return clientTime; }

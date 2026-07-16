@@ -2,6 +2,118 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xinke.erp.mapper.DyViewerLeadMapper">
 
+    <update id="createPluginClientTable">
+        create table if not exists dy_plugin_client (
+            client_id varchar(80) not null comment 'Plugin computer unique id',
+            client_name varchar(120) default null comment 'Display name',
+            plugin_version varchar(32) default null comment 'Plugin version',
+            source varchar(64) default null comment 'Report source',
+            room_key varchar(128) default null comment 'Last room key',
+            live_room_name varchar(120) default null comment 'Last live room name',
+            page_url varchar(500) default null comment 'Last page url',
+            request_url varchar(1000) default null comment 'Last request url',
+            status char(1) not null default '0' comment '0 enabled, 1 disabled',
+            report_count bigint not null default 0 comment 'Report count',
+            fail_count bigint not null default 0 comment 'Blocked or failed count',
+            last_report_time datetime default null comment 'Last report time',
+            last_success_time datetime default null comment 'Last success time',
+            last_error_time datetime default null comment 'Last error time',
+            last_error_msg varchar(500) default null comment 'Last error message',
+            remark varchar(500) default null comment 'Remark',
+            create_time datetime default null comment 'Create time',
+            update_time datetime default null comment 'Update time',
+            primary key (client_id),
+            key idx_dy_plugin_client_status (status),
+            key idx_dy_plugin_client_last_report (last_report_time),
+            key idx_dy_plugin_client_error (last_error_time)
+        ) engine=InnoDB default charset=utf8mb4 comment='Douyin capture plugin clients'
+    </update>
+
+    <insert id="upsertPluginClient">
+        insert into dy_plugin_client(
+            client_id, client_name, plugin_version, source, room_key, live_room_name,
+            page_url, request_url, last_report_time, report_count, create_time, update_time
+        )
+        values(
+            #{clientId}, #{clientName}, #{pluginVersion}, #{source}, #{roomKey}, #{liveRoomName},
+            #{pageUrl}, #{requestUrl}, sysdate(), 1, sysdate(), sysdate()
+        )
+        on duplicate key update
+            client_name = if(values(client_name) is null or values(client_name) = '', client_name, values(client_name)),
+            plugin_version = ifnull(values(plugin_version), plugin_version),
+            source = ifnull(values(source), source),
+            room_key = ifnull(values(room_key), room_key),
+            live_room_name = if(values(live_room_name) is null or values(live_room_name) = '', live_room_name, values(live_room_name)),
+            page_url = ifnull(values(page_url), page_url),
+            request_url = ifnull(values(request_url), request_url),
+            last_report_time = sysdate(),
+            report_count = ifnull(report_count, 0) + 1,
+            update_time = sysdate()
+    </insert>
+
+    <select id="selectPluginClientById" resultType="java.util.HashMap">
+        select client_id as clientId, client_name as clientName, plugin_version as pluginVersion,
+               source, room_key as roomKey, live_room_name as liveRoomName,
+               page_url as pageUrl, request_url as requestUrl, status,
+               report_count as reportCount, fail_count as failCount,
+               last_report_time as lastReportTime, last_success_time as lastSuccessTime,
+               last_error_time as lastErrorTime, last_error_msg as lastErrorMsg,
+               remark, create_time as createTime, update_time as updateTime
+        from dy_plugin_client
+        where client_id = #{clientId}
+        limit 1
+    </select>
+
+    <select id="selectPluginClientList" parameterType="java.util.Map" resultType="java.util.HashMap">
+        select client_id as clientId, client_name as clientName, plugin_version as pluginVersion,
+               source, room_key as roomKey, live_room_name as liveRoomName,
+               page_url as pageUrl, request_url as requestUrl, status,
+               report_count as reportCount, fail_count as failCount,
+               last_report_time as lastReportTime, last_success_time as lastSuccessTime,
+               last_error_time as lastErrorTime, last_error_msg as lastErrorMsg,
+               remark, create_time as createTime, update_time as updateTime
+        from dy_plugin_client
+        <where>
+            <if test="clientId != null and clientId != ''">
+                and client_id like concat('%', #{clientId}, '%')
+            </if>
+            <if test="clientName != null and clientName != ''">
+                and client_name like concat('%', #{clientName}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+        </where>
+        order by last_report_time desc, update_time desc
+    </select>
+
+    <update id="updatePluginClient">
+        update dy_plugin_client
+        <set>
+            <if test="clientName != null">client_name = #{clientName},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where client_id = #{clientId}
+    </update>
+
+    <update id="markPluginClientSuccess">
+        update dy_plugin_client
+        set last_success_time = sysdate(),
+            update_time = sysdate()
+        where client_id = #{clientId}
+    </update>
+
+    <update id="markPluginClientError">
+        update dy_plugin_client
+        set last_error_time = sysdate(),
+            last_error_msg = #{errorMsg},
+            fail_count = ifnull(fail_count, 0) + 1,
+            update_time = sysdate()
+        where client_id = #{clientId}
+    </update>
+
     <insert id="insertCaptureBatch" useGeneratedKeys="true" keyProperty="batchId">
         insert ignore into dy_capture_batch(
             batch_no, room_key, douyin_user_id, payload_type, source, live_room_name,
@@ -172,12 +284,18 @@
 
     <update id="updateLeadCommentStats">
         update dy_viewer_daily_lead
-        set has_comment = 1,
-            comment_count = comment_count + 1,
-            intent = 'high',
-            first_comment_time = ifnull(first_comment_time, #{capturedAt}),
-            last_comment_time = #{capturedAt},
-            last_comment_content = #{content},
+        set has_comment = if((select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}) > 0, 1, 0),
+            comment_count = (select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            intent = if((select count(1) from dy_viewer_comment c where c.lead_id = #{leadId}) > 0, 'high', intent),
+            first_comment_time = (select min(c.captured_at) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            last_comment_time = (select max(c.captured_at) from dy_viewer_comment c where c.lead_id = #{leadId}),
+            last_comment_content = (
+                select c.content
+                from dy_viewer_comment c
+                where c.lead_id = #{leadId}
+                order by c.captured_at desc, c.comment_id desc
+                limit 1
+            ),
             update_time = sysdate()
         where lead_id = #{leadId}
     </update>
@@ -548,14 +666,17 @@
                group_concat(distinct coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key)
                             order by coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key)
                             separator '、') as live_room_name,
-               max(ifnull(l.has_comment, 0)) as has_comment,
-               sum(ifnull(l.comment_count, 0)) as comment_count,
-               min(l.first_comment_time) as first_comment_time,
-               max(l.last_comment_time) as last_comment_time,
-               substring_index(
-                   group_concat(nullif(l.last_comment_content, '') order by l.last_comment_time desc, l.lead_id desc separator '\n'),
-                   '\n',
-                   1
+               if((select count(1) from dy_viewer_comment c where c.viewer_id = l.viewer_id and c.lead_date = l.lead_date) > 0, 1, 0) as has_comment,
+               (select count(1) from dy_viewer_comment c where c.viewer_id = l.viewer_id and c.lead_date = l.lead_date) as comment_count,
+               (select min(c.captured_at) from dy_viewer_comment c where c.viewer_id = l.viewer_id and c.lead_date = l.lead_date) as first_comment_time,
+               (select max(c.captured_at) from dy_viewer_comment c where c.viewer_id = l.viewer_id and c.lead_date = l.lead_date) as last_comment_time,
+               (
+                   select c.content
+                   from dy_viewer_comment c
+                   where c.viewer_id = l.viewer_id
+                     and c.lead_date = l.lead_date
+                   order by c.captured_at desc, c.comment_id desc
+                   limit 1
                ) as last_comment_content,
                min(l.create_time) as create_time,
                max(l.update_time) as update_time

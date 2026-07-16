@@ -88,7 +88,7 @@
           <template #default="scope">
             <div class="comment-cell">
               <el-tag v-if="Number(scope.row.has_comment) === 1" type="success" effect="light">
-                {{ scope.row.comment_count || 1 }}条
+                {{ Number(scope.row.comment_count || 0) }}条
               </el-tag>
               <el-tag v-else type="info" effect="plain">无</el-tag>
               <span>{{ scope.row.last_comment_content || '暂无评论' }}</span>

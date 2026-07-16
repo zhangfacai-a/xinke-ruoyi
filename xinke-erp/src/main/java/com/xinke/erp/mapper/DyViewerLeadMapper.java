@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface DyViewerLeadMapper
 {
+    int createPluginClientTable();
+
     int insertCaptureBatch(Map<String, Object> data);
 
     int upsertLiveRoom(Map<String, Object> data);
@@ -110,4 +112,16 @@ public interface DyViewerLeadMapper
     List<Map<String, Object>> selectBiSignalWords(Map<String, Object> query);
 
     List<Map<String, Object>> selectBiDataQuality(Map<String, Object> query);
+
+    int upsertPluginClient(Map<String, Object> data);
+
+    Map<String, Object> selectPluginClientById(@Param("clientId") String clientId);
+
+    List<Map<String, Object>> selectPluginClientList(Map<String, Object> query);
+
+    int updatePluginClient(Map<String, Object> data);
+
+    int markPluginClientSuccess(Map<String, Object> data);
+
+    int markPluginClientError(Map<String, Object> data);
 }

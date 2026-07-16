@@ -18,6 +18,10 @@
             <artifactId>xinke-common</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.xinke</groupId>
+            <artifactId>xinke-system</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.alibaba.fastjson2</groupId>
             <artifactId>fastjson2</artifactId>
         </dependency>

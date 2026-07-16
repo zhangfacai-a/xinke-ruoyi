@@ -298,9 +298,9 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         {
             throw new ServiceException("Report is required");
         }
-        if (!hasText(report.getRoomKey()))
+        if (!hasText(report.getRoomKey()) && !hasText(report.getLiveRoomName()))
         {
-            throw new ServiceException("roomKey is required");
+            throw new ServiceException("roomKey or liveRoomName is required");
         }
         if (!hasText(report.getPayloadType()))
         {
@@ -326,10 +326,11 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
 
     private Long insertBatch(DyCaptureReport report, String payloadType, int itemCount)
     {
-        upsertLiveRoom(report.getRoomKey(), report.getLiveRoomName(), report.getSource());
+        String roomKey = canonicalRoomKey(report);
+        upsertLiveRoom(roomKey, report.getLiveRoomName(), report.getSource());
         Map<String, Object> data = new HashMap<>();
-        data.put("batchNo", hasText(report.getBatchNo()) ? report.getBatchNo() : nextBatchNo(report.getRoomKey(), payloadType));
-        data.put("roomKey", report.getRoomKey());
+        data.put("batchNo", hasText(report.getBatchNo()) ? report.getBatchNo() : nextBatchNo(roomKey, payloadType));
+        data.put("roomKey", roomKey);
         data.put("douyinUserId", report.getUserId());
         data.put("payloadType", payloadType);
         data.put("source", report.getSource());
@@ -380,7 +381,7 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         {
             return 0;
         }
-        String roomKey = trim(report.getRoomKey(), 64);
+        String roomKey = canonicalRoomKey(report);
         String capturedAt = dateTimeOf(comment.getCapturedAt());
         String leadDate = dateOf(comment.getCapturedAt());
         Long leadId = null;
@@ -450,11 +451,24 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
 
     private String captureRoomKey(DyCaptureReport report, DyViewerPayload audience)
     {
+        if (report != null && hasText(report.getLiveRoomName()))
+        {
+            return trim(report.getLiveRoomName(), 64);
+        }
         if (report != null && hasText(report.getRoomKey()))
         {
             return trim(report.getRoomKey(), 64);
         }
         return audience == null ? "" : trim(audience.getRoomId(), 64);
+    }
+
+    private String canonicalRoomKey(DyCaptureReport report)
+    {
+        if (report != null && hasText(report.getLiveRoomName()))
+        {
+            return trim(report.getLiveRoomName(), 64);
+        }
+        return report == null ? "" : trim(report.getRoomKey(), 64);
     }
 
     private void applyOwnerRule(Map<String, Object> data, Map<String, Object> current, String nextOwnerName)
