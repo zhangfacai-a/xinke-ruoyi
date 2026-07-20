@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -52,5 +53,13 @@ public class FinanceReconcileController extends BaseController
     public AjaxResult run(@RequestBody Map<String, Object> form)
     {
         return success(financeWorkflowService.runReconcile(form, getUsername()));
+    }
+
+    @PreAuthorize("@ss.hasPermi('finance:reconcile:handle')")
+    @Log(title = "财务对账差异处理", businessType = BusinessType.UPDATE)
+    @PostMapping("/diff/{diffNo}/resolve")
+    public AjaxResult resolve(@PathVariable String diffNo, @RequestBody Map<String, Object> form)
+    {
+        return toAjax(financeWorkflowService.resolveReconcileDiff(diffNo, form, getUsername()));
     }
 }

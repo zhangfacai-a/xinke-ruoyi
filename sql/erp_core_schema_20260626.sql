@@ -58,7 +58,18 @@ create table if not exists erp_warehouse (
   warehouse_id bigint not null auto_increment,
   warehouse_code varchar(64) not null,
   warehouse_name varchar(128) not null,
-  warehouse_type varchar(32) default 'self',
+  warehouse_type varchar(32) default 'physical',
+  warehouse_usage varchar(32) not null default 'normal',
+  ownership_type varchar(32) not null default 'self_operated',
+  provider_name varchar(128) null,
+  external_warehouse_code varchar(128) null,
+  owner_code varchar(64) null,
+  sync_mode varchar(32) not null default 'manual',
+  sync_status varchar(32) not null default 'not_applicable',
+  last_sync_time datetime null,
+  enable_location char(1) not null default '1',
+  allow_negative_stock char(1) not null default '0',
+  priority int not null default 100,
   contact_name varchar(64) null,
   contact_phone varchar(32) null,
   address varchar(255) null,
@@ -80,6 +91,13 @@ create table if not exists erp_supplier (
   contact_phone varchar(32) null,
   settlement_type varchar(32) default 'monthly',
   payment_days int default 30,
+  supplier_level varchar(8) not null default 'B',
+  lead_time_days int not null default 7,
+  min_order_amount decimal(14,2) not null default 0.00,
+  quality_score decimal(5,2) not null default 80.00,
+  delivery_score decimal(5,2) not null default 80.00,
+  service_score decimal(5,2) not null default 80.00,
+  preferred_flag char(1) not null default '0',
   status char(1) default '0',
   create_by varchar(64) default '',
   create_time datetime null,
@@ -120,12 +138,56 @@ create table if not exists erp_inventory_balance (
   defective_qty int default 0,
   safety_qty int default 0,
   cost_price decimal(12,2) default 0.00,
+  external_available_qty int null,
+  external_locked_qty int null,
+  sync_diff_qty int null,
+  sync_status varchar(32) not null default 'not_applicable',
+  last_sync_time datetime null,
   create_time datetime null,
   update_time datetime null,
   primary key (balance_id),
   unique key uk_erp_inventory_wh_sku (warehouse_id, sku_id),
   key idx_erp_inventory_sku (sku_code)
 ) engine=innodb default charset=utf8mb4 comment='ERP 库存余额';
+
+create table if not exists erp_warehouse_location (
+  location_id bigint not null auto_increment,
+  warehouse_id bigint not null,
+  location_code varchar(64) not null,
+  location_name varchar(128) not null,
+  zone_code varchar(64) null,
+  usage_type varchar(32) not null default 'normal',
+  barcode varchar(128) null,
+  sort_order int not null default 100,
+  status char(1) not null default '0',
+  create_by varchar(64) default '',
+  create_time datetime null,
+  update_by varchar(64) default '',
+  update_time datetime null,
+  remark varchar(500) null,
+  primary key (location_id),
+  unique key uk_erp_location_code (warehouse_id, location_code)
+) engine=innodb default charset=utf8mb4 comment='实体仓库位档案';
+
+create table if not exists erp_warehouse_sync_log (
+  sync_log_id bigint not null auto_increment,
+  sync_batch_no varchar(64) not null,
+  warehouse_id bigint not null,
+  source_type varchar(64) not null default 'manual',
+  sync_status varchar(32) not null,
+  total_sku_count int not null default 0,
+  matched_sku_count int not null default 0,
+  unmatched_sku_count int not null default 0,
+  difference_sku_count int not null default 0,
+  started_time datetime null,
+  finished_time datetime null,
+  message varchar(500) null,
+  create_by varchar(64) default '',
+  create_time datetime null,
+  primary key (sync_log_id),
+  unique key uk_erp_warehouse_sync_batch (sync_batch_no),
+  key idx_erp_warehouse_sync_time (warehouse_id, create_time)
+) engine=innodb default charset=utf8mb4 comment='云仓库存同步日志';
 
 create table if not exists erp_inventory_movement (
   movement_id bigint not null auto_increment,
@@ -157,8 +219,17 @@ create table if not exists erp_purchase_order (
   supplier_name varchar(128) null,
   warehouse_id bigint null,
   total_amount decimal(14,2) default 0.00,
+  tax_amount decimal(14,2) not null default 0.00,
+  total_with_tax decimal(14,2) not null default 0.00,
   purchase_status varchar(32) default 'draft',
+  purchase_date date not null,
   expected_time datetime null,
+  submit_by varchar(64) null,
+  submit_time datetime null,
+  approve_by varchar(64) null,
+  approve_time datetime null,
+  close_by varchar(64) null,
+  close_time datetime null,
   create_by varchar(64) default '',
   create_time datetime null,
   update_by varchar(64) default '',
@@ -180,6 +251,8 @@ create table if not exists erp_purchase_order_item (
   purchase_price decimal(12,2) default 0.00,
   tax_rate decimal(6,4) default 0.0000,
   amount decimal(14,2) default 0.00,
+  tax_amount decimal(14,2) not null default 0.00,
+  tax_inclusive_amount decimal(14,2) not null default 0.00,
   primary key (item_id),
   key idx_erp_purchase_item_order (purchase_id),
   key idx_erp_purchase_item_sku (sku_id)
@@ -289,7 +362,7 @@ select 'SHOP-DEMO-001', '演示旗舰店', 'douyin', '抖音电商', 'admin', '0
 where not exists (select 1 from erp_shop where shop_code = 'SHOP-DEMO-001');
 
 insert into erp_warehouse(warehouse_code, warehouse_name, warehouse_type, contact_name, contact_phone, address, status, create_by, create_time)
-select 'WH-DEMO-001', '上海主仓', 'self', '仓库主管', '13800000000', '上海市', '0', 'admin', sysdate()
+select 'WH-DEMO-001', '上海主仓', 'physical', '仓库主管', '13800000000', '上海市', '0', 'admin', sysdate()
 where not exists (select 1 from erp_warehouse where warehouse_code = 'WH-DEMO-001');
 
 insert into erp_supplier(supplier_code, supplier_name, contact_name, contact_phone, settlement_type, payment_days, status, create_by, create_time)
@@ -315,8 +388,8 @@ where w.warehouse_code = 'WH-DEMO-001'
     select 1 from erp_inventory_balance b where b.warehouse_id = w.warehouse_id and b.sku_id = s.sku_id
   );
 
-insert into erp_purchase_order(purchase_no, supplier_id, supplier_name, warehouse_id, total_amount, purchase_status, expected_time, create_by, create_time, remark)
-select 'PO-DEMO-20260628-001', sup.supplier_id, sup.supplier_name, wh.warehouse_id, 1850.00, 'approved', date_add(sysdate(), interval 3 day), 'admin', sysdate(), '初始化演示采购单'
+insert into erp_purchase_order(purchase_no, supplier_id, supplier_name, warehouse_id, total_amount, purchase_status, purchase_date, expected_time, create_by, create_time, remark)
+select 'PO-DEMO-20260628-001', sup.supplier_id, sup.supplier_name, wh.warehouse_id, 1850.00, 'approved', curdate(), date_add(sysdate(), interval 3 day), 'admin', sysdate(), '初始化演示采购单'
 from erp_supplier sup
 join erp_warehouse wh on wh.warehouse_code = 'WH-DEMO-001'
 where sup.supplier_code = 'SUP-DEMO-001'
@@ -350,6 +423,7 @@ where not exists (select 1 from sys_menu where perms = 'erp:warehouse:list');
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '供应商管理', @erp_parent_id, 7, 'supplier', 'erp/supplier/index', 1, 0, 'C', '0', '0', 'erp:supplier:list', 'peoples', 'admin', sysdate(), 'ERP supplier'
 where not exists (select 1 from sys_menu where perms = 'erp:supplier:list');
+update sys_menu set route_name = 'ErpSupplier' where perms = 'erp:supplier:list';
 
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '库存查询', @erp_parent_id, 8, 'inventory', 'erp/inventory/index', 1, 0, 'C', '0', '0', 'erp:inventory:list', 'monitor', 'admin', sysdate(), 'ERP inventory'
@@ -358,6 +432,7 @@ where not exists (select 1 from sys_menu where perms = 'erp:inventory:list');
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '采购订单', @erp_parent_id, 9, 'purchase', 'erp/purchase/index', 1, 0, 'C', '0', '0', 'erp:purchase:list', 'form', 'admin', sysdate(), 'ERP purchase'
 where not exists (select 1 from sys_menu where perms = 'erp:purchase:list');
+update sys_menu set route_name = 'ErpPurchaseOrder' where perms = 'erp:purchase:list';
 
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '库存流水', @erp_parent_id, 10, 'movement', 'erp/movement/index', 1, 0, 'C', '0', '0', 'erp:movement:list', 'log', 'admin', sysdate(), 'ERP movement'
@@ -412,6 +487,9 @@ where not exists (select 1 from sys_menu where perms = 'erp:supplier:remove');
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '库存查询', @inventory_menu_id, 1, '#', '', 1, 0, 'F', '0', '0', 'erp:inventory:query', '#', 'admin', sysdate(), ''
 where not exists (select 1 from sys_menu where perms = 'erp:inventory:query');
+insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+select '云仓库存同步', @inventory_menu_id, 2, '#', '', 1, 0, 'F', '0', '0', 'erp:inventory:sync', '#', 'admin', sysdate(), ''
+where not exists (select 1 from sys_menu where perms = 'erp:inventory:sync');
 
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '采购查询', @purchase_menu_id, 1, '#', '', 1, 0, 'F', '0', '0', 'erp:purchase:query', '#', 'admin', sysdate(), ''

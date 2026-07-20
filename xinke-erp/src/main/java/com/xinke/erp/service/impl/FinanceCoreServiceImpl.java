@@ -1,5 +1,6 @@
 package com.xinke.erp.service.impl;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +33,10 @@ public class FinanceCoreServiceImpl implements IFinanceCoreService
     @Override
     public List<Map<String, Object>> selectCashFlowList(Map<String, Object> query) { return financeCoreMapper.selectCashFlowList(query); }
     @Override
+    public Map<String, Object> selectCashFlowSummary(Map<String, Object> query) { return financeCoreMapper.selectCashFlowSummary(query); }
+    @Override
+    public List<Map<String, Object>> selectCashFlowAccountOptions() { return financeCoreMapper.selectCashFlowAccountOptions(); }
+    @Override
     public List<Map<String, Object>> selectExpenseList(Map<String, Object> query) { return financeCoreMapper.selectExpenseList(query); }
     @Override
     public List<Map<String, Object>> selectVoucherList(Map<String, Object> query) { return financeCoreMapper.selectVoucherList(query); }
@@ -41,4 +46,24 @@ public class FinanceCoreServiceImpl implements IFinanceCoreService
     public List<Map<String, Object>> selectReconcileDiffList(Map<String, Object> query) { return financeCoreMapper.selectReconcileDiffList(query); }
     @Override
     public List<Map<String, Object>> selectPeriodCloseList(Map<String, Object> query) { return financeCoreMapper.selectPeriodCloseList(query); }
+
+    @Override
+    public Map<String, Object> selectDashboardOverview()
+    {
+        Map<String, Object> result = new LinkedHashMap<>();
+        Map<String, Object> summary = financeCoreMapper.selectFinanceDashboardSummary();
+        result.put("summary", summary == null ? new LinkedHashMap<>() : summary);
+        result.put("cashTrend", financeCoreMapper.selectFinanceCashTrend());
+        result.put("recentActivities", financeCoreMapper.selectFinanceRecentActivities());
+        return result;
+    }
+
+    @Override
+    public List<Map<String, Object>> selectLedgerList(Map<String, Object> query) { return financeCoreMapper.selectLedgerList(query); }
+
+    @Override
+    public List<Map<String, Object>> selectTrialBalanceList(Map<String, Object> query) { return financeCoreMapper.selectTrialBalanceList(query); }
+
+    @Override
+    public Map<String, Object> selectTrialBalanceSummary(Map<String, Object> query) { return financeCoreMapper.selectTrialBalanceSummary(query); }
 }

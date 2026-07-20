@@ -5,7 +5,7 @@ import { getToken } from '@/utils/auth'
 import errorCode from '@/utils/errorCode'
 import { blobValidate } from '@/utils/xinke'
 
-const baseURL = import.meta.env.VITE_APP_BASE_API
+const baseURL = import.meta.env.VITE_APP_BASE_API || (import.meta.env.DEV ? '/dev-api' : '/prod-api')
 let downloadLoadingInstance
 
 export default {

@@ -1,15 +1,25 @@
 package com.xinke.erp.domain;
 
+import jakarta.validation.constraints.Size;
+
 public class DyViewerCommentPayload
 {
+    @Size(max = 128, message = "评论ID长度不能超过128")
     private String id;
+    @Size(max = 256, message = "secUid长度不能超过256")
     private String secUid;
+    @Size(max = 512, message = "评论去重键长度不能超过512")
     private String dedupeKey;
+    @Size(max = 128, message = "昵称长度不能超过128")
     private String nickname;
+    @Size(max = 2000, message = "评论内容长度不能超过2000")
     private String content;
+    @Size(max = 32, message = "等级长度不能超过32")
     private String level;
     private Long capturedAt;
+    @Size(max = 64, message = "评论来源长度不能超过64")
     private String source;
+    @Size(max = 500, message = "pageUrl长度不能超过500")
     private String pageUrl;
 
     public String getId() { return id; }

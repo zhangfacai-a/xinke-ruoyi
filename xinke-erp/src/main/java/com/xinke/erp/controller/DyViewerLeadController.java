@@ -3,8 +3,12 @@ package com.xinke.erp.controller;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,13 +17,16 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import com.xinke.common.annotation.Anonymous;
 import com.xinke.common.annotation.Log;
+import com.xinke.common.annotation.RateLimiter;
 import com.xinke.common.core.controller.BaseController;
 import com.xinke.common.core.domain.AjaxResult;
 import com.xinke.common.core.page.TableDataInfo;
 import com.xinke.common.enums.BusinessType;
+import com.xinke.common.enums.LimitType;
 import com.xinke.common.utils.poi.ExcelUtil;
 import com.xinke.erp.domain.DyCaptureReport;
 import com.xinke.erp.domain.DyViewerLeadExport;
@@ -34,6 +41,7 @@ public class DyViewerLeadController extends BaseController
     private static final int PLUGIN_DISABLED_CODE = 46001;
     private static final int PLUGIN_VERSION_BLOCKED_CODE = 46002;
     private static final int PLUGIN_CLIENT_DISABLED_CODE = 46003;
+    private static final int PLUGIN_AUTH_FAILED_CODE = 46004;
     private static final String CONFIG_ENABLED = "live.plugin.enabled";
     private static final String CONFIG_MIN_VERSION = "live.plugin.minVersion";
     private static final String CONFIG_LATEST_VERSION = "live.plugin.latestVersion";
@@ -47,10 +55,21 @@ public class DyViewerLeadController extends BaseController
     @Autowired
     private DyViewerLeadMapper dyViewerLeadMapper;
 
+    @Value("${live.plugin.report-key:}")
+    private String pluginReportKey;
+
     @Anonymous
+    @RateLimiter(time = 60, count = 120, limitType = LimitType.IP)
     @PostMapping({ "/live/viewer/report", "/live/userRoom/report" })
-    public AjaxResult report(@RequestBody DyCaptureReport report)
+    public AjaxResult report(@Valid @RequestBody DyCaptureReport report,
+            @RequestHeader(value = "X-Plugin-Key", required = false) String requestPluginKey)
     {
+        if (!pluginAuthenticated(requestPluginKey))
+        {
+            return AjaxResult.error(PLUGIN_AUTH_FAILED_CODE, "插件认证失败")
+                    .put("pluginAction", "stop")
+                    .put("reason", "authentication_failed");
+        }
         AjaxResult blocked = checkPluginControl(report);
         if (blocked != null)
         {
@@ -277,6 +296,17 @@ public class DyViewerLeadController extends BaseController
                     "Plugin version is too old. Please update to " + minVersion + " or later", data);
         }
         return null;
+    }
+
+    private boolean pluginAuthenticated(String requestPluginKey)
+    {
+        String expected = pluginReportKey == null ? "" : pluginReportKey.trim();
+        if (expected.isEmpty())
+        {
+            return true;
+        }
+        String actual = requestPluginKey == null ? "" : requestPluginKey.trim();
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
     }
 
     private AjaxResult pluginStop(int code, String message, Map<String, Object> data)

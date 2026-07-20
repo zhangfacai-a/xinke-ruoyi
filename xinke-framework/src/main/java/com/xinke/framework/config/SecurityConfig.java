@@ -1,6 +1,7 @@
 package com.xinke.framework.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -13,6 +14,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.filter.CorsFilter;
 import com.xinke.framework.config.properties.PermitAllUrlProperties;
 import com.xinke.framework.security.filter.JwtAuthenticationTokenFilter;
@@ -58,6 +61,9 @@ public class SecurityConfig
     @Autowired
     private PermitAllUrlProperties permitAllUrl;
 
+    @Value("${security.frame-ancestors:}")
+    private String frameAncestors;
+
 	/**
 	 * 身份验证实现
 	 */
@@ -88,11 +94,13 @@ public class SecurityConfig
         return httpSecurity
             // CSRF禁用，因为不使用session
             .csrf(csrf -> csrf.disable())
-            // 禁用HTTP响应标头
+            // 安全响应标头；外部 BI iframe 来源通过配置显式放行
             .headers((headersCustomizer) -> {
-                headersCustomizer.cacheControl(cache -> cache.disable())
-                    .frameOptions(options -> options.disable())
-                    .contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'self' http://39.96.157.230"));
+                String allowedFrames = frameAncestors == null ? "" : frameAncestors.trim();
+                headersCustomizer.frameOptions(options -> options.disable())
+                    .referrerPolicy(policy -> policy.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                    .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "camera=(), microphone=(), geolocation=()"))
+                    .contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'self' " + allowedFrames));
             })
             // 认证失败处理类
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
@@ -105,7 +113,6 @@ public class SecurityConfig
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 静态资源，可匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
-                    .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

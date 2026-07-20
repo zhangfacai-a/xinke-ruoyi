@@ -83,6 +83,13 @@
         where warehouse_id = #{warehouseId}
           and sku_id = #{skuId}
         limit 1
+        for update
+    </select>
+
+    <select id="selectWarehouseInventoryPolicy" parameterType="Long" resultType="java.util.HashMap">
+        select warehouse_id, warehouse_name, warehouse_type, warehouse_usage, allow_negative_stock, status
+        from erp_warehouse
+        where warehouse_id = #{warehouseId}
     </select>
 
     <insert id="insertInventoryBalance">

@@ -1,12 +1,14 @@
 <template>
   <div class="app-container">
+    <el-alert class="config-guide" type="info" :closable="false" show-icon title="财务基础资料当前采用受控维护：这里用于核对期间、科目、费用类型和资金账户，避免业务人员随意修改已用于凭证的基础数据。" />
+    <div class="config-toolbar"><el-button icon="Refresh" :loading="loading" @click="loadData">刷新基础资料</el-button></div>
     <el-tabs v-model="activeName">
       <el-tab-pane label="会计期间" name="period">
         <el-table v-loading="loading" :data="periodList">
           <el-table-column label="期间" prop="periodCode" align="center" />
           <el-table-column label="开始日期" prop="startDate" align="center" />
           <el-table-column label="结束日期" prop="endDate" align="center" />
-          <el-table-column label="结账状态" prop="closeStatus" align="center" />
+          <el-table-column label="结账状态" align="center"><template #default="{ row }"><el-tag round :type="row.closeStatus === 'closed' ? 'success' : 'warning'">{{ row.closeStatus === 'closed' ? '已关账' : '开放' }}</el-tag></template></el-table-column>
           <el-table-column label="结账人" prop="closeBy" align="center" />
           <el-table-column label="结账时间" prop="closeTime" align="center" width="170" />
         </el-table>
@@ -15,10 +17,10 @@
         <el-table v-loading="loading" :data="subjectList">
           <el-table-column label="科目编码" prop="subjectCode" align="center" />
           <el-table-column label="科目名称" prop="subjectName" align="center" min-width="160" />
-          <el-table-column label="科目类型" prop="subjectType" align="center" />
+          <el-table-column label="科目类型" align="center"><template #default="{ row }">{{ subjectTypeLabel(row.subjectType) }}</template></el-table-column>
           <el-table-column label="上级科目" prop="parentCode" align="center" />
-          <el-table-column label="余额方向" prop="balanceDirection" align="center" />
-          <el-table-column label="状态" prop="status" align="center" />
+          <el-table-column label="余额方向" align="center"><template #default="{ row }">{{ row.balanceDirection === 'debit' ? '借方' : '贷方' }}</template></el-table-column>
+          <el-table-column label="状态" align="center"><template #default="{ row }"><el-tag round :type="row.status === '0' ? 'success' : 'info'">{{ row.status === '0' ? '启用' : '停用' }}</el-tag></template></el-table-column>
         </el-table>
       </el-tab-pane>
       <el-tab-pane label="费用类型" name="feeType">
@@ -28,7 +30,7 @@
           <el-table-column label="费用分类" prop="feeCategory" align="center" />
           <el-table-column label="默认科目" prop="defaultSubjectCode" align="center" />
           <el-table-column label="分摊规则" prop="allocateRule" align="center" />
-          <el-table-column label="状态" prop="status" align="center" />
+          <el-table-column label="状态" align="center"><template #default="{ row }">{{ row.status === '0' ? '启用' : '停用' }}</template></el-table-column>
         </el-table>
       </el-tab-pane>
       <el-tab-pane label="平台账户" name="platformAccount">
@@ -37,7 +39,7 @@
           <el-table-column label="店铺" prop="shopName" align="center" min-width="150" />
           <el-table-column label="账户号" prop="accountNo" align="center" min-width="180" />
           <el-table-column label="币种" prop="currency" align="center" />
-          <el-table-column label="状态" prop="status" align="center" />
+          <el-table-column label="状态" align="center"><template #default="{ row }">{{ row.status === '0' ? '启用' : '停用' }}</template></el-table-column>
         </el-table>
       </el-tab-pane>
       <el-tab-pane label="银行账户" name="bankAccount">
@@ -46,8 +48,8 @@
           <el-table-column label="开户行" prop="bankName" align="center" />
           <el-table-column label="银行账号" prop="bankNo" align="center" min-width="180" />
           <el-table-column label="币种" prop="currency" align="center" />
-          <el-table-column label="期初余额" prop="openingBalance" align="right" />
-          <el-table-column label="状态" prop="status" align="center" />
+          <el-table-column label="期初余额" align="right"><template #default="{ row }">{{ money(row.openingBalance) }}</template></el-table-column>
+          <el-table-column label="状态" align="center"><template #default="{ row }">{{ row.status === '0' ? '启用' : '停用' }}</template></el-table-column>
         </el-table>
       </el-tab-pane>
     </el-tabs>
@@ -84,5 +86,12 @@ function loadData() {
   })
 }
 
+function money(value) { return `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
+function subjectTypeLabel(value) { return ({ asset: '资产', liability: '负债', equity: '权益', revenue: '收入', cost: '成本', expense: '费用' })[value] || value || '-' }
+
 loadData()
 </script>
+
+<style scoped>
+.config-guide { margin-bottom:12px; }.config-toolbar { display:flex; justify-content:flex-end; margin-bottom:8px; }
+</style>

@@ -89,9 +89,18 @@ insert into erp_shop(shop_code, shop_name, platform_code, platform_name, owner_n
 ('DEMO-SHOP-TM', '天猫官方店', 'tmall', '天猫', '钱运营', '0', 'admin', sysdate(), '演示店铺'),
 ('DEMO-SHOP-JD', '京东自营店', 'jd', '京东', '孙运营', '0', 'admin', sysdate(), '演示店铺');
 
-insert into erp_warehouse(warehouse_code, warehouse_name, warehouse_type, contact_name, contact_phone, address, status, create_by, create_time, remark) values
-('DEMO-WH-HZ', '杭州中心仓', 'self', '李仓管', '13800001111', '杭州市余杭区未来科技城', '0', 'admin', sysdate(), '演示仓库'),
-('DEMO-WH-SH', '上海前置仓', 'third_party', '周仓管', '13800002222', '上海市青浦区云仓园区', '0', 'admin', sysdate(), '演示仓库');
+insert into erp_warehouse(
+    warehouse_code, warehouse_name, warehouse_type, warehouse_usage, ownership_type,
+    provider_name, external_warehouse_code, owner_code, sync_mode, sync_status,
+    enable_location, allow_negative_stock, priority,
+    contact_name, contact_phone, address, status, create_by, create_time, remark
+) values
+('DEMO-WH-HZ', '杭州中心仓', 'physical', 'normal', 'self_operated',
+ null, null, null, 'manual', 'not_applicable', '1', '0', 10,
+ '李仓管', '13800001111', '杭州市余杭区未来科技城', '0', 'admin', sysdate(), '演示实体仓'),
+('DEMO-WH-SH', '上海云仓', 'cloud', 'normal', 'outsourced',
+ '演示云仓服务商', 'CLOUD-SH-01', 'OWNER-XINKE', 'manual', 'never', '0', '0', 20,
+ '周仓管', '13800002222', '上海市青浦区云仓园区', '0', 'admin', sysdate(), '演示云仓');
 
 insert into erp_supplier(supplier_code, supplier_name, contact_name, contact_phone, settlement_type, payment_days, status, create_by, create_time, remark) values
 ('DEMO-SUP-A', '广州源头供应链有限公司', '王经理', '13900001111', 'monthly', 30, '0', 'admin', sysdate(), '主营小家电'),
@@ -146,19 +155,19 @@ insert into erp_inventory_balance(warehouse_id, warehouse_name, sku_id, sku_code
 (@wh_sh, '上海前置仓', @sku5, 'DEMO-SKU-005', '保温杯-钛灰色', 320, 10, 50, 4, 70, 45.00, sysdate(), sysdate()),
 (@wh_sh, '上海前置仓', @sku6, 'DEMO-SKU-006', '防晒套装-三件套', 150, 6, 25, 1, 40, 52.00, sysdate(), sysdate());
 
-insert into erp_purchase_order(purchase_no, supplier_id, supplier_name, warehouse_id, total_amount, purchase_status, expected_time, create_by, create_time, remark) values
-('DEMO-PO-001', @sup_a, '广州源头供应链有限公司', @wh_hz, 28600.00, 'approved', date_add(sysdate(), interval 3 day), 'admin', sysdate(), '榨汁杯补货'),
-('DEMO-PO-002', @sup_b, '深圳优选科技有限公司', @wh_sh, 34500.00, 'processing', date_add(sysdate(), interval 5 day), 'admin', sysdate(), '耳机和套装补货'),
-('DEMO-PO-003', @sup_a, '广州源头供应链有限公司', @wh_hz, 13500.00, 'draft', date_add(sysdate(), interval 7 day), 'admin', sysdate(), '保温杯试单');
+insert into erp_purchase_order(purchase_no, supplier_id, supplier_name, warehouse_id, total_amount, tax_amount, total_with_tax, purchase_status, purchase_date, expected_time, create_by, create_time, remark) values
+('DEMO-PO-001', @sup_a, '广州源头供应链有限公司', @wh_hz, 28600.00, 3718.00, 32318.00, 'approved', date_sub(curdate(), interval 10 day), date_add(sysdate(), interval 3 day), 'admin', sysdate(), '榨汁杯补货'),
+('DEMO-PO-002', @sup_b, '深圳优选科技有限公司', @wh_sh, 34500.00, 4485.00, 38985.00, 'processing', date_sub(curdate(), interval 5 day), date_add(sysdate(), interval 5 day), 'admin', sysdate(), '耳机和套装补货'),
+('DEMO-PO-003', @sup_a, '广州源头供应链有限公司', @wh_hz, 13500.00, 1755.00, 15255.00, 'draft', curdate(), date_add(sysdate(), interval 7 day), 'admin', sysdate(), '保温杯试单');
 
 set @po1 := (select purchase_id from erp_purchase_order where purchase_no = 'DEMO-PO-001');
 set @po2 := (select purchase_id from erp_purchase_order where purchase_no = 'DEMO-PO-002');
-insert into erp_purchase_order_item(purchase_id, purchase_no, sku_id, sku_code, sku_name, quantity, received_qty, purchase_price, tax_rate, amount) values
-(@po1, 'DEMO-PO-001', @sku1, 'DEMO-SKU-001', '榨汁杯-奶白色', 300, 180, 66.00, 0.13, 19800.00),
-(@po1, 'DEMO-PO-001', @sku2, 'DEMO-SKU-002', '榨汁杯-薄荷绿', 120, 80, 73.33, 0.13, 8800.00),
-(@po2, 'DEMO-PO-002', @sku3, 'DEMO-SKU-003', '蓝牙耳机-标准版', 160, 90, 90.00, 0.13, 14400.00),
-(@po2, 'DEMO-PO-002', @sku4, 'DEMO-SKU-004', '蓝牙耳机-Pro版', 80, 20, 131.25, 0.13, 10500.00),
-(@po2, 'DEMO-PO-002', @sku6, 'DEMO-SKU-006', '防晒套装-三件套', 180, 60, 53.33, 0.13, 9600.00);
+insert into erp_purchase_order_item(purchase_id, purchase_no, sku_id, sku_code, sku_name, quantity, received_qty, purchase_price, tax_rate, amount, tax_amount, tax_inclusive_amount) values
+(@po1, 'DEMO-PO-001', @sku1, 'DEMO-SKU-001', '榨汁杯-奶白色', 300, 180, 66.00, 0.13, 19800.00, 2574.00, 22374.00),
+(@po1, 'DEMO-PO-001', @sku2, 'DEMO-SKU-002', '榨汁杯-薄荷绿', 120, 80, 73.33, 0.13, 8800.00, 1144.00, 9944.00),
+(@po2, 'DEMO-PO-002', @sku3, 'DEMO-SKU-003', '蓝牙耳机-标准版', 160, 90, 90.00, 0.13, 14400.00, 1872.00, 16272.00),
+(@po2, 'DEMO-PO-002', @sku4, 'DEMO-SKU-004', '蓝牙耳机-Pro版', 80, 20, 131.25, 0.13, 10500.00, 1365.00, 11865.00),
+(@po2, 'DEMO-PO-002', @sku6, 'DEMO-SKU-006', '防晒套装-三件套', 180, 60, 53.33, 0.13, 9600.00, 1248.00, 10848.00);
 
 insert into erp_sales_order(sales_no, platform_order_no, shop_id, shop_name, customer_id, order_status, pay_amount, pay_time, create_by, create_time, remark) values
 ('DEMO-SO-001', 'DY202606290001', @shop_dy, '抖音旗舰店', @cus1, 'paid', 387.00, concat(@today, ' 10:12:00'), 'admin', sysdate(), '直播间订单'),

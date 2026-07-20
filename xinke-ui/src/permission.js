@@ -25,6 +25,10 @@ router.beforeEach(async (to, from) => {
   if (queryToken) {
     setToken(embedToken)
     useUserStore().token = embedToken
+    const cleanQuery = { ...to.query }
+    delete cleanQuery.token
+    delete cleanQuery.accessToken
+    return { path: to.path, query: cleanQuery, hash: to.hash, replace: true }
   }
   if (embedToken || getToken()) {
     to.meta.title && useSettingsStore().setTitle(to.meta.title)

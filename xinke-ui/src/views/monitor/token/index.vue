@@ -76,7 +76,7 @@
       <div class="panel-head">
         <div>
           <h3>获取记录</h3>
-          <p>记录保存在当前浏览器本地，用于追踪什么时候生成过外部看板 token。</p>
+          <p>本地只记录获取时间、账号和脱敏摘要，不保存完整 token。</p>
         </div>
         <el-button type="danger" plain icon="Delete" @click="clearHistory" :disabled="!historyRows.length">
           清空记录
@@ -87,13 +87,6 @@
         <el-table-column label="获取时间" prop="createdAt" width="180" />
         <el-table-column label="账号" prop="username" width="140" />
         <el-table-column label="Token摘要" prop="tokenMask" min-width="280" show-overflow-tooltip />
-        <el-table-column label="嵌入地址" prop="embedUrl" min-width="360" show-overflow-tooltip />
-        <el-table-column label="操作" width="190" fixed="right">
-          <template #default="scope">
-            <el-button link type="primary" icon="CopyDocument" @click="copyText(scope.row.embedUrl)">复制地址</el-button>
-            <el-button link type="primary" icon="CopyDocument" @click="copyText(scope.row.token)">复制Token</el-button>
-          </template>
-        </el-table-column>
       </el-table>
     </section>
   </div>
@@ -141,26 +134,25 @@ function appendHistory(token) {
     id: `${Date.now()}`,
     createdAt: parseTime(new Date()),
     username: userStore.name || userStore.nickName || '当前用户',
-    token,
-    tokenMask: maskToken(token),
-    embedUrl: embedUrl.value || buildEmbedUrl(token)
+    tokenMask: maskToken(token)
   }
   const nextRows = [row, ...rows].slice(0, 50)
   localStorage.setItem(historyKey, JSON.stringify(nextRows))
   historyRows.value = nextRows
 }
 
-function buildEmbedUrl(token) {
-  const url = new URL('/live-bi-embed', window.location.origin)
-  url.searchParams.set('token', token)
-  url.searchParams.set('days', '7')
-  return url.toString()
-}
-
 function readHistory() {
   try {
     const rows = JSON.parse(localStorage.getItem(historyKey) || '[]')
-    return Array.isArray(rows) ? rows : []
+    if (!Array.isArray(rows)) return []
+    const sanitizedRows = rows.map(row => ({
+      id: row.id,
+      createdAt: row.createdAt,
+      username: row.username,
+      tokenMask: row.tokenMask || maskToken(row.token || '')
+    }))
+    localStorage.setItem(historyKey, JSON.stringify(sanitizedRows))
+    return sanitizedRows
   } catch (e) {
     return []
   }

@@ -8,6 +8,13 @@ export function listWarehouse(query) {
   })
 }
 
+export function getWarehouseSummary() {
+  return request({
+    url: '/erp/warehouse/summary',
+    method: 'get'
+  })
+}
+
 export function getWarehouse(warehouseId) {
   return request({
     url: '/erp/warehouse/' + warehouseId,
@@ -34,6 +41,36 @@ export function updateWarehouse(data) {
 export function delWarehouse(warehouseId) {
   return request({
     url: '/erp/warehouse/' + warehouseId,
+    method: 'delete'
+  })
+}
+
+export function listWarehouseLocation(warehouseId) {
+  return request({
+    url: `/erp/warehouse/${warehouseId}/location/list`,
+    method: 'get'
+  })
+}
+
+export function addWarehouseLocation(data) {
+  return request({
+    url: '/erp/warehouse/location',
+    method: 'post',
+    data
+  })
+}
+
+export function updateWarehouseLocation(data) {
+  return request({
+    url: '/erp/warehouse/location',
+    method: 'put',
+    data
+  })
+}
+
+export function delWarehouseLocation(locationIds) {
+  return request({
+    url: `/erp/warehouse/location/${locationIds}`,
     method: 'delete'
   })
 }

@@ -306,6 +306,22 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         {
             throw new ServiceException("payloadType is required");
         }
+        String payloadType = normalize(report.getPayloadType());
+        if (!"comments".equals(payloadType)
+                && !"audiences".equals(payloadType)
+                && !"online_audiences".equals(payloadType))
+        {
+            throw new ServiceException("Unsupported payloadType");
+        }
+        if ("comments".equals(payloadType) && (report.getComments() == null || report.getComments().isEmpty()))
+        {
+            throw new ServiceException("comments cannot be empty");
+        }
+        if (("audiences".equals(payloadType) || "online_audiences".equals(payloadType))
+                && (report.getAudiences() == null || report.getAudiences().isEmpty()))
+        {
+            throw new ServiceException("audiences cannot be empty");
+        }
     }
 
     private Map<String, Object> normalizeBiQuery(Map<String, Object> query)

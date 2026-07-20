@@ -4,6 +4,8 @@
     <resultMap id="ErpOrderItemResult" type="ErpOrderItem">
         <id property="orderItemId" column="order_item_id"/>
         <result property="orderId" column="order_id"/>
+        <result property="mainOrderNo" column="main_order_no"/>
+        <result property="subOrderNo" column="sub_order_no"/>
         <result property="shopId" column="shop_id"/>
         <result property="shopName" column="shop_name"/>
         <result property="productId" column="product_id"/>
@@ -24,7 +26,10 @@
     </resultMap>
 
     <sql id="selectOrderItemVo">
-        select order_item_id, order_id, shop_id, shop_name, product_id, product_name, sku_id, sku_name,
+        select order_item_id, order_id,
+               coalesce(nullif(main_order_no, ''), cast(order_id as char)) main_order_no,
+               coalesce(nullif(sub_order_no, ''), concat(cast(order_id as char), '-', order_item_id)) sub_order_no,
+               shop_id, shop_name, product_id, product_name, sku_id, sku_name,
                quantity, pay_amount, product_cost, platform_fee, ad_cost, freight_fee, refund_cost,
                profit_amount, order_status, pay_time, dt
         from dwd_order_item
@@ -34,6 +39,12 @@
         <include refid="selectOrderItemVo"/>
         <where>
             <if test="orderId != null">and order_id = #{orderId}</if>
+            <if test="mainOrderNo != null and mainOrderNo != ''">
+                and coalesce(nullif(main_order_no, ''), cast(order_id as char)) like concat('%', #{mainOrderNo}, '%')
+            </if>
+            <if test="subOrderNo != null and subOrderNo != ''">
+                and coalesce(nullif(sub_order_no, ''), concat(cast(order_id as char), '-', order_item_id)) like concat('%', #{subOrderNo}, '%')
+            </if>
             <if test="shopName != null and shopName != ''">and shop_name like concat('%', #{shopName}, '%')</if>
             <if test="productName != null and productName != ''">and product_name like concat('%', #{productName}, '%')</if>
             <if test="orderStatus != null">and order_status = #{orderStatus}</if>
@@ -45,4 +56,439 @@
         <include refid="selectOrderItemVo"/>
         where order_item_id = #{orderItemId}
     </select>
+
+    <sql id="fulfillmentOrderWhere">
+        <where>
+            <if test="query.mainOrderNo != null and query.mainOrderNo != ''">
+                and o.main_order_no like concat('%', #{query.mainOrderNo}, '%')
+            </if>
+            <if test="query.subOrderNo != null and query.subOrderNo != ''">
+                and exists (
+                    select 1 from erp_sales_order_item si
+                    where si.sales_id = o.sales_id
+                      and si.sub_order_no like concat('%', #{query.subOrderNo}, '%')
+                )
+            </if>
+            <if test="query.shopName != null and query.shopName != ''">
+                and o.shop_name like concat('%', #{query.shopName}, '%')
+            </if>
+            <if test="query.productName != null and query.productName != ''">
+                and exists (
+                    select 1 from erp_sales_order_item si
+                    where si.sales_id = o.sales_id
+                      and (si.product_name like concat('%', #{query.productName}, '%')
+                           or si.sku_name like concat('%', #{query.productName}, '%')
+                           or si.sku_code like concat('%', #{query.productName}, '%'))
+                )
+            </if>
+            <if test="query.fulfillmentStatus != null and query.fulfillmentStatus != ''">
+                and o.fulfillment_status = #{query.fulfillmentStatus}
+            </if>
+            <if test="query.beginPayTime != null and query.beginPayTime != ''">
+                and o.pay_time &gt;= concat(#{query.beginPayTime}, ' 00:00:00')
+            </if>
+            <if test="query.endPayTime != null and query.endPayTime != ''">
+                and o.pay_time &lt;= concat(#{query.endPayTime}, ' 23:59:59')
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectFulfillmentOrderList" resultType="java.util.LinkedHashMap">
+        select o.sales_id as salesId, o.sales_no as salesNo,
+               o.main_order_no as mainOrderNo, o.shop_id as shopId, o.shop_name as shopName,
+               o.order_status as orderStatus, o.fulfillment_status as fulfillmentStatus,
+               o.total_quantity as totalQuantity, o.shipped_quantity as shippedQuantity,
+               o.refunded_quantity as refundedQuantity, o.pay_amount as payAmount,
+               o.refund_amount as refundAmount, o.pay_time as payTime,
+               count(i.item_id) as itemCount,
+               sum(case when i.quantity &gt; i.shipped_quantity + i.refunded_quantity then 1 else 0 end) as pendingItemCount,
+               round(if(o.total_quantity = 0, 0,
+                   (o.shipped_quantity + o.refunded_quantity) * 100 / o.total_quantity), 2) as processRate
+        from erp_sales_order o
+        left join erp_sales_order_item i on i.sales_id = o.sales_id
+        <include refid="fulfillmentOrderWhere"/>
+        group by o.sales_id, o.sales_no, o.main_order_no, o.shop_id, o.shop_name,
+                 o.order_status, o.fulfillment_status, o.total_quantity,
+                 o.shipped_quantity, o.refunded_quantity, o.pay_amount,
+                 o.refund_amount, o.pay_time
+        order by o.pay_time desc, o.sales_id desc
+    </select>
+
+    <select id="selectFulfillmentSummary" resultType="java.util.LinkedHashMap">
+        select count(*) as orderCount,
+               ifnull(sum(o.pay_amount), 0) as payAmount,
+               sum(case when o.fulfillment_status = 'pending' then 1 else 0 end) as pendingCount,
+               sum(case when o.fulfillment_status = 'partial_shipped' then 1 else 0 end) as partialShippedCount,
+               sum(case when o.fulfillment_status = 'shipped' then 1 else 0 end) as shippedCount,
+               sum(case when o.fulfillment_status in ('after_sale', 'refunded') then 1 else 0 end) as afterSaleCount,
+               ifnull(sum(o.total_quantity - o.shipped_quantity - o.refunded_quantity), 0) as pendingQuantity
+        from erp_sales_order o
+        <include refid="fulfillmentOrderWhere"/>
+    </select>
+
+    <select id="selectSalesOrderById" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select sales_id as salesId, sales_no as salesNo, platform_order_no as platformOrderNo,
+               main_order_no as mainOrderNo, shop_id as shopId, shop_name as shopName,
+               customer_id as customerId, customer_name as customerName, source_type as sourceType,
+               order_status as orderStatus, fulfillment_status as fulfillmentStatus,
+               total_quantity as totalQuantity, shipped_quantity as shippedQuantity,
+               refunded_quantity as refundedQuantity, pay_amount as payAmount,
+               refund_amount as refundAmount, pay_time as payTime, data_sync_time as dataSyncTime,
+               create_time as createTime, update_time as updateTime, remark
+        from erp_sales_order
+        where sales_id = #{salesId}
+    </select>
+
+    <select id="selectSalesOrderForUpdate" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select * from erp_sales_order where sales_id = #{salesId} for update
+    </select>
+
+    <select id="selectSalesOrderItems" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select item_id as salesItemId, sales_id as salesId, sales_no as salesNo,
+               dwd_order_item_id as dwdOrderItemId, main_order_no as mainOrderNo,
+               sub_order_no as subOrderNo, sku_id as skuId, sku_code as skuCode,
+               sku_name as skuName, product_name as productName, quantity,
+               shipped_quantity as shippedQuantity, refunded_quantity as refundedQuantity,
+               greatest(quantity - shipped_quantity - refunded_quantity, 0) as pendingQuantity,
+               pay_amount as payAmount, product_cost as productCost,
+               item_status as itemStatus, version, create_time as createTime, update_time as updateTime
+        from erp_sales_order_item
+        where sales_id = #{salesId}
+        order by item_id
+    </select>
+
+    <select id="selectSalesOrderItemForUpdate" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select * from erp_sales_order_item where item_id = #{salesItemId} for update
+    </select>
+
+    <select id="selectSalesOrderItem" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select item_id as salesItemId, sales_id as salesId
+        from erp_sales_order_item
+        where item_id = #{salesItemId}
+    </select>
+
+    <select id="selectSalesShipments" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select shipment_id as shipmentId, shipment_no as shipmentNo, sales_id as salesId,
+               sales_no as salesNo, main_order_no as mainOrderNo, package_no as packageNo,
+               warehouse_id as warehouseId, warehouse_name as warehouseName,
+               logistics_company as logisticsCompany, logistics_no as logisticsNo,
+               shipment_status as shipmentStatus, shipped_time as shippedTime,
+               shipped_by as shippedBy, signed_time as signedTime,
+               cancel_by as cancelBy, cancel_time as cancelTime, cancel_reason as cancelReason,
+               create_by as createBy, create_time as createTime, remark
+        from erp_sales_shipment
+        where sales_id = #{salesId}
+        order by shipment_id desc
+    </select>
+
+    <select id="selectShipmentItems" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select shipment_item_id as shipmentItemId, shipment_id as shipmentId,
+               shipment_no as shipmentNo, sales_item_id as salesItemId,
+               sub_order_no as subOrderNo, sku_id as skuId, sku_code as skuCode,
+               sku_name as skuName, quantity
+        from erp_sales_shipment_item
+        where shipment_id = #{shipmentId}
+        order by shipment_item_id
+    </select>
+
+    <select id="selectAfterSales" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select after_sale_id as afterSaleId, after_sale_no as afterSaleNo,
+               sales_id as salesId, sales_item_id as salesItemId, sales_no as salesNo,
+               main_order_no as mainOrderNo, sub_order_no as subOrderNo,
+               sku_id as skuId, sku_code as skuCode, sku_name as skuName,
+               quantity, after_sale_type as afterSaleType,
+               after_sale_status as afterSaleStatus, refund_amount as refundAmount,
+               return_warehouse_id as returnWarehouseId,
+               return_warehouse_name as returnWarehouseName, reason,
+               approve_by as approveBy, approve_time as approveTime,
+               complete_by as completeBy, complete_time as completeTime,
+               create_by as createBy, create_time as createTime, remark
+        from erp_after_sale_order
+        where sales_id = #{salesId}
+        order by after_sale_id desc
+    </select>
+
+    <select id="selectAvailableWarehouses" resultType="java.util.LinkedHashMap">
+        select warehouse_id as warehouseId, warehouse_code as warehouseCode,
+               warehouse_name as warehouseName, warehouse_type as warehouseType,
+               warehouse_usage as warehouseUsage
+        from erp_warehouse
+        where status = '0'
+        order by case when warehouse_type in ('physical', 'self') then 0 else 1 end,
+                 warehouse_id
+    </select>
+
+    <select id="selectWarehouseForFulfillment" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select warehouse_id as warehouseId, warehouse_code as warehouseCode,
+               warehouse_name as warehouseName, warehouse_type as warehouseType,
+               warehouse_usage as warehouseUsage, allow_negative_stock as allowNegativeStock,
+               status
+        from erp_warehouse
+        where warehouse_id = #{warehouseId}
+    </select>
+
+    <select id="selectReservedShipmentQuantity" parameterType="Long" resultType="int">
+        select ifnull(sum(si.quantity), 0)
+        from erp_sales_shipment_item si
+        inner join erp_sales_shipment s on s.shipment_id = si.shipment_id
+        where si.sales_item_id = #{salesItemId}
+          and s.shipment_status = 'draft'
+    </select>
+
+    <select id="selectReservedAfterSale" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select ifnull(sum(quantity), 0) as reservedQuantity,
+               ifnull(sum(refund_amount), 0) as reservedAmount
+        from erp_after_sale_order
+        where sales_item_id = #{salesItemId}
+          and after_sale_status in ('pending', 'approved')
+    </select>
+
+    <select id="selectFulfillmentLogs" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select log_id as logId, sales_id as salesId, sales_item_id as salesItemId,
+               biz_type as bizType, biz_no as bizNo, action_type as actionType,
+               from_status as fromStatus, to_status as toStatus,
+               operator_name as operatorName, action_time as actionTime, detail
+        from erp_sales_fulfillment_log
+        where sales_id = #{salesId}
+        order by log_id desc
+        limit 100
+    </select>
+
+    <insert id="syncSalesOrdersFromDwd">
+        insert into erp_sales_order(
+            sales_no, platform_order_no, main_order_no, shop_id, shop_name,
+            source_type, order_status, fulfillment_status, total_quantity,
+            pay_amount, pay_time, data_sync_time, create_by, create_time, update_time
+        )
+        select concat('SO-', substr(sha2(concat(x.shop_id, '|', x.main_order_no), 256), 1, 24)),
+               x.main_order_no, x.main_order_no, x.shop_id, x.shop_name,
+               'dwd_sync', 'paid', 'pending', x.total_quantity,
+               x.pay_amount, x.pay_time, sysdate(), 'system', sysdate(), sysdate()
+        from (
+            select ifnull(d.shop_id, 0) shop_id,
+                   coalesce(nullif(d.main_order_no, ''), cast(d.order_id as char)) main_order_no,
+                   max(d.shop_name) shop_name, sum(ifnull(d.quantity, 0)) total_quantity,
+                   sum(ifnull(d.pay_amount, 0)) pay_amount, max(d.pay_time) pay_time
+            from dwd_order_item d
+            group by ifnull(d.shop_id, 0),
+                     coalesce(nullif(d.main_order_no, ''), cast(d.order_id as char))
+        ) x
+        on duplicate key update
+            shop_name = values(shop_name), pay_amount = values(pay_amount),
+            pay_time = values(pay_time), data_sync_time = sysdate(), update_time = sysdate()
+    </insert>
+
+    <insert id="syncSalesOrderItemsFromDwd">
+        insert into erp_sales_order_item(
+            sales_id, sales_no, dwd_order_item_id, main_order_no, sub_order_no,
+            sku_id, sku_code, sku_name, product_name, quantity,
+            pay_amount, product_cost, item_status, create_time, update_time
+        )
+        select o.sales_id, o.sales_no, d.order_item_id, o.main_order_no,
+               coalesce(nullif(d.sub_order_no, ''), concat(o.main_order_no, '-', d.order_item_id)),
+               d.sku_id, s.sku_code, d.sku_name, d.product_name, ifnull(d.quantity, 0),
+               ifnull(d.pay_amount, 0), ifnull(d.product_cost, 0), 'paid', sysdate(), sysdate()
+        from dwd_order_item d
+        inner join erp_sales_order o
+                on o.shop_id = ifnull(d.shop_id, 0)
+               and o.main_order_no = coalesce(nullif(d.main_order_no, ''), cast(d.order_id as char))
+        left join erp_product_sku s on s.sku_id = d.sku_id
+        on duplicate key update
+            sku_code = values(sku_code), sku_name = values(sku_name),
+            product_name = values(product_name), quantity = values(quantity),
+            pay_amount = values(pay_amount), product_cost = values(product_cost), update_time = sysdate()
+    </insert>
+
+    <update id="refreshSalesOrderQuantity">
+        update erp_sales_order o
+        left join (
+            select sales_id, sum(quantity) total_qty, sum(shipped_quantity) shipped_qty,
+                   sum(refunded_quantity) refunded_qty
+            from erp_sales_order_item group by sales_id
+        ) x on x.sales_id = o.sales_id
+        set o.total_quantity = ifnull(x.total_qty, 0),
+            o.shipped_quantity = ifnull(x.shipped_qty, 0),
+            o.refunded_quantity = ifnull(x.refunded_qty, 0),
+            o.update_time = sysdate()
+    </update>
+
+    <select id="selectShipmentByIdempotencyKey" parameterType="String" resultType="java.util.LinkedHashMap">
+        select shipment_no as shipmentNo
+        from erp_sales_shipment
+        where idempotency_key = #{idempotencyKey}
+        limit 1
+    </select>
+
+    <select id="selectShipmentForUpdate" parameterType="String" resultType="java.util.LinkedHashMap">
+        select shipment_id as shipmentId, shipment_no as shipmentNo, sales_id as salesId,
+               sales_no as salesNo, main_order_no as mainOrderNo,
+               warehouse_id as warehouseId, warehouse_name as warehouseName,
+               logistics_company as logisticsCompany, logistics_no as logisticsNo,
+               shipment_status as shipmentStatus, remark
+        from erp_sales_shipment
+        where shipment_no = #{shipmentNo}
+        for update
+    </select>
+
+    <insert id="insertShipment" parameterType="map" useGeneratedKeys="true" keyProperty="shipmentId">
+        insert into erp_sales_shipment(
+            shipment_no, sales_id, sales_no, main_order_no, package_no,
+            warehouse_id, warehouse_name, logistics_company, logistics_no,
+            idempotency_key, shipment_status, version, create_by, create_time, update_time, remark
+        ) values(
+            #{shipmentNo}, #{salesId}, #{salesNo}, #{mainOrderNo}, #{packageNo},
+            #{warehouseId}, #{warehouseName}, #{logisticsCompany}, #{logisticsNo},
+            #{idempotencyKey}, 'draft', 0, #{createBy}, sysdate(), sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertShipmentItem" parameterType="map">
+        insert into erp_sales_shipment_item(
+            shipment_id, shipment_no, sales_id, sales_item_id, sales_no,
+            main_order_no, sub_order_no, sku_id, sku_code, sku_name, quantity, create_time
+        ) values(
+            #{shipmentId}, #{shipmentNo}, #{salesId}, #{salesItemId}, #{salesNo},
+            #{mainOrderNo}, #{subOrderNo}, #{skuId}, #{skuCode}, #{skuName}, #{quantity}, sysdate()
+        )
+    </insert>
+
+    <update id="updateShipmentStatus">
+        update erp_sales_shipment
+        set shipment_status = #{toStatus}, version = version + 1,
+            update_by = #{username}, update_time = sysdate(),
+            shipped_time = if(#{toStatus} = 'shipped', sysdate(), shipped_time),
+            shipped_by = if(#{toStatus} = 'shipped', #{username}, shipped_by),
+            signed_time = if(#{toStatus} = 'signed', sysdate(), signed_time),
+            cancel_by = if(#{toStatus} = 'canceled', #{username}, cancel_by),
+            cancel_time = if(#{toStatus} = 'canceled', sysdate(), cancel_time),
+            cancel_reason = if(#{toStatus} = 'canceled', #{reason}, cancel_reason)
+        where shipment_no = #{shipmentNo}
+          and shipment_status = #{fromStatus}
+    </update>
+
+    <update id="increaseItemShippedQuantity">
+        update erp_sales_order_item
+        set shipped_quantity = shipped_quantity + #{quantity},
+            version = version + 1, update_time = sysdate()
+        where item_id = #{salesItemId}
+          and shipped_quantity + refunded_quantity + #{quantity} &lt;= quantity
+    </update>
+
+    <select id="selectAfterSaleByIdempotencyKey" parameterType="String" resultType="java.util.LinkedHashMap">
+        select after_sale_no as afterSaleNo
+        from erp_after_sale_order
+        where idempotency_key = #{idempotencyKey}
+        limit 1
+    </select>
+
+    <select id="selectAfterSaleForUpdate" parameterType="String" resultType="java.util.LinkedHashMap">
+        select after_sale_id as afterSaleId, after_sale_no as afterSaleNo,
+               sales_id as salesId, sales_item_id as salesItemId,
+               after_sale_type as afterSaleType, after_sale_status as afterSaleStatus,
+               quantity, refund_amount as refundAmount,
+               return_warehouse_id as returnWarehouseId,
+               return_warehouse_name as returnWarehouseName, reason, remark
+        from erp_after_sale_order
+        where after_sale_no = #{afterSaleNo}
+        for update
+    </select>
+
+    <insert id="insertAfterSale" parameterType="map" useGeneratedKeys="true" keyProperty="afterSaleId">
+        insert into erp_after_sale_order(
+            after_sale_no, sales_id, sales_item_id, sales_no, main_order_no, sub_order_no,
+            sku_id, sku_code, sku_name, quantity, after_sale_type, after_sale_status,
+            amount, refund_amount, return_warehouse_id, return_warehouse_name,
+            idempotency_key, reason, version, create_by, create_time, update_time, remark
+        ) values(
+            #{afterSaleNo}, #{salesId}, #{salesItemId}, #{salesNo}, #{mainOrderNo}, #{subOrderNo},
+            #{skuId}, #{skuCode}, #{skuName}, #{quantity}, #{afterSaleType}, 'pending',
+            #{refundAmount}, #{refundAmount}, #{returnWarehouseId}, #{returnWarehouseName},
+            #{idempotencyKey}, #{reason}, 0, #{createBy}, sysdate(), sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateAfterSaleStatus">
+        update erp_after_sale_order
+        set after_sale_status = #{toStatus}, version = version + 1,
+            update_by = #{username}, update_time = sysdate(),
+            approve_by = if(#{toStatus} = 'approved', #{username}, approve_by),
+            approve_time = if(#{toStatus} = 'approved', sysdate(), approve_time),
+            complete_by = if(#{toStatus} = 'completed', #{username}, complete_by),
+            complete_time = if(#{toStatus} = 'completed', sysdate(), complete_time)
+        where after_sale_no = #{afterSaleNo}
+          and after_sale_status = #{fromStatus}
+    </update>
+
+    <update id="increaseItemRefundedQuantity">
+        update erp_sales_order_item
+        set refunded_quantity = refunded_quantity + #{quantity},
+            version = version + 1, update_time = sysdate()
+        where item_id = #{salesItemId}
+          and refunded_quantity + #{quantity} &lt;= quantity
+    </update>
+
+    <update id="updateDwdRefundCost">
+        update dwd_order_item
+        set refund_cost = ifnull(refund_cost, 0) + #{refundAmount},
+            profit_amount = ifnull(pay_amount, 0) - ifnull(product_cost, 0)
+                          - ifnull(platform_fee, 0) - ifnull(ad_cost, 0)
+                          - ifnull(freight_fee, 0) - (ifnull(refund_cost, 0) + #{refundAmount})
+        where order_item_id = #{dwdOrderItemId}
+    </update>
+
+    <update id="refreshSalesOrderItemStatus">
+        update erp_sales_order_item
+        set item_status = case
+                when refunded_quantity &gt;= quantity then 'refunded'
+                when shipped_quantity &gt;= quantity - refunded_quantity then 'shipped'
+                when shipped_quantity &gt; 0 then 'partial_shipped'
+                when refunded_quantity &gt; 0 then 'partial_refunded'
+                else 'paid'
+            end,
+            update_time = sysdate()
+        where sales_id = #{salesId};
+    </update>
+
+    <update id="refreshSalesOrderStatus">
+        update erp_sales_order o
+        inner join (
+            select i.sales_id, sum(i.quantity) total_qty,
+                   sum(i.shipped_quantity) shipped_qty,
+                   sum(i.refunded_quantity) refunded_qty,
+                   ifnull((select sum(a.refund_amount) from erp_after_sale_order a
+                           where a.sales_id = i.sales_id and a.after_sale_status = 'completed'), 0) refund_amount
+            from erp_sales_order_item i
+            where i.sales_id = #{salesId}
+            group by i.sales_id
+        ) x on x.sales_id = o.sales_id
+        set o.total_quantity = x.total_qty,
+            o.shipped_quantity = x.shipped_qty,
+            o.refunded_quantity = x.refunded_qty,
+            o.refund_amount = x.refund_amount,
+            o.fulfillment_status = case
+                when x.refunded_qty &gt;= x.total_qty then 'refunded'
+                when x.shipped_qty &gt;= x.total_qty - x.refunded_qty then 'shipped'
+                when x.shipped_qty &gt; 0 then 'partial_shipped'
+                when x.refunded_qty &gt; 0 then 'after_sale'
+                else 'pending'
+            end,
+            o.order_status = case
+                when x.refunded_qty &gt;= x.total_qty then 'refunded'
+                when x.shipped_qty &gt;= x.total_qty - x.refunded_qty then 'shipped'
+                else o.order_status
+            end,
+            o.version = o.version + 1,
+            o.update_time = sysdate()
+        where o.sales_id = #{salesId}
+    </update>
+
+    <insert id="insertFulfillmentLog" parameterType="map">
+        insert into erp_sales_fulfillment_log(
+            sales_id, sales_item_id, biz_type, biz_no, action_type,
+            from_status, to_status, operator_name, action_time, detail
+        ) values(
+            #{salesId}, #{salesItemId}, #{bizType}, #{bizNo}, #{actionType},
+            #{fromStatus}, #{toStatus}, #{operatorName}, sysdate(), #{detail}
+        )
+    </insert>
 </mapper>

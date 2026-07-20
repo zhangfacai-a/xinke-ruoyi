@@ -5,6 +5,8 @@
         <id property="balanceId" column="balance_id"/>
         <result property="warehouseId" column="warehouse_id"/>
         <result property="warehouseName" column="warehouse_name"/>
+        <result property="warehouseType" column="warehouse_type"/>
+        <result property="providerName" column="provider_name"/>
         <result property="skuId" column="sku_id"/>
         <result property="skuCode" column="sku_code"/>
         <result property="skuName" column="sku_name"/>
@@ -14,20 +16,122 @@
         <result property="defectiveQty" column="defective_qty"/>
         <result property="safetyQty" column="safety_qty"/>
         <result property="costPrice" column="cost_price"/>
+        <result property="externalAvailableQty" column="external_available_qty"/>
+        <result property="externalLockedQty" column="external_locked_qty"/>
+        <result property="syncDiffQty" column="sync_diff_qty"/>
+        <result property="syncStatus" column="sync_status"/>
+        <result property="lastSyncTime" column="last_sync_time"/>
         <result property="createTime" column="create_time"/>
         <result property="updateTime" column="update_time"/>
     </resultMap>
 
-    <select id="selectInventoryList" parameterType="ErpInventoryBalance" resultMap="ErpInventoryResult">
-        select balance_id, warehouse_id, warehouse_name, sku_id, sku_code, sku_name,
-               available_qty, locked_qty, inbound_qty, defective_qty, safety_qty, cost_price,
-               create_time, update_time
-        from erp_inventory_balance
+    <sql id="inventoryWhere">
         <where>
-            <if test="warehouseName != null and warehouseName != ''">and warehouse_name like concat('%', #{warehouseName}, '%')</if>
-            <if test="skuCode != null and skuCode != ''">and sku_code like concat('%', #{skuCode}, '%')</if>
-            <if test="skuName != null and skuName != ''">and sku_name like concat('%', #{skuName}, '%')</if>
+            <if test="warehouseName != null and warehouseName != ''">and b.warehouse_name like concat('%', #{warehouseName}, '%')</if>
+            <if test="warehouseType != null and warehouseType != ''">and w.warehouse_type = #{warehouseType}</if>
+            <if test="skuCode != null and skuCode != ''">and b.sku_code like concat('%', #{skuCode}, '%')</if>
+            <if test="skuName != null and skuName != ''">and b.sku_name like concat('%', #{skuName}, '%')</if>
+            <if test="syncStatus != null and syncStatus != ''">and b.sync_status = #{syncStatus}</if>
+            <if test="onlyWarning == 'low_stock'">and b.available_qty &lt;= b.safety_qty</if>
+            <if test="onlyWarning == 'sync_diff'">and w.warehouse_type in ('cloud', 'third_party') and ifnull(b.sync_diff_qty, 0) != 0</if>
         </where>
-        order by balance_id desc
+    </sql>
+
+    <select id="selectInventoryList" parameterType="ErpInventoryBalance" resultMap="ErpInventoryResult">
+        select b.balance_id, b.warehouse_id, b.warehouse_name, w.warehouse_type, w.provider_name,
+               b.sku_id, b.sku_code, b.sku_name, b.available_qty, b.locked_qty,
+               b.inbound_qty, b.defective_qty, b.safety_qty, b.cost_price,
+               b.external_available_qty, b.external_locked_qty, b.sync_diff_qty,
+               b.sync_status, b.last_sync_time, b.create_time, b.update_time
+        from erp_inventory_balance b
+        inner join erp_warehouse w on w.warehouse_id = b.warehouse_id
+        <include refid="inventoryWhere"/>
+        order by case when ifnull(b.sync_diff_qty, 0) != 0 then 0 else 1 end,
+                 case when b.available_qty &lt;= b.safety_qty then 0 else 1 end,
+                 b.balance_id desc
+    </select>
+
+    <select id="selectInventorySummary" parameterType="ErpInventoryBalance" resultType="java.util.LinkedHashMap">
+        select count(distinct b.warehouse_id) as warehouseCount,
+               count(*) as skuCount,
+               ifnull(sum(case when w.warehouse_type in ('physical', 'self', 'return') then b.available_qty else 0 end), 0) as physicalAvailableQty,
+               ifnull(sum(case when w.warehouse_type in ('cloud', 'third_party') then b.available_qty else 0 end), 0) as cloudLedgerAvailableQty,
+               ifnull(sum(case when w.warehouse_type in ('cloud', 'third_party') then ifnull(b.external_available_qty, 0) else 0 end), 0) as cloudExternalAvailableQty,
+               ifnull(sum(b.locked_qty), 0) as lockedQty,
+               ifnull(sum(b.inbound_qty), 0) as inboundQty,
+               ifnull(sum(b.defective_qty), 0) as defectiveQty,
+               sum(case when b.available_qty &lt;= b.safety_qty then 1 else 0 end) as lowStockSkuCount,
+               sum(case when w.warehouse_type in ('cloud', 'third_party') and ifnull(b.sync_diff_qty, 0) != 0 then 1 else 0 end) as cloudDiffSkuCount,
+               ifnull(sum(b.available_qty * b.cost_price), 0) as inventoryAmount
+        from erp_inventory_balance b
+        inner join erp_warehouse w on w.warehouse_id = b.warehouse_id
+        <include refid="inventoryWhere"/>
+    </select>
+
+    <select id="selectExistingSkuCodes" resultType="String">
+        select sku_code
+        from erp_product_sku
+        where sku_code in
+        <foreach collection="skuCodes" item="skuCode" open="(" separator="," close=")">
+            #{skuCode}
+        </foreach>
+    </select>
+
+    <insert id="syncCloudInventoryItem">
+        insert into erp_inventory_balance(
+            warehouse_id, warehouse_name, sku_id, sku_code, sku_name,
+            available_qty, locked_qty, inbound_qty, defective_qty, safety_qty, cost_price,
+            external_available_qty, external_locked_qty, sync_diff_qty, sync_status,
+            last_sync_time, create_time, update_time
+        )
+        select #{warehouseId}, #{warehouseName}, s.sku_id, s.sku_code, s.sku_name,
+               0, 0, 0, 0, 0, ifnull(s.cost_price, 0),
+               #{item.availableQty}, ifnull(#{item.lockedQty}, 0), #{item.availableQty},
+               if(#{item.availableQty} = 0, 'matched', 'difference'),
+               sysdate(), sysdate(), sysdate()
+        from erp_product_sku s
+        where s.sku_code = #{item.skuCode}
+        limit 1
+        on duplicate key update
+            warehouse_name = values(warehouse_name),
+            sku_code = values(sku_code),
+            sku_name = values(sku_name),
+            external_available_qty = values(external_available_qty),
+            external_locked_qty = values(external_locked_qty),
+            sync_diff_qty = values(external_available_qty) - available_qty,
+            sync_status = if(values(external_available_qty) = available_qty, 'matched', 'difference'),
+            last_sync_time = sysdate(),
+            update_time = sysdate()
+    </insert>
+
+    <select id="countCloudDifference" parameterType="Long" resultType="int">
+        select count(*)
+        from erp_inventory_balance
+        where warehouse_id = #{warehouseId}
+          and ifnull(sync_diff_qty, 0) != 0
+    </select>
+
+    <insert id="insertCloudSyncLog">
+        insert into erp_warehouse_sync_log(
+            sync_batch_no, warehouse_id, source_type, sync_status, total_sku_count,
+            matched_sku_count, unmatched_sku_count, difference_sku_count,
+            started_time, finished_time, message, create_by, create_time
+        ) values(
+            #{syncBatchNo}, #{warehouseId}, #{sourceType}, #{syncStatus}, #{totalSkuCount},
+            #{matchedSkuCount}, #{unmatchedSkuCount}, #{differenceSkuCount},
+            #{startedTime}, sysdate(), #{message}, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <select id="selectCloudSyncLogList" parameterType="Long" resultType="java.util.LinkedHashMap">
+        select sync_log_id as syncLogId, sync_batch_no as syncBatchNo, warehouse_id as warehouseId,
+               source_type as sourceType, sync_status as syncStatus, total_sku_count as totalSkuCount,
+               matched_sku_count as matchedSkuCount, unmatched_sku_count as unmatchedSkuCount,
+               difference_sku_count as differenceSkuCount, started_time as startedTime,
+               finished_time as finishedTime, message, create_by as createBy, create_time as createTime
+        from erp_warehouse_sync_log
+        where warehouse_id = #{warehouseId}
+        order by sync_log_id desc
+        limit 30
     </select>
 </mapper>

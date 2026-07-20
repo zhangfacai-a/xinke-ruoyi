@@ -39,9 +39,9 @@ const usePermissionStore = defineStore(
             const sdata = JSON.parse(JSON.stringify(res.data))
             const rdata = JSON.parse(JSON.stringify(res.data))
             const defaultData = JSON.parse(JSON.stringify(res.data))
-            const sidebarRoutes = filterAsyncRouter(sdata)
-            const rewriteRoutes = filterAsyncRouter(rdata, false, true)
-            const defaultRoutes = filterAsyncRouter(defaultData)
+            const sidebarRoutes = ensureUniqueRouteNames(filterAsyncRouter(sdata))
+            const rewriteRoutes = ensureUniqueRouteNames(filterAsyncRouter(rdata, false, true))
+            const defaultRoutes = ensureUniqueRouteNames(filterAsyncRouter(defaultData))
             const asyncRoutes = filterDynamicRoutes(dynamicRoutes)
             asyncRoutes.forEach(route => { router.addRoute(route) })
             this.setRoutes(rewriteRoutes)
@@ -122,6 +122,38 @@ export const loadView = (view) => {
     }
   }
   return res
+}
+
+// Vue Router 会在注册同名路由时移除旧路由。菜单 SQL 即使遗漏 route_name，也不应导致已有业务页面变成 404。
+function ensureUniqueRouteNames(routes, usedNames = new Set(), parentPath = '') {
+  routes.forEach(route => {
+    const fullPath = [parentPath, route.path].filter(Boolean).join('/').replace(/\/+/g, '/')
+    if (route.name) {
+      const originalName = route.name
+      let candidate = originalName
+      if (usedNames.has(candidate)) {
+        const pathSuffix = fullPath
+          .split('/')
+          .filter(Boolean)
+          .map(segment => segment.replace(/[^a-zA-Z0-9]/g, ''))
+          .filter(Boolean)
+          .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
+          .join('') || 'Route'
+        candidate = `${originalName}${pathSuffix}`
+        let sequence = 2
+        while (usedNames.has(candidate)) {
+          candidate = `${originalName}${pathSuffix}${sequence++}`
+        }
+        route.name = candidate
+        console.warn(`[router] 路由名 ${originalName} 重复，已自动调整为 ${candidate}`)
+      }
+      usedNames.add(candidate)
+    }
+    if (route.children?.length) {
+      ensureUniqueRouteNames(route.children, usedNames, fullPath)
+    }
+  })
+  return routes
 }
 
 export default usePermissionStore

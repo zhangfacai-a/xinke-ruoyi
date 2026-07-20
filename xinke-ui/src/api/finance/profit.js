@@ -1,5 +1,12 @@
 import request from '@/utils/request'
 
+export function getFinanceDashboardOverview() {
+  return request({
+    url: '/finance/dashboard/overview',
+    method: 'get'
+  })
+}
+
 export function listDailyProfit(query) {
   return request({
     url: '/finance/profit/daily',

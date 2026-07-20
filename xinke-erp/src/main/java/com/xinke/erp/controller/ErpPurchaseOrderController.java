@@ -18,6 +18,7 @@ import com.xinke.common.core.domain.AjaxResult;
 import com.xinke.common.core.page.TableDataInfo;
 import com.xinke.common.enums.BusinessType;
 import com.xinke.erp.domain.ErpPurchaseOrder;
+import com.xinke.erp.domain.ErpPurchaseReceiveRequest;
 import com.xinke.erp.service.IErpPurchaseOrderService;
 
 @RestController
@@ -36,6 +37,20 @@ public class ErpPurchaseOrderController extends BaseController
         return getDataTable(list);
     }
 
+    @PreAuthorize("@ss.hasPermi('erp:purchase:list')")
+    @GetMapping("/summary")
+    public AjaxResult summary()
+    {
+        return success(purchaseOrderService.selectPurchaseOrderSummary());
+    }
+
+    @PreAuthorize("@ss.hasPermi('erp:purchase:query')")
+    @GetMapping("/sku/{skuId}/history")
+    public AjaxResult skuHistory(@PathVariable Long skuId, Integer limit)
+    {
+        return success(purchaseOrderService.selectSkuPurchaseHistory(skuId, limit));
+    }
+
     @PreAuthorize("@ss.hasPermi('erp:purchase:query')")
     @GetMapping("/{purchaseId}")
     public AjaxResult getInfo(@PathVariable Long purchaseId)
@@ -44,7 +59,7 @@ public class ErpPurchaseOrderController extends BaseController
     }
 
     @PreAuthorize("@ss.hasPermi('erp:purchase:add')")
-    @Log(title = "ERP 采购订单", businessType = BusinessType.INSERT)
+    @Log(title = "ERP采购订单", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@Validated @RequestBody ErpPurchaseOrder purchaseOrder)
     {
@@ -53,7 +68,7 @@ public class ErpPurchaseOrderController extends BaseController
     }
 
     @PreAuthorize("@ss.hasPermi('erp:purchase:edit')")
-    @Log(title = "ERP 采购订单", businessType = BusinessType.UPDATE)
+    @Log(title = "ERP采购订单", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@Validated @RequestBody ErpPurchaseOrder purchaseOrder)
     {
@@ -61,8 +76,24 @@ public class ErpPurchaseOrderController extends BaseController
         return toAjax(purchaseOrderService.updatePurchaseOrder(purchaseOrder));
     }
 
+    @PreAuthorize("@ss.hasPermi('erp:purchase:edit')")
+    @Log(title = "ERP采购订单状态", businessType = BusinessType.UPDATE)
+    @PutMapping("/{purchaseId}/status/{targetStatus}")
+    public AjaxResult updateStatus(@PathVariable Long purchaseId, @PathVariable String targetStatus)
+    {
+        return toAjax(purchaseOrderService.updatePurchaseOrderStatus(purchaseId, targetStatus, getUsername()));
+    }
+
+    @PreAuthorize("@ss.hasPermi('erp:purchase:edit')")
+    @Log(title = "ERP采购到货", businessType = BusinessType.INSERT)
+    @PostMapping("/{purchaseId}/receive")
+    public AjaxResult receive(@PathVariable Long purchaseId, @RequestBody ErpPurchaseReceiveRequest request)
+    {
+        return toAjax(purchaseOrderService.receivePurchaseOrder(purchaseId, request, getUsername()));
+    }
+
     @PreAuthorize("@ss.hasPermi('erp:purchase:remove')")
-    @Log(title = "ERP 采购订单", businessType = BusinessType.DELETE)
+    @Log(title = "ERP采购订单", businessType = BusinessType.DELETE)
     @DeleteMapping("/{purchaseIds}")
     public AjaxResult remove(@PathVariable Long[] purchaseIds)
     {

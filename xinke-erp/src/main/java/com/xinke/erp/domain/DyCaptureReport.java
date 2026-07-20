@@ -1,23 +1,44 @@
 package com.xinke.erp.domain;
 
 import java.util.List;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public class DyCaptureReport
 {
+    @Size(max = 128, message = "batchNo长度不能超过128")
     private String batchNo;
+    @Size(max = 128, message = "roomKey长度不能超过128")
     private String roomKey;
+    @Size(max = 128, message = "userId长度不能超过128")
     private String userId;
+    @Size(max = 64, message = "source长度不能超过64")
     private String source;
+    @NotBlank(message = "payloadType不能为空")
+    @Size(max = 32, message = "payloadType长度不能超过32")
     private String payloadType;
+    @Size(max = 128, message = "直播间名称长度不能超过128")
     private String liveRoomName;
+    @Size(max = 500, message = "pageUrl长度不能超过500")
     private String pageUrl;
+    @Size(max = 1000, message = "requestUrl长度不能超过1000")
     private String requestUrl;
+    @NotBlank(message = "插件版本不能为空")
+    @Size(max = 32, message = "插件版本长度不能超过32")
     private String pluginVersion;
+    @NotBlank(message = "电脑编号不能为空")
+    @Size(max = 128, message = "电脑编号长度不能超过128")
     private String clientId;
+    @Size(max = 128, message = "电脑名称长度不能超过128")
     private String clientName;
     private Integer queueSize;
     private Long clientTime;
+    @Valid
+    @Size(max = 500, message = "单次评论上报不能超过500条")
     private List<DyViewerCommentPayload> comments;
+    @Valid
+    @Size(max = 500, message = "单次观众上报不能超过500条")
     private List<DyViewerPayload> audiences;
 
     public String getBatchNo() { return batchNo; }

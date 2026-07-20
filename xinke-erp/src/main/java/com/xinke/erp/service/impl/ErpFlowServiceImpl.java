@@ -1,6 +1,7 @@
 package com.xinke.erp.service.impl;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -179,11 +180,12 @@ public class ErpFlowServiceImpl implements IErpFlowService
         assertWritable(flowType);
         FlowMeta meta = meta(flowType);
         Map<String, Object> data = sanitize(meta, form);
+        validateFlowWarehouses(flowType, data);
         if (!data.containsKey(meta.noColumn) && !meta.pkColumn.equals(meta.noColumn))
         {
             data.put(meta.noColumn, nextNo(meta.noPrefix));
         }
-        defaultAudit(data, username, true);
+        defaultAudit(meta, data, username, true);
         defaultStatus(meta, data);
         assertPeriodOpen(data.get("period_code"));
         return erpFlowMapper.insertFlow(meta.tableName, data);
@@ -196,9 +198,16 @@ public class ErpFlowServiceImpl implements IErpFlowService
         assertWritable(flowType);
         FlowMeta meta = meta(flowType);
         Map<String, Object> data = sanitize(meta, form);
+        validateFlowWarehouses(flowType, data);
         data.remove(meta.pkColumn);
-        data.put("update_by", username);
-        data.put("update_time", now());
+        if (meta.columns.contains("update_by"))
+        {
+            data.put("update_by", username);
+        }
+        if (meta.columns.contains("update_time"))
+        {
+            data.put("update_time", now());
+        }
         assertRowPeriodOpen(meta, id);
         assertPeriodOpen(data.get("period_code"));
         return erpFlowMapper.updateFlow(meta.tableName, meta.pkColumn, id, data);
@@ -325,26 +334,52 @@ public class ErpFlowServiceImpl implements IErpFlowService
             throw new ServiceException("warehouseId, skuId and quantity are required");
         }
 
+        Map<String, Object> warehousePolicy = erpFlowMapper.selectWarehouseInventoryPolicy(warehouseId);
+        if (warehousePolicy == null)
+        {
+            throw new ServiceException("Warehouse does not exist");
+        }
+        if (!"0".equals(String.valueOf(warehousePolicy.get("status"))))
+        {
+            throw new ServiceException("Warehouse is disabled");
+        }
+
         Map<String, Object> balance = erpFlowMapper.selectInventoryBalance(warehouseId, skuId);
         int beforeQty = balance == null ? 0 : intValue(balance.get("available_qty"));
         int beforeDefectiveQty = balance == null ? 0 : intValue(balance.get("defective_qty"));
         int afterQty = beforeQty + quantity * direction;
-        if (afterQty < 0)
+        if (afterQty < 0 && !"1".equals(String.valueOf(warehousePolicy.get("allow_negative_stock"))))
         {
             throw new ServiceException("Insufficient inventory");
         }
 
-        BigDecimal costPrice = decimal(defaultValue(form.get("costPrice"), balance == null ? BigDecimal.ZERO : balance.get("cost_price")));
+        BigDecimal existingCost = balance == null ? BigDecimal.ZERO : decimal(balance.get("cost_price"));
+        BigDecimal transactionCost = decimal(defaultValue(form.get("costPrice"), existingCost));
+        BigDecimal balanceCost = existingCost;
+        if (direction > 0)
+        {
+            if (beforeQty > 0 && afterQty > 0)
+            {
+                balanceCost = existingCost.multiply(BigDecimal.valueOf(beforeQty))
+                        .add(transactionCost.multiply(BigDecimal.valueOf(quantity)))
+                        .divide(BigDecimal.valueOf(afterQty), 2, RoundingMode.HALF_UP);
+            }
+            else
+            {
+                balanceCost = transactionCost.setScale(2, RoundingMode.HALF_UP);
+            }
+        }
+        BigDecimal movementCost = direction > 0 ? transactionCost : balanceCost;
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("warehouseId", warehouseId);
-        data.put("warehouseName", form.get("warehouseName"));
+        data.put("warehouseName", defaultValue(form.get("warehouseName"), warehousePolicy.get("warehouse_name")));
         data.put("skuId", skuId);
         data.put("skuCode", form.get("skuCode"));
         data.put("skuName", form.get("skuName"));
         data.put("availableQty", afterQty);
         data.put("defectiveQty", defective ? beforeDefectiveQty + quantity : beforeDefectiveQty);
         data.put("safetyQty", intValue(form.get("safetyQty")));
-        data.put("costPrice", costPrice);
+        data.put("costPrice", balanceCost);
         if (balance == null)
         {
             erpFlowMapper.insertInventoryBalance(data);
@@ -364,7 +399,7 @@ public class ErpFlowServiceImpl implements IErpFlowService
         movement.put("quantity", quantity * direction);
         movement.put("beforeQty", beforeQty);
         movement.put("afterQty", afterQty);
-        movement.put("costPrice", costPrice);
+        movement.put("costPrice", movementCost);
         movement.put("operatorName", username);
         movement.put("createBy", username);
         movement.put("remark", form.get("remark"));
@@ -379,11 +414,65 @@ public class ErpFlowServiceImpl implements IErpFlowService
             layer.put("sourceType", movement.get("sourceType"));
             layer.put("sourceNo", movement.get("sourceNo"));
             layer.put("remainQty", quantity);
-            layer.put("costPrice", costPrice);
+            layer.put("costPrice", transactionCost);
             layer.put("inboundDate", defaultText(form.get("inboundDate"), LocalDate.now().toString()));
             erpFlowMapper.insertCostLayer(layer);
         }
         return 1;
+    }
+
+    private void validateFlowWarehouses(String flowType, Map<String, Object> data)
+    {
+        Map<String, Object> warehouse = validateWarehouseField(data, "warehouse_id", "warehouse_name");
+        Map<String, Object> fromWarehouse = validateWarehouseField(data, "from_warehouse_id", "from_warehouse_name");
+        Map<String, Object> toWarehouse = validateWarehouseField(data, "to_warehouse_id", "to_warehouse_name");
+
+        if (("purchase-request".equals(flowType) || "purchase-receipt".equals(flowType)) && warehouse != null)
+        {
+            String usage = String.valueOf(warehouse.get("warehouse_usage"));
+            if ("return".equals(usage) || "defective".equals(usage))
+            {
+                throw new ServiceException("采购业务不能直接进入退货仓或残次仓");
+            }
+        }
+        if ("inventory-stocktake".equals(flowType) && warehouse != null && isCloudWarehouse(warehouse))
+        {
+            throw new ServiceException("云仓请使用库存同步对账，不能发起实体盘点单");
+        }
+        if ("inventory-transfer".equals(flowType) && fromWarehouse != null && toWarehouse != null
+                && String.valueOf(fromWarehouse.get("warehouse_id")).equals(String.valueOf(toWarehouse.get("warehouse_id"))))
+        {
+            throw new ServiceException("调出仓和调入仓不能相同");
+        }
+    }
+
+    private Map<String, Object> validateWarehouseField(Map<String, Object> data, String idKey, String nameKey)
+    {
+        Long warehouseId = longValue(data.get(idKey));
+        if (warehouseId == null)
+        {
+            return null;
+        }
+        Map<String, Object> warehouse = erpFlowMapper.selectWarehouseInventoryPolicy(warehouseId);
+        if (warehouse == null)
+        {
+            throw new ServiceException("仓库不存在：" + warehouseId);
+        }
+        if (!"0".equals(String.valueOf(warehouse.get("status"))))
+        {
+            throw new ServiceException("仓库已停用：" + warehouse.get("warehouse_name"));
+        }
+        if (data.containsKey(nameKey))
+        {
+            data.put(nameKey, warehouse.get("warehouse_name"));
+        }
+        return warehouse;
+    }
+
+    private boolean isCloudWarehouse(Map<String, Object> warehouse)
+    {
+        String warehouseType = String.valueOf(warehouse.get("warehouse_type"));
+        return "cloud".equals(warehouseType) || "third_party".equals(warehouseType);
     }
 
     private static void register(String flowType, String tableName, String pkColumn, String noColumn, String statusColumn,
@@ -454,15 +543,27 @@ public class ErpFlowServiceImpl implements IErpFlowService
         return data;
     }
 
-    private void defaultAudit(Map<String, Object> data, String username, boolean create)
+    private void defaultAudit(FlowMeta meta, Map<String, Object> data, String username, boolean create)
     {
         if (create)
         {
-            data.putIfAbsent("create_by", username);
-            data.putIfAbsent("create_time", now());
+            if (meta.columns.contains("create_by"))
+            {
+                data.putIfAbsent("create_by", username);
+            }
+            if (meta.columns.contains("create_time"))
+            {
+                data.putIfAbsent("create_time", now());
+            }
         }
-        data.putIfAbsent("update_by", username);
-        data.putIfAbsent("update_time", now());
+        if (meta.columns.contains("update_by"))
+        {
+            data.putIfAbsent("update_by", username);
+        }
+        if (meta.columns.contains("update_time"))
+        {
+            data.putIfAbsent("update_time", now());
+        }
     }
 
     private void defaultStatus(FlowMeta meta, Map<String, Object> data)

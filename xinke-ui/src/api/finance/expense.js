@@ -8,6 +8,14 @@ export function addExpense(data) {
   return request({ url: '/finance/expense', method: 'post', data })
 }
 
+export function updateExpense(expenseNo, data) {
+  return request({ url: `/finance/expense/${expenseNo}`, method: 'put', data })
+}
+
+export function voidExpense(expenseNo) {
+  return request({ url: `/finance/expense/${expenseNo}/void`, method: 'post' })
+}
+
 export function approveExpense(expenseNo) {
   return request({ url: `/finance/expense/${expenseNo}/approve`, method: 'post' })
 }

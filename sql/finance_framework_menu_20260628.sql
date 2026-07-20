@@ -13,6 +13,7 @@ update sys_menu set menu_name = '财务看板', component = 'finance/profit' whe
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '财务配置', @finance_parent_id, 2, 'config', 'finance/config', 1, 0, 'C', '0', '0', 'finance:config:list', 'tool', 'admin', sysdate(), 'Finance config'
 where not exists (select 1 from sys_menu where perms = 'finance:config:list');
+update sys_menu set route_name = 'FinanceConfig' where perms = 'finance:config:list';
 
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 select '平台结算', @finance_parent_id, 3, 'settlement', 'finance/settlement', 1, 0, 'C', '0', '0', 'finance:settlement:list', 'money', 'admin', sysdate(), 'Platform settlement'

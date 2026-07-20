@@ -65,6 +65,7 @@
           <el-table-column v-for="col in currentConfig.columns" :key="col.prop" :label="col.label" :prop="col.prop" :min-width="col.width || 120" :align="col.align || 'center'" show-overflow-tooltip>
             <template #default="scope">
               <el-tag v-if="col.tag" :type="statusTag(scope.row[col.prop])" :title="formatValue(scope.row[col.prop])">{{ formatValue(scope.row[col.prop]) }}</el-tag>
+              <span v-else-if="isWarehouseField(col.prop)" :title="warehouseLabel(scope.row[col.prop], scope.row, col.prop)">{{ warehouseLabel(scope.row[col.prop], scope.row, col.prop) }}</span>
               <span v-else :title="formatValue(scope.row[col.prop])">{{ formatValue(scope.row[col.prop]) }}</span>
             </template>
           </el-table-column>
@@ -90,6 +91,9 @@
               <el-input-number v-if="field.type === 'number'" v-model="form[field.prop]" :min="0" :precision="field.precision ?? 0" controls-position="right" style="width: 100%" />
               <el-date-picker v-else-if="field.type === 'date'" v-model="form[field.prop]" type="date" value-format="YYYY-MM-DD" placeholder="请选择日期" style="width: 100%" />
               <el-date-picker v-else-if="field.type === 'datetime'" v-model="form[field.prop]" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="请选择时间" style="width: 100%" />
+              <el-select v-else-if="field.type === 'warehouse'" v-model="form[field.prop]" filterable clearable placeholder="请选择仓库" style="width:100%" @change="value => applyWarehouseToForm(field.prop, value)">
+                <el-option v-for="item in warehouseOptions" :key="item.warehouseId" :value="item.warehouseId" :label="`${item.warehouseName} · ${isCloudWarehouse(item) ? '云仓' : '实体仓'}`" />
+              </el-select>
               <el-select v-else-if="field.type === 'select'" v-model="form[field.prop]" clearable style="width: 100%">
                 <el-option v-for="opt in field.options || statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
               </el-select>
@@ -108,14 +112,20 @@
 
     <el-dialog :title="inventoryTitle" v-model="inventoryOpen" width="620px" append-to-body>
       <el-form :model="inventoryForm" label-width="120px">
-        <el-form-item v-if="inventoryAction === 'transfer'" label="调出仓库ID">
-          <el-input-number v-model="inventoryForm.fromWarehouseId" :min="1" controls-position="right" />
+        <el-form-item v-if="inventoryAction === 'transfer'" label="调出仓库">
+          <el-select v-model="inventoryForm.fromWarehouseId" filterable placeholder="请选择调出仓" style="width:100%" @change="value => applyInventoryWarehouse('from', value)">
+            <el-option v-for="item in warehouseOptions" :key="item.warehouseId" :label="`${item.warehouseName} · ${isCloudWarehouse(item) ? '云仓' : '实体仓'}`" :value="item.warehouseId" />
+          </el-select>
         </el-form-item>
-        <el-form-item v-if="inventoryAction === 'transfer'" label="调入仓库ID">
-          <el-input-number v-model="inventoryForm.toWarehouseId" :min="1" controls-position="right" />
+        <el-form-item v-if="inventoryAction === 'transfer'" label="调入仓库">
+          <el-select v-model="inventoryForm.toWarehouseId" filterable placeholder="请选择调入仓" style="width:100%" @change="value => applyInventoryWarehouse('to', value)">
+            <el-option v-for="item in warehouseOptions" :key="item.warehouseId" :label="`${item.warehouseName} · ${isCloudWarehouse(item) ? '云仓' : '实体仓'}`" :value="item.warehouseId" :disabled="item.warehouseId === inventoryForm.fromWarehouseId" />
+          </el-select>
         </el-form-item>
-        <el-form-item v-if="inventoryAction !== 'transfer'" label="仓库ID">
-          <el-input-number v-model="inventoryForm.warehouseId" :min="1" controls-position="right" />
+        <el-form-item v-if="inventoryAction !== 'transfer'" label="仓库">
+          <el-select v-model="inventoryForm.warehouseId" filterable placeholder="请选择仓库" style="width:100%" @change="value => applyInventoryWarehouse('single', value)">
+            <el-option v-for="item in warehouseOptions" :key="item.warehouseId" :label="`${item.warehouseName} · ${isCloudWarehouse(item) ? '云仓' : '实体仓'}`" :value="item.warehouseId" />
+          </el-select>
         </el-form-item>
         <el-form-item label="SKU ID">
           <el-input-number v-model="inventoryForm.skuId" :min="1" controls-position="right" />
@@ -160,6 +170,7 @@ import {
   inventoryLoss,
   generateSupplierPayable
 } from '@/api/erp/flow'
+import { listWarehouse } from '@/api/erp/warehouse'
 
 const { proxy } = getCurrentInstance()
 
@@ -185,17 +196,17 @@ const configs = {
   'purchase-request': cfg('采购申请', 'request_id', 'request_no', 'request_status', [
     text('request_no', '申请单号'), text('request_title', '申请标题'), text('supplier_name', '供应商'), num('total_amount', '金额', 2), status('request_status')
   ], [
-    text('request_no', '申请单号'), text('request_title', '申请标题'), text('requester_name', '申请人'), text('department_name', '部门'), num('supplier_id', '供应商ID'), text('supplier_name', '供应商'), num('warehouse_id', '仓库ID'), date('expected_date', '期望到货'), ...baseAmount
+    text('request_no', '申请单号'), text('request_title', '申请标题'), text('requester_name', '申请人'), text('department_name', '部门'), num('supplier_id', '供应商ID'), text('supplier_name', '供应商'), warehouse('warehouse_id', '收货仓库'), date('expected_date', '期望到货'), ...baseAmount
   ]),
   'purchase-receipt': cfg('采购入库', 'receipt_id', 'receipt_no', 'receipt_status', [
     text('receipt_no', '入库单号'), text('purchase_no', '采购单号'), text('supplier_name', '供应商'), num('total_qty', '数量'), num('total_amount', '金额', 2), status('receipt_status')
   ], [
-    text('receipt_no', '入库单号'), text('purchase_no', '采购单号'), num('supplier_id', '供应商ID'), text('supplier_name', '供应商'), num('warehouse_id', '仓库ID'), text('warehouse_name', '仓库'), date('receipt_date', '入库日期'), num('total_qty', '数量'), ...baseAmount
+    text('receipt_no', '入库单号'), text('purchase_no', '采购单号'), num('supplier_id', '供应商ID'), text('supplier_name', '供应商'), warehouse('warehouse_id', '入库仓库'), date('receipt_date', '入库日期'), num('total_qty', '数量'), ...baseAmount
   ]),
   'purchase-return': cfg('采购退货', 'return_id', 'return_no', 'return_status', [
     text('return_no', '退货单号'), text('purchase_no', '采购单号'), text('supplier_name', '供应商'), num('total_qty', '数量'), num('total_amount', '金额', 2), status('return_status')
   ], [
-    text('return_no', '退货单号'), text('purchase_no', '采购单号'), text('receipt_no', '入库单号'), num('supplier_id', '供应商ID'), text('supplier_name', '供应商'), num('warehouse_id', '仓库ID'), date('return_date', '退货日期'), num('total_qty', '数量'), text('return_reason', '原因'), ...baseAmount
+    text('return_no', '退货单号'), text('purchase_no', '采购单号'), text('receipt_no', '入库单号'), num('supplier_id', '供应商ID'), text('supplier_name', '供应商'), warehouse('warehouse_id', '退货仓库'), date('return_date', '退货日期'), num('total_qty', '数量'), text('return_reason', '原因'), ...baseAmount
   ]),
   'supplier-reconcile': cfg('供应商对账', 'reconcile_id', 'reconcile_no', 'reconcile_status', [
     text('reconcile_no', '对账单号'), text('supplier_name', '供应商'), text('period_code', '期间'), num('payable_amount', '应付金额', 2), num('diff_amount', '差异', 2), status('reconcile_status')
@@ -208,19 +219,19 @@ const configs = {
     text('quote_no', '报价单号'), num('supplier_id', '供应商ID'), text('supplier_name', '供应商'), num('sku_id', 'SKU ID'), text('sku_code', 'SKU编码'), num('quote_price', '报价', 2), num('min_order_qty', '最小起订量'), date('effective_date', '生效日期'), date('expire_date', '失效日期'), text('remark', '备注', 'textarea', 24)
   ]),
   'inventory-transfer': cfg('库存调拨', 'transfer_id', 'transfer_no', 'transfer_status', [
-    text('transfer_no', '调拨单号'), num('from_warehouse_id', '调出仓'), num('to_warehouse_id', '调入仓'), num('total_qty', '数量'), status('transfer_status')
+    text('transfer_no', '调拨单号'), warehouse('from_warehouse_id', '调出仓'), warehouse('to_warehouse_id', '调入仓'), num('total_qty', '数量'), status('transfer_status')
   ], [
-    text('transfer_no', '调拨单号'), num('from_warehouse_id', '调出仓库ID'), num('to_warehouse_id', '调入仓库ID'), date('transfer_date', '调拨日期'), num('total_qty', '数量'), text('remark', '备注', 'textarea', 24)
+    text('transfer_no', '调拨单号'), warehouse('from_warehouse_id', '调出仓库'), warehouse('to_warehouse_id', '调入仓库'), date('transfer_date', '调拨日期'), num('total_qty', '数量'), text('remark', '备注', 'textarea', 24)
   ]),
   'inventory-stocktake': cfg('库存盘点', 'stocktake_id', 'stocktake_no', 'stocktake_status', [
-    text('stocktake_no', '盘点单号'), num('warehouse_id', '仓库ID'), date('stocktake_date', '盘点日期'), num('profit_loss_amount', '盈亏金额', 2), status('stocktake_status')
+    text('stocktake_no', '盘点单号'), warehouse('warehouse_id', '仓库'), date('stocktake_date', '盘点日期'), num('profit_loss_amount', '盈亏金额', 2), status('stocktake_status')
   ], [
-    text('stocktake_no', '盘点单号'), num('warehouse_id', '仓库ID'), text('warehouse_name', '仓库'), date('stocktake_date', '盘点日期'), num('total_sku_count', 'SKU数量'), num('profit_loss_amount', '盈亏金额', 2), text('remark', '备注', 'textarea', 24)
+    text('stocktake_no', '盘点单号'), warehouse('warehouse_id', '仓库'), date('stocktake_date', '盘点日期'), num('total_sku_count', 'SKU数量'), num('profit_loss_amount', '盈亏金额', 2), text('remark', '备注', 'textarea', 24)
   ]),
   'inventory-loss': cfg('库存报损', 'loss_id', 'loss_no', 'loss_status', [
-    text('loss_no', '报损单号'), num('warehouse_id', '仓库ID'), text('sku_code', 'SKU'), num('quantity', '数量'), num('loss_amount', '损失金额', 2), status('loss_status')
+    text('loss_no', '报损单号'), warehouse('warehouse_id', '仓库'), text('sku_code', 'SKU'), num('quantity', '数量'), num('loss_amount', '损失金额', 2), status('loss_status')
   ], [
-    text('loss_no', '报损单号'), num('warehouse_id', '仓库ID'), num('sku_id', 'SKU ID'), text('sku_code', 'SKU编码'), text('sku_name', 'SKU名称'), num('quantity', '数量'), num('cost_price', '成本价', 2), num('loss_amount', '损失金额', 2), text('loss_reason', '报损原因'), text('remark', '备注', 'textarea', 24)
+    text('loss_no', '报损单号'), warehouse('warehouse_id', '仓库'), num('sku_id', 'SKU ID'), text('sku_code', 'SKU编码'), text('sku_name', 'SKU名称'), num('quantity', '数量'), num('cost_price', '成本价', 2), num('loss_amount', '损失金额', 2), text('loss_reason', '报损原因'), text('remark', '备注', 'textarea', 24)
   ]),
   'inventory-warning': simpleCfg('库存预警', 'rule_id', 'status', ['warehouse_id', 'sku_code', 'min_qty', 'max_qty', 'warning_level', 'status']),
   'inventory-ageing': simpleCfg('库龄分析', 'snapshot_id', '', ['snapshot_date', 'warehouse_id', 'sku_code', 'qty_0_30', 'qty_31_60', 'qty_61_90', 'qty_90_plus']),
@@ -325,6 +336,7 @@ const queryParams = reactive({ pageNum: 1, pageSize: 10, keyword: undefined, sta
 const inventoryOpen = ref(false)
 const inventoryAction = ref('in')
 const inventoryForm = ref({})
+const warehouseOptions = ref([])
 
 const currentGroup = computed(() => groups.find(group => group.name === activeGroup.value))
 const currentConfig = computed(() => configs[activeType.value])
@@ -342,6 +354,7 @@ function simpleCfg(label, pk, statusProp, props) {
 function item(type, label, desc) { return { type, label, desc } }
 function text(prop, label, type = 'text', span) { return { prop, label, type, span } }
 function num(prop, label, precision = 0) { return { prop, label, type: 'number', precision } }
+function warehouse(prop, label) { return { prop, label, type: 'warehouse' } }
 function date(prop, label) { return { prop, label, type: 'date' } }
 function status(prop) { return { prop, label: '状态', tag: true } }
 function normalizeColumn(col) { return { ...col, width: col.width || 130 } }
@@ -354,16 +367,23 @@ function labelOf(prop) {
     channel_name: '渠道', order_count: '订单数', gmv: 'GMV', net_amount: '净成交额',
     product_cost: '商品成本', platform_fee: '平台扣点', ad_cost: '推广费',
     freight_fee: '运费', after_sale_cost: '售后成本', profit_amount: '利润',
-    share_profit_amount: '应分润', paid_amount: '已付款', remain_amount: '未付款'
+    share_profit_amount: '应分润', paid_amount: '已付款', remain_amount: '未付款',
+    warehouse_id: '仓库', from_warehouse_id: '调出仓', to_warehouse_id: '调入仓'
   }
   return dict[prop] || prop
 }
 function fieldByProp(prop) {
+  if (isWarehouseField(prop)) return warehouse(prop, labelOf(prop))
   if (prop.includes('amount') || prop.includes('price') || prop.includes('qty') || prop.endsWith('_id')) return num(prop, labelOf(prop), prop.includes('amount') || prop.includes('price') ? 2 : 0)
   if (prop.includes('date')) return date(prop, labelOf(prop))
   if (prop.includes('status')) return { prop, label: labelOf(prop), type: 'select' }
   return text(prop, labelOf(prop))
 }
+function isWarehouseField(prop) { return ['warehouse_id', 'from_warehouse_id', 'to_warehouse_id'].includes(prop) }
+function isCloudWarehouse(item) { return ['cloud', 'third_party'].includes(item?.warehouseType) }
+function warehouseNameProp(prop) { return ({ warehouse_id: 'warehouse_name', from_warehouse_id: 'from_warehouse_name', to_warehouse_id: 'to_warehouse_name' })[prop] }
+function warehouseLabel(value, row, prop) { return row?.[warehouseNameProp(prop)] || warehouseOptions.value.find(item => item.warehouseId === Number(value))?.warehouseName || formatValue(value) }
+function applyWarehouseToForm(prop, value) { const selected = warehouseOptions.value.find(item => item.warehouseId === value); const nameProp = warehouseNameProp(prop); if (nameProp) form.value[nameProp] = selected?.warehouseName }
 function statusTag(value) {
   if (['approved', 'done', 'enabled', 'matched', 'open'].includes(value)) return 'success'
   if (['processing', 'unmatched'].includes(value)) return 'warning'
@@ -450,7 +470,17 @@ function openInventoryAction(action) {
   inventoryForm.value = { quantity: 1, costPrice: 0 }
   inventoryOpen.value = true
 }
+function applyInventoryWarehouse(position, value) {
+  const selected = warehouseOptions.value.find(item => item.warehouseId === value)
+  if (position === 'from') inventoryForm.value.fromWarehouseName = selected?.warehouseName
+  else if (position === 'to') inventoryForm.value.toWarehouseName = selected?.warehouseName
+  else inventoryForm.value.warehouseName = selected?.warehouseName
+}
 function submitInventoryAction() {
+  if (inventoryAction.value === 'transfer') {
+    if (!inventoryForm.value.fromWarehouseId || !inventoryForm.value.toWarehouseId) { proxy.$modal.msgWarning('请选择调出仓和调入仓'); return }
+    if (inventoryForm.value.fromWarehouseId === inventoryForm.value.toWarehouseId) { proxy.$modal.msgWarning('调出仓和调入仓不能相同'); return }
+  } else if (!inventoryForm.value.warehouseId) { proxy.$modal.msgWarning('请选择仓库'); return }
   const map = { in: inventoryIn, out: inventoryOut, transfer: inventoryTransfer, loss: inventoryLoss }
   map[inventoryAction.value](inventoryForm.value).then(() => {
     proxy.$modal.msgSuccess('库存处理成功')
@@ -459,6 +489,8 @@ function submitInventoryAction() {
   })
 }
 
+async function loadWarehouses() { const response = await listWarehouse({ pageNum: 1, pageSize: 200, status: '0' }); warehouseOptions.value = response.rows || [] }
+loadWarehouses()
 getList()
 </script>
 

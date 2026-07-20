@@ -43,6 +43,10 @@ nbdist/
 *.swp
 .env
 .env.*
+!xinke-ui/.env.development
+!xinke-ui/.env.production
+!xinke-ui/.env.staging
+/config/application-local.yml
 
 ######################################################################
 # Frontend

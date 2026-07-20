@@ -18,6 +18,7 @@ import com.xinke.common.core.domain.AjaxResult;
 import com.xinke.common.core.page.TableDataInfo;
 import com.xinke.common.enums.BusinessType;
 import com.xinke.erp.domain.ErpWarehouse;
+import com.xinke.erp.domain.ErpWarehouseLocation;
 import com.xinke.erp.service.IErpWarehouseService;
 
 @RestController
@@ -34,6 +35,13 @@ public class ErpWarehouseController extends BaseController
         startPage();
         List<ErpWarehouse> list = warehouseService.selectWarehouseList(warehouse);
         return getDataTable(list);
+    }
+
+    @PreAuthorize("@ss.hasPermi('erp:warehouse:list')")
+    @GetMapping("/summary")
+    public AjaxResult summary()
+    {
+        return success(warehouseService.selectWarehouseSummary());
     }
 
     @PreAuthorize("@ss.hasPermi('erp:warehouse:query')")
@@ -67,5 +75,38 @@ public class ErpWarehouseController extends BaseController
     public AjaxResult remove(@PathVariable Long[] warehouseIds)
     {
         return toAjax(warehouseService.deleteWarehouseByIds(warehouseIds));
+    }
+
+    @PreAuthorize("@ss.hasPermi('erp:warehouse:query')")
+    @GetMapping("/{warehouseId}/location/list")
+    public AjaxResult locationList(@PathVariable Long warehouseId)
+    {
+        return success(warehouseService.selectLocationList(warehouseId));
+    }
+
+    @PreAuthorize("@ss.hasPermi('erp:warehouse:add')")
+    @Log(title = "ERP 仓库库位", businessType = BusinessType.INSERT)
+    @PostMapping("/location")
+    public AjaxResult addLocation(@Validated @RequestBody ErpWarehouseLocation location)
+    {
+        location.setCreateBy(getUsername());
+        return toAjax(warehouseService.insertLocation(location));
+    }
+
+    @PreAuthorize("@ss.hasPermi('erp:warehouse:edit')")
+    @Log(title = "ERP 仓库库位", businessType = BusinessType.UPDATE)
+    @PutMapping("/location")
+    public AjaxResult editLocation(@Validated @RequestBody ErpWarehouseLocation location)
+    {
+        location.setUpdateBy(getUsername());
+        return toAjax(warehouseService.updateLocation(location));
+    }
+
+    @PreAuthorize("@ss.hasPermi('erp:warehouse:remove')")
+    @Log(title = "ERP 仓库库位", businessType = BusinessType.DELETE)
+    @DeleteMapping("/location/{locationIds}")
+    public AjaxResult removeLocation(@PathVariable Long[] locationIds)
+    {
+        return toAjax(warehouseService.deleteLocationByIds(locationIds));
     }
 }

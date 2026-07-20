@@ -6,11 +6,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import java.util.UUID;
 import com.xinke.common.constant.HttpStatus;
 import com.xinke.common.core.domain.AjaxResult;
 import com.xinke.common.core.text.Convert;
@@ -91,14 +93,26 @@ public class GlobalExceptionHandler
     }
 
     /**
+     * 接口或静态资源不存在。
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public AjaxResult handleNoResourceFoundException(NoResourceFoundException e, HttpServletRequest request)
+    {
+        String requestURI = request.getRequestURI();
+        log.warn("请求地址'{}'不存在", requestURI);
+        return AjaxResult.error(HttpStatus.NOT_FOUND, "请求接口不存在，请确认后端版本已更新并重启");
+    }
+
+    /**
      * 拦截未知的运行时异常
      */
     @ExceptionHandler(RuntimeException.class)
     public AjaxResult handleRuntimeException(RuntimeException e, HttpServletRequest request)
     {
         String requestURI = request.getRequestURI();
-        log.error("请求地址'{}',发生未知异常.", requestURI, e);
-        return AjaxResult.error(e.getMessage());
+        String errorId = UUID.randomUUID().toString().substring(0, 8);
+        log.error("请求地址'{}',发生未知异常,错误编号:{}.", requestURI, errorId, e);
+        return AjaxResult.error("系统处理失败，请联系管理员（错误编号：" + errorId + "）");
     }
 
     /**
@@ -108,8 +122,9 @@ public class GlobalExceptionHandler
     public AjaxResult handleException(Exception e, HttpServletRequest request)
     {
         String requestURI = request.getRequestURI();
-        log.error("请求地址'{}',发生系统异常.", requestURI, e);
-        return AjaxResult.error(e.getMessage());
+        String errorId = UUID.randomUUID().toString().substring(0, 8);
+        log.error("请求地址'{}',发生系统异常,错误编号:{}.", requestURI, errorId, e);
+        return AjaxResult.error("系统处理失败，请联系管理员（错误编号：" + errorId + "）");
     }
 
     /**

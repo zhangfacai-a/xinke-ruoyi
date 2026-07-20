@@ -318,6 +318,7 @@ set @purchase_root := (select menu_id from sys_menu where perms = 'purchase:root
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time)
 select '采购匹配', 0, 8, 'purchase', null, 1, 0, 'M', '0', '0', 'purchase:root', 'shopping', 'admin', sysdate()
 where @purchase_root is null;
+update sys_menu set route_name = 'PurchaseMatch' where perms = 'purchase:root';
 set @purchase_root := (select menu_id from sys_menu where perms = 'purchase:root' limit 1);
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time)
 select '手工订单总表', @purchase_root, 2, 'manual', 'erp/purchaseMatch/manual/index', 1, 0, 'C', '0', '0', 'purchase:manual:list', 'list', 'admin', sysdate()
@@ -334,6 +335,7 @@ where not exists (select 1 from sys_menu where perms='purchase:import:query');
 insert into sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time)
 select '供应商设置', @purchase_root, 7, 'supplier', 'erp/purchaseMatch/supplier/index', 1, 0, 'C', '0', '0', 'purchase:supplier:list', 'peoples', 'admin', sysdate()
 where not exists (select 1 from sys_menu where perms='purchase:supplier:list');
+update sys_menu set route_name = 'PurchaseMatchSupplier' where perms = 'purchase:supplier:list';
 
 -- 补充按钮权限
 set @menu_supplier := (select menu_id from sys_menu where perms='purchase:supplier:list' limit 1);

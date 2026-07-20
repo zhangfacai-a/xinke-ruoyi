@@ -13,6 +13,10 @@ public class ErpOrderItem extends BaseEntity
     private Long orderItemId;
     @Excel(name = "Order ID")
     private Long orderId;
+    @Excel(name = "主订单号")
+    private String mainOrderNo;
+    @Excel(name = "子订单号")
+    private String subOrderNo;
     private Long shopId;
     private String shopName;
     private Long productId;
@@ -37,6 +41,10 @@ public class ErpOrderItem extends BaseEntity
     public void setOrderItemId(Long orderItemId) { this.orderItemId = orderItemId; }
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }
+    public String getMainOrderNo() { return mainOrderNo; }
+    public void setMainOrderNo(String mainOrderNo) { this.mainOrderNo = mainOrderNo; }
+    public String getSubOrderNo() { return subOrderNo; }
+    public void setSubOrderNo(String subOrderNo) { this.subOrderNo = subOrderNo; }
     public Long getShopId() { return shopId; }
     public void setShopId(Long shopId) { this.shopId = shopId; }
     public String getShopName() { return shopName; }

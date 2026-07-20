@@ -1,14 +1,17 @@
 ﻿# 数据源配置
 spring:
+    config:
+        # 本地开发私有配置（已被 Git 忽略），生产环境仍使用环境变量
+        import: optional:file:./config/application-local.yml
     datasource:
         type: com.alibaba.druid.pool.DruidDataSource
         driverClassName: com.mysql.cj.jdbc.Driver
         druid:
             # 主库数据源
             master:
-                url: jdbc:mysql://${MYSQL_HOST:47.116.62.234}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:xinkeerp}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+                url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:xinkeerp}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8
                 username: ${MYSQL_USERNAME:root}
-                password: ${MYSQL_PASSWORD:Xinke123.}
+                password: ${MYSQL_PASSWORD:}
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
@@ -42,13 +45,13 @@ spring:
             webStatFilter: 
                 enabled: true
             statViewServlet:
-                enabled: true
-                # 设置白名单，不填则允许所有访问
-                allow:
+                enabled: ${DRUID_STAT_ENABLED:false}
+                # 仅在显式开启时允许本机访问
+                allow: 127.0.0.1
                 url-pattern: /druid/*
                 # 控制台管理用户名和密码
                 login-username: xinke
-                login-password: ${DRUID_LOGIN_PASSWORD:change-me}
+                login-password: ${DRUID_LOGIN_PASSWORD:}
             filter:
                 stat:
                     enabled: true
@@ -58,4 +61,4 @@ spring:
                     merge-sql: true
                 wall:
                     config:
-                        multi-statement-allow: true
+                        multi-statement-allow: false

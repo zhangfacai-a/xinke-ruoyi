@@ -1,16 +1,24 @@
 package com.xinke.erp.domain;
 
+import jakarta.validation.constraints.Size;
+
 public class DyViewerPayload
 {
+    @Size(max = 256, message = "secUid长度不能超过256")
     private String secUid;
+    @Size(max = 128, message = "昵称长度不能超过128")
     private String nickname;
+    @Size(max = 500, message = "头像地址长度不能超过500")
     private String avatar;
+    @Size(max = 128, message = "anchorId长度不能超过128")
     private String anchorId;
+    @Size(max = 128, message = "roomId长度不能超过128")
     private String roomId;
     private Integer gender;
     private Integer gradeLevel;
     private Integer fansClubLevel;
     private Long capturedAt;
+    @Size(max = 64, message = "观众来源长度不能超过64")
     private String source;
 
     public String getSecUid() { return secUid; }

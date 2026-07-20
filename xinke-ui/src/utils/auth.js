@@ -7,7 +7,10 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  return Cookies.set(TokenKey, token)
+  return Cookies.set(TokenKey, token, {
+    sameSite: 'Lax',
+    secure: window.location.protocol === 'https:'
+  })
 }
 
 export function removeToken() {

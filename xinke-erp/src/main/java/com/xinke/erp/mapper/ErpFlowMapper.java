@@ -41,6 +41,8 @@ public interface ErpFlowMapper
 
     Map<String, Object> selectInventoryBalance(@Param("warehouseId") Long warehouseId, @Param("skuId") Long skuId);
 
+    Map<String, Object> selectWarehouseInventoryPolicy(Long warehouseId);
+
     int insertInventoryBalance(Map<String, Object> data);
 
     int updateInventoryBalance(Map<String, Object> data);

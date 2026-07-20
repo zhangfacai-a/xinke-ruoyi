@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xinke.erp.mapper.ErpSupplierMapper">
     <resultMap id="ErpSupplierResult" type="ErpSupplier">
@@ -9,7 +9,17 @@
         <result property="contactPhone" column="contact_phone"/>
         <result property="settlementType" column="settlement_type"/>
         <result property="paymentDays" column="payment_days"/>
+        <result property="supplierLevel" column="supplier_level"/>
+        <result property="leadTimeDays" column="lead_time_days"/>
+        <result property="minOrderAmount" column="min_order_amount"/>
+        <result property="qualityScore" column="quality_score"/>
+        <result property="deliveryScore" column="delivery_score"/>
+        <result property="serviceScore" column="service_score"/>
+        <result property="preferredFlag" column="preferred_flag"/>
         <result property="status" column="status"/>
+        <result property="purchaseOrderCount" column="purchase_order_count"/>
+        <result property="openPurchaseAmount" column="open_purchase_amount"/>
+        <result property="lastPurchaseTime" column="last_purchase_time"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
         <result property="updateBy" column="update_by"/>
@@ -18,30 +28,51 @@
     </resultMap>
 
     <sql id="selectSupplierVo">
-        select supplier_id, supplier_code, supplier_name, contact_name, contact_phone, settlement_type,
-               payment_days, status, create_by, create_time, update_by, update_time, remark
-        from erp_supplier
+        select s.supplier_id, s.supplier_code, s.supplier_name, s.contact_name, s.contact_phone,
+               s.settlement_type, s.payment_days, s.supplier_level, s.lead_time_days,
+               s.min_order_amount, s.quality_score, s.delivery_score, s.service_score,
+               s.preferred_flag, s.status,
+               coalesce(p.purchase_order_count, 0) as purchase_order_count,
+               coalesce(p.open_purchase_amount, 0) as open_purchase_amount,
+               p.last_purchase_time,
+               s.create_by, s.create_time, s.update_by, s.update_time, s.remark
+        from erp_supplier s
+        left join (
+            select supplier_id, count(*) as purchase_order_count,
+                   sum(case when purchase_status not in ('completed', 'done', 'closed') then total_with_tax else 0 end) as open_purchase_amount,
+                   max(create_time) as last_purchase_time
+            from erp_purchase_order group by supplier_id
+        ) p on p.supplier_id = s.supplier_id
     </sql>
 
     <select id="selectSupplierList" parameterType="ErpSupplier" resultMap="ErpSupplierResult">
         <include refid="selectSupplierVo"/>
         <where>
-            <if test="supplierCode != null and supplierCode != ''">and supplier_code like concat('%', #{supplierCode}, '%')</if>
-            <if test="supplierName != null and supplierName != ''">and supplier_name like concat('%', #{supplierName}, '%')</if>
-            <if test="contactName != null and contactName != ''">and contact_name like concat('%', #{contactName}, '%')</if>
-            <if test="status != null and status != ''">and status = #{status}</if>
+            <if test="supplierCode != null and supplierCode != ''">and s.supplier_code like concat('%', #{supplierCode}, '%')</if>
+            <if test="supplierName != null and supplierName != ''">and s.supplier_name like concat('%', #{supplierName}, '%')</if>
+            <if test="contactName != null and contactName != ''">and s.contact_name like concat('%', #{contactName}, '%')</if>
+            <if test="supplierLevel != null and supplierLevel != ''">and s.supplier_level = #{supplierLevel}</if>
+            <if test="preferredFlag != null and preferredFlag != ''">and s.preferred_flag = #{preferredFlag}</if>
+            <if test="status != null and status != ''">and s.status = #{status}</if>
         </where>
-        order by supplier_id desc
+        order by s.preferred_flag desc, s.supplier_level asc, s.supplier_id desc
     </select>
 
     <select id="selectSupplierById" parameterType="Long" resultMap="ErpSupplierResult">
         <include refid="selectSupplierVo"/>
-        where supplier_id = #{supplierId}
+        where s.supplier_id = #{supplierId}
     </select>
 
     <insert id="insertSupplier" parameterType="ErpSupplier" useGeneratedKeys="true" keyProperty="supplierId">
-        insert into erp_supplier(supplier_code, supplier_name, contact_name, contact_phone, settlement_type, payment_days, status, create_by, create_time, remark)
-        values(#{supplierCode}, #{supplierName}, #{contactName}, #{contactPhone}, #{settlementType}, #{paymentDays}, #{status}, #{createBy}, sysdate(), #{remark})
+        insert into erp_supplier(
+            supplier_code, supplier_name, contact_name, contact_phone, settlement_type, payment_days,
+            supplier_level, lead_time_days, min_order_amount, quality_score, delivery_score,
+            service_score, preferred_flag, status, create_by, create_time, remark
+        ) values(
+            #{supplierCode}, #{supplierName}, #{contactName}, #{contactPhone}, #{settlementType}, #{paymentDays},
+            #{supplierLevel}, #{leadTimeDays}, #{minOrderAmount}, #{qualityScore}, #{deliveryScore},
+            #{serviceScore}, #{preferredFlag}, #{status}, #{createBy}, sysdate(), #{remark}
+        )
     </insert>
 
     <update id="updateSupplier" parameterType="ErpSupplier">
@@ -53,6 +84,13 @@
             <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
             <if test="settlementType != null">settlement_type = #{settlementType},</if>
             <if test="paymentDays != null">payment_days = #{paymentDays},</if>
+            <if test="supplierLevel != null">supplier_level = #{supplierLevel},</if>
+            <if test="leadTimeDays != null">lead_time_days = #{leadTimeDays},</if>
+            <if test="minOrderAmount != null">min_order_amount = #{minOrderAmount},</if>
+            <if test="qualityScore != null">quality_score = #{qualityScore},</if>
+            <if test="deliveryScore != null">delivery_score = #{deliveryScore},</if>
+            <if test="serviceScore != null">service_score = #{serviceScore},</if>
+            <if test="preferredFlag != null">preferred_flag = #{preferredFlag},</if>
             <if test="status != null">status = #{status},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
@@ -63,8 +101,6 @@
 
     <delete id="deleteSupplierByIds" parameterType="Long">
         delete from erp_supplier where supplier_id in
-        <foreach collection="array" item="supplierId" open="(" separator="," close=")">
-            #{supplierId}
-        </foreach>
+        <foreach collection="array" item="supplierId" open="(" separator="," close=")">#{supplierId}</foreach>
     </delete>
 </mapper>

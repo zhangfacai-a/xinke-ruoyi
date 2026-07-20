@@ -7,6 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,6 +45,22 @@ public class FinanceExpenseController extends BaseController
     public AjaxResult add(@RequestBody Map<String, Object> form)
     {
         return toAjax(financeWorkflowService.insertExpense(form, getUsername()));
+    }
+
+    @PreAuthorize("@ss.hasPermi('finance:expense:edit')")
+    @Log(title = "财务费用单草稿修改", businessType = BusinessType.UPDATE)
+    @PutMapping("/{expenseNo}")
+    public AjaxResult edit(@PathVariable String expenseNo, @RequestBody Map<String, Object> form)
+    {
+        return toAjax(financeWorkflowService.updateExpense(expenseNo, form, getUsername()));
+    }
+
+    @PreAuthorize("@ss.hasPermi('finance:expense:edit')")
+    @Log(title = "财务费用单草稿作废", businessType = BusinessType.UPDATE)
+    @PostMapping("/{expenseNo}/void")
+    public AjaxResult voidDraft(@PathVariable String expenseNo)
+    {
+        return toAjax(financeWorkflowService.voidExpense(expenseNo, getUsername()));
     }
 
     @PreAuthorize("@ss.hasPermi('finance:expense:audit')")

@@ -25,14 +25,15 @@
       <el-table-column label="往来方" prop="counterpartyName" align="center" min-width="150" />
       <el-table-column label="店铺" prop="shopName" align="center" />
       <el-table-column label="期间" prop="periodCode" align="center" />
-      <el-table-column label="应收金额" prop="billAmount" align="right" />
-      <el-table-column label="已核销" prop="writeoffAmount" align="right" />
-      <el-table-column label="未核销" prop="remainAmount" align="right" />
+      <el-table-column label="应收金额" align="right"><template #default="{ row }">{{ money(row.billAmount) }}</template></el-table-column>
+      <el-table-column label="已核销" align="right"><template #default="{ row }">{{ money(row.writeoffAmount) }}</template></el-table-column>
+      <el-table-column label="未核销" align="right"><template #default="{ row }"><strong>{{ money(row.remainAmount) }}</strong></template></el-table-column>
       <el-table-column label="到期日" prop="dueDate" align="center" />
-      <el-table-column label="状态" prop="billStatus" align="center" />
+      <el-table-column label="状态" align="center"><template #default="{ row }"><el-tag round :type="billStatusType(row.billStatus)">{{ billStatusLabel(row.billStatus) }}</el-tag></template></el-table-column>
       <el-table-column label="操作" align="center" width="120" fixed="right">
         <template #default="scope">
-          <el-button link type="primary" @click="handleWriteoff(scope.row)" v-hasPermi="['finance:receivable:writeoff']">核销</el-button>
+          <el-button v-if="scope.row.billStatus !== 'settled' && Number(scope.row.remainAmount || 0) > 0" link type="primary" @click="handleWriteoff(scope.row)" v-hasPermi="['finance:receivable:writeoff']">选择收款核销</el-button>
+          <span v-else class="done-text">已结清</span>
         </template>
       </el-table-column>
     </el-table>
@@ -45,7 +46,9 @@
           <el-input v-model="form.receivableNo" disabled />
         </el-form-item>
         <el-form-item label="流水号" prop="cashFlowNo">
-          <el-input v-model="form.cashFlowNo" placeholder="请输入已收款流水号" />
+          <el-select v-model="form.cashFlowNo" placeholder="选择已入账且未完全核销的收款" filterable style="width:100%" @change="handleCashFlowChange">
+            <el-option v-for="item in cashFlowOptions" :key="item.flowNo" :label="`${item.flowNo} · ${item.counterpartyName || '未填写往来方'} · 可用 ${money(item.availableAmount)}`" :value="item.flowNo" />
+          </el-select>
         </el-form-item>
         <el-form-item label="核销金额" prop="writeoffAmount">
           <el-input-number v-model="form.writeoffAmount" :precision="2" :step="100" controls-position="right" style="width: 100%" />
@@ -53,6 +56,7 @@
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
         </el-form-item>
+        <el-alert :closable="false" type="info" show-icon title="核销会同时减少应收余额和流水可用余额；一条收款流水可以分次核销多张应收单。" />
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -66,6 +70,7 @@
 
 <script setup name="FinanceReceivable">
 import { listReceivable, writeoffReceivable } from '@/api/finance/receivable'
+import { listCashFlow } from '@/api/finance/cashflow'
 
 const { proxy } = getCurrentInstance()
 const dataList = ref([])
@@ -73,6 +78,7 @@ const loading = ref(true)
 const showSearch = ref(true)
 const total = ref(0)
 const open = ref(false)
+const cashFlowOptions = ref([])
 const data = reactive({
   form: {},
   queryParams: { pageNum: 1, pageSize: 10, receivableNo: undefined, periodCode: undefined, counterpartyName: undefined },
@@ -89,10 +95,13 @@ function getList() {
 }
 function handleQuery() { queryParams.value.pageNum = 1; getList() }
 function resetQuery() { proxy.resetForm('queryRef'); handleQuery() }
-function handleWriteoff(row) {
+async function handleWriteoff(row) {
   form.value = { receivableNo: row.receivableNo, cashFlowNo: undefined, writeoffAmount: Number(row.remainAmount || 0), remark: undefined }
   open.value = true
+  const response = await listCashFlow({ pageNum: 1, pageSize: 100, flowType: 'in', entryStatus: 'posted' })
+  cashFlowOptions.value = (response.rows || []).filter(item => Number(item.availableAmount || 0) > 0)
 }
+function handleCashFlowChange(flowNo) { const row = cashFlowOptions.value.find(item => item.flowNo === flowNo); if (row) form.value.writeoffAmount = Math.min(Number(form.value.writeoffAmount || 0), Number(row.availableAmount || 0)) }
 function submitWriteoff() {
   proxy.$refs.writeoffRef.validate(valid => {
     if (!valid) return
@@ -103,5 +112,10 @@ function submitWriteoff() {
     })
   })
 }
+function money(value) { return `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
+function billStatusLabel(value) { return ({ open: '待收款', partial: '部分收款', settled: '已结清' })[value] || value || '-' }
+function billStatusType(value) { return ({ open: 'warning', partial: 'primary', settled: 'success' })[value] || 'info' }
 getList()
 </script>
+
+<style scoped>.done-text { color:#00a879; font-size:13px; }</style>
