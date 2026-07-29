@@ -57,9 +57,9 @@ spring:
   servlet:
     multipart:
       # 单个文件大小
-      max-file-size: 10MB
+      max-file-size: 30MB
       # 设置总上传的文件大小
-      max-request-size: 20MB
+      max-request-size: 35MB
   # 服务模块
   devtools:
     restart:
@@ -112,6 +112,26 @@ pagehelper:
   helperDialect: mysql
   supportMethodsArguments: true
   params: count=countSql
+
+# 动态数据集配置
+datahub:
+  # 为空时使用当前数据库；生产环境建议配置为独立 MySQL Schema
+  schema: ${DATAHUB_SCHEMA:}
+  # 必须是私有目录，代码会拒绝 xinke.profile 及其子目录
+  storage-path: ${DATAHUB_STORAGE_PATH:}
+  table-prefix: dh_data_
+  max-file-size: 30MB
+  max-rows: 50000
+  max-dataset-rows: 200000
+  max-columns: 200
+  max-cell-length: 10000
+  preview-rows: 20
+  preview-expire-hours: 24
+  insert-batch-size: 500
+  recovery-stale-minutes: 30
+  dispatch-batch-size: 20
+  max-edit-mutations: 1000
+  version-retention-days: 30
 
 # Springdoc配置
 springdoc:

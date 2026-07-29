@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.datahub.mapper.DataHubMapper">
+
+    <resultMap id="DatasetResult" type="com.xinke.datahub.domain.DataHubDataset">
+        <id property="datasetId" column="dataset_id"/>
+        <result property="displayName" column="display_name"/>
+        <result property="normalizedName" column="normalized_name"/>
+        <result property="datasetCode" column="dataset_code"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="ownerUserName" column="owner_user_name"/>
+        <result property="currentSchemaId" column="current_schema_id"/>
+        <result property="currentVersionId" column="current_version_id"/>
+        <result property="currentSchemaVersion" column="current_schema_version"/>
+        <result property="currentVersionNo" column="current_version_no"/>
+        <result property="rowCount" column="row_count"/>
+        <result property="columnCount" column="column_count"/>
+        <result property="status" column="status"/>
+        <result property="sourceFileName" column="source_file_name"/>
+        <result property="sourceSheetName" column="source_sheet_name"/>
+        <result property="activeJobId" column="active_job_id"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="accessMask" column="access_mask"/>
+        <result property="folderId" column="folder_id"/>
+        <result property="folderItemVersion" column="folder_item_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ColumnResult" type="com.xinke.datahub.domain.DataHubColumn">
+        <id property="columnId" column="column_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="schemaId" column="schema_id"/>
+        <result property="sourceIndex" column="source_index"/>
+        <result property="ordinalPosition" column="ordinal_position"/>
+        <result property="sourceName" column="source_name"/>
+        <result property="displayName" column="display_name"/>
+        <result property="physicalName" column="physical_name"/>
+        <result property="dataType" column="data_type"/>
+        <result property="columnLength" column="column_length"/>
+        <result property="numericPrecision" column="numeric_precision"/>
+        <result property="numericScale" column="numeric_scale"/>
+        <result property="nullable" column="is_nullable" javaType="boolean"/>
+        <result property="businessKey" column="is_business_key" javaType="boolean"/>
+        <result property="translationSource" column="translation_source"/>
+        <result property="samplesJson" column="samples_json"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="JobResult" type="com.xinke.datahub.domain.DataHubImportJob">
+        <id property="jobId" column="job_id"/>
+        <result property="jobNo" column="job_no"/>
+        <result property="previewId" column="preview_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="operationType" column="operation_type"/>
+        <result property="sourceVersionId" column="source_version_id"/>
+        <result property="sourceLockVersion" column="source_lock_version"/>
+        <result property="targetVersionId" column="target_version_id"/>
+        <result property="rollbackTargetVersionId" column="rollback_target_version_id"/>
+        <result property="retryOfJobId" column="retry_of_job_id"/>
+        <result property="status" column="status"/>
+        <result property="phase" column="phase"/>
+        <result property="sourceFileName" column="source_file_name"/>
+        <result property="storedFilePath" column="stored_file_path"/>
+        <result property="fileType" column="file_type"/>
+        <result property="fileHash" column="file_hash"/>
+        <result property="dedupKey" column="dedup_key"/>
+        <result property="sheetName" column="sheet_name"/>
+        <result property="proposedDisplayName" column="proposed_display_name"/>
+        <result property="proposedPhysicalName" column="proposed_physical_name"/>
+        <result property="schemaSnapshotJson" column="schema_snapshot_json"/>
+        <result property="operationPayloadJson" column="operation_payload_json"/>
+        <result property="stagingTableName" column="staging_table_name"/>
+        <result property="targetTableName" column="target_table_name"/>
+        <result property="totalRows" column="total_rows"/>
+        <result property="processedRows" column="processed_rows"/>
+        <result property="successRows" column="success_rows"/>
+        <result property="failedRows" column="failed_rows"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="uploadUserId" column="upload_user_id"/>
+        <result property="uploadUserName" column="upload_user_name"/>
+        <result property="expireTime" column="expire_time"/>
+        <result property="startTime" column="start_time"/>
+        <result property="finishTime" column="finish_time"/>
+        <result property="cancelRequested" column="cancel_requested"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <resultMap id="VersionResult" type="com.xinke.datahub.domain.DataHubDataVersion">
+        <id property="versionId" column="version_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="parentVersionId" column="parent_version_id"/>
+        <result property="schemaId" column="schema_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="versionType" column="version_type"/>
+        <result property="physicalTableName" column="physical_table_name"/>
+        <result property="rowCount" column="row_count"/>
+        <result property="status" column="status"/>
+        <result property="retentionUntil" column="retention_until"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="ErrorResult" type="com.xinke.datahub.domain.DataHubImportError">
+        <id property="errorId" column="error_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="sourceRowNo" column="source_row_no"/>
+        <result property="sourceColumnName" column="source_column_name"/>
+        <result property="physicalColumnName" column="physical_column_name"/>
+        <result property="rawValue" column="raw_value"/>
+        <result property="errorCode" column="error_code"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="AclResult" type="com.xinke.datahub.domain.DataHubAcl">
+        <id property="aclId" column="acl_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="subjectType" column="subject_type"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="subjectName" column="subject_name"/>
+        <result property="permissionMask" column="permission_mask"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <insert id="insertImportJob" parameterType="com.xinke.datahub.domain.DataHubImportJob" useGeneratedKeys="true" keyProperty="jobId">
+        insert into dh_import_job(
+            job_no, preview_id, dataset_id, operation_type, status, phase,
+            source_file_name, stored_file_path, file_type, file_hash, sheet_name,
+            proposed_display_name, proposed_physical_name, schema_snapshot_json,
+            staging_table_name, target_table_name, total_rows, processed_rows,
+            success_rows, failed_rows, error_message, upload_user_id, upload_user_name,
+            expire_time, start_time, finish_time, create_time, update_time
+        ) values (
+            #{jobNo}, #{previewId}, #{datasetId}, #{operationType}, #{status}, #{phase},
+            #{sourceFileName}, #{storedFilePath}, #{fileType}, #{fileHash}, #{sheetName},
+            #{proposedDisplayName}, #{proposedPhysicalName}, #{schemaSnapshotJson},
+            #{stagingTableName}, #{targetTableName}, coalesce(#{totalRows}, 0), coalesce(#{processedRows}, 0),
+            coalesce(#{successRows}, 0), coalesce(#{failedRows}, 0), #{errorMessage}, #{uploadUserId}, #{uploadUserName},
+            #{expireTime}, #{startTime}, #{finishTime}, sysdate(3), sysdate(3)
+        )
+    </insert>
+
+    <update id="updateImportJob" parameterType="com.xinke.datahub.domain.DataHubImportJob">
+        update dh_import_job
+        <set>
+            <if test="datasetId != null">dataset_id = #{datasetId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="phase != null">phase = #{phase},</if>
+            <if test="sheetName != null">sheet_name = #{sheetName},</if>
+            <if test="proposedDisplayName != null">proposed_display_name = #{proposedDisplayName},</if>
+            <if test="proposedPhysicalName != null">proposed_physical_name = #{proposedPhysicalName},</if>
+            <if test="schemaSnapshotJson != null">schema_snapshot_json = #{schemaSnapshotJson},</if>
+            <if test="stagingTableName != null">staging_table_name = #{stagingTableName},</if>
+            <if test="targetTableName != null">target_table_name = #{targetTableName},</if>
+            <if test="totalRows != null">total_rows = #{totalRows},</if>
+            <if test="processedRows != null">processed_rows = #{processedRows},</if>
+            <if test="successRows != null">success_rows = #{successRows},</if>
+            <if test="failedRows != null">failed_rows = #{failedRows},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            <if test="startTime != null">start_time = #{startTime},</if>
+            <if test="finishTime != null">finish_time = #{finishTime},</if>
+            update_time = sysdate(3)
+        </set>
+        where job_id = #{jobId}
+        <if test="lockVersion != null">and lock_version = #{lockVersion}</if>
+    </update>
+
+    <update id="updatePreviewSheet" parameterType="com.xinke.datahub.domain.DataHubImportJob">
+        update dh_import_job
+        set status = 'PENDING_CONFIRM', phase = '等待确认', sheet_name = #{sheetName},
+            proposed_display_name = #{proposedDisplayName}, proposed_physical_name = #{proposedPhysicalName},
+            total_rows = #{totalRows}, processed_rows = 0, success_rows = 0, failed_rows = 0,
+            error_message = null, start_time = null, finish_time = null, update_time = sysdate(3)
+        where job_id = #{jobId}
+          and status in ('PENDING_CONFIRM', 'VALIDATION_FAILED', 'FAILED')
+          and expire_time &gt; sysdate(3)
+    </update>
+
+    <update id="queueImportJob">
+        update dh_import_job
+        set status = 'QUEUED', phase = '等待执行', proposed_display_name = #{displayName},
+            proposed_physical_name = #{physicalName}, schema_snapshot_json = #{schemaJson},
+            error_message = null, processed_rows = 0, success_rows = 0, failed_rows = 0,
+            start_time = null, finish_time = null, update_time = sysdate(3)
+        where preview_id = #{previewId} and upload_user_id = #{userId}
+          and status in ('PENDING_CONFIRM', 'VALIDATION_FAILED', 'FAILED')
+          and expire_time &gt; sysdate(3)
+          and ((sheet_name = #{expectedSheetName}) or (sheet_name is null and #{expectedSheetName} is null))
+    </update>
+
+    <update id="claimQueuedImportJob">
+        update dh_import_job
+        set status = 'VALIDATING', phase = '等待执行', start_time = sysdate(3),
+            lock_version = lock_version + 1, update_time = sysdate(3)
+        where preview_id = #{previewId} and status = 'QUEUED'
+    </update>
+
+    <update id="requeueClaimedImportJob">
+        update dh_import_job
+        set status = 'QUEUED', phase = '等待执行', start_time = null, update_time = sysdate(3)
+        where preview_id = #{previewId} and lock_version = #{lockVersion}
+          and status = 'VALIDATING' and phase = '等待执行'
+    </update>
+
+    <select id="selectQueuedPreviewIds" resultType="string">
+        select preview_id from dh_import_job where status = 'QUEUED' order by job_id limit #{limit}
+    </select>
+
+    <update id="requeueStaleImportJobs">
+        update dh_import_job
+        set status = 'QUEUED', phase = '等待恢复', processed_rows = 0, success_rows = 0,
+            failed_rows = 0, error_message = null, start_time = null, finish_time = null,
+            lock_version = lock_version + 1, update_time = sysdate(3)
+        where status in ('VALIDATING', 'STAGING', 'COMMITTING', 'RECOVERING')
+          and update_time &lt; #{staleBefore}
+    </update>
+
+    <update id="failStaleParsingJobs">
+        update dh_import_job
+        set status = 'FAILED', phase = '预览中断', error_message = '服务重启导致预览中断，请重新上传',
+            finish_time = sysdate(3), update_time = sysdate(3)
+        where status = 'PARSING' and update_time &lt; #{staleBefore}
+    </update>
+
+    <update id="touchImportJob">
+        update dh_import_job set update_time = sysdate(3)
+        where job_id = #{jobId} and lock_version = #{lockVersion}
+          and status in ('VALIDATING', 'STAGING', 'COMMITTING')
+    </update>
+
+    <select id="countClaimedImportJob" resultType="int">
+        select count(1) from dh_import_job
+        where job_id = #{jobId} and lock_version = #{lockVersion} and status = #{status}
+    </select>
+
+    <update id="markImportJobFailed" parameterType="com.xinke.datahub.domain.DataHubImportJob">
+        update dh_import_job
+        set status = 'FAILED', phase = #{phase}, error_message = #{errorMessage},
+            success_rows = 0, finish_time = #{finishTime}, update_time = sysdate(3)
+        where job_id = #{jobId} and lock_version = #{lockVersion}
+          and status in ('QUEUED', 'VALIDATING', 'STAGING', 'COMMITTING', 'RECOVERING')
+    </update>
+
+    <select id="selectJobByPreviewId" resultMap="JobResult">
+        select * from dh_import_job where preview_id = #{previewId}
+    </select>
+
+    <select id="selectExpiredStoredFiles" resultMap="JobResult">
+        select * from dh_import_job
+        where stored_file_path != '' and expire_time &lt; sysdate(3)
+          and status in ('PENDING_CONFIRM', 'VALIDATION_FAILED', 'FAILED', 'SUCCESS', 'MANUAL_REQUIRED')
+        order by job_id limit #{limit}
+    </select>
+
+    <update id="clearStoredFilePath">
+        update dh_import_job set stored_file_path = '', update_time = sysdate(3) where job_id = #{jobId}
+    </update>
+
+    <select id="selectJobsByDatasetId" resultMap="JobResult">
+        select * from dh_import_job where dataset_id = #{datasetId} order by job_id desc limit 100
+    </select>
+
+    <delete id="deleteImportErrors">
+        delete from dh_import_error where job_id = #{jobId}
+    </delete>
+
+    <insert id="insertImportErrors">
+        insert into dh_import_error(job_id, source_row_no, source_column_name, physical_column_name,
+                                    raw_value, error_code, error_message, create_time)
+        values
+        <foreach collection="errors" item="item" separator=",">
+            (#{item.jobId}, #{item.sourceRowNo}, #{item.sourceColumnName}, #{item.physicalColumnName},
+             #{item.rawValue}, #{item.errorCode}, #{item.errorMessage}, sysdate(3))
+        </foreach>
+    </insert>
+
+    <select id="selectImportErrors" resultMap="ErrorResult">
+        select * from dh_import_error where job_id = #{jobId} order by source_row_no, error_id limit 1000
+    </select>
+
+    <select id="countDatasetByNameKey" resultType="int">
+        select count(1) from dh_dataset where normalized_name = #{normalizedName}
+    </select>
+
+    <select id="countDatasetByCode" resultType="int">
+        select count(1) from dh_dataset where dataset_code = #{datasetCode}
+    </select>
+
+    <select id="countVersionByPhysicalTable" resultType="int">
+        select count(1) from dh_dataset_version where physical_table_name = #{physicalTableName}
+    </select>
+
+    <insert id="insertDataset" parameterType="com.xinke.datahub.domain.DataHubDataset" useGeneratedKeys="true" keyProperty="datasetId">
+        insert into dh_dataset(
+            display_name, normalized_name, dataset_code, owner_user_id, owner_user_name,
+            row_count, column_count, status, source_file_name, source_sheet_name,
+            lock_version, del_flag, create_by, create_time, update_by, update_time, remark
+        ) values (
+            #{displayName}, #{normalizedName}, #{datasetCode}, #{ownerUserId}, #{ownerUserName},
+            #{rowCount}, #{columnCount}, #{status}, #{sourceFileName}, #{sourceSheetName},
+            0, '0', #{createBy}, sysdate(3), #{updateBy}, sysdate(3), #{remark}
+        )
+    </insert>
+
+    <insert id="insertSchema" parameterType="com.xinke.datahub.domain.DataHubSchema" useGeneratedKeys="true" keyProperty="schemaId">
+        insert into dh_dataset_schema(dataset_id, version_no, source_job_id, schema_hash, status, create_by, create_time)
+        values(#{datasetId}, #{versionNo}, #{sourceJobId}, #{schemaHash}, #{status}, #{createBy}, sysdate(3))
+    </insert>
+
+    <insert id="insertColumns">
+        insert into dh_dataset_column(
+            dataset_id, schema_id, source_index, ordinal_position, source_name, display_name,
+            physical_name, data_type, column_length, numeric_precision, numeric_scale,
+            is_nullable, is_business_key, translation_source, samples_json, create_time
+        ) values
+        <foreach collection="columns" item="item" separator=",">
+            (#{item.datasetId}, #{item.schemaId}, #{item.sourceIndex}, #{item.ordinalPosition},
+             #{item.sourceName}, #{item.displayName}, #{item.physicalName}, #{item.dataType},
+             #{item.columnLength}, #{item.numericPrecision}, #{item.numericScale},
+             #{item.nullable}, #{item.businessKey}, #{item.translationSource}, #{item.samplesJson}, sysdate(3))
+        </foreach>
+    </insert>
+
+    <insert id="insertVersion" parameterType="com.xinke.datahub.domain.DataHubDataVersion" useGeneratedKeys="true" keyProperty="versionId">
+        insert into dh_dataset_version(
+            dataset_id, parent_version_id, schema_id, job_id, version_no, version_type, physical_table_name,
+            row_count, status, retention_until, create_time
+        ) values (
+            #{datasetId}, #{parentVersionId}, #{schemaId}, #{jobId}, #{versionNo}, #{versionType}, #{physicalTableName},
+            #{rowCount}, #{status}, #{retentionUntil}, sysdate(3)
+        )
+    </insert>
+
+    <update id="publishDataset" parameterType="com.xinke.datahub.domain.DataHubDataset">
+        update dh_dataset
+        set current_schema_id = #{currentSchemaId}, current_version_id = #{currentVersionId},
+            row_count = #{rowCount}, column_count = #{columnCount}, status = #{status},
+            update_by = #{updateBy}, update_time = sysdate(3)
+        where dataset_id = #{datasetId}
+    </update>
+
+    <sql id="datasetSelect">
+        select d.*, s.version_no as current_schema_version, v.version_no as current_version_no
+        from dh_dataset d
+        left join dh_dataset_schema s on s.schema_id = d.current_schema_id
+        left join dh_dataset_version v on v.version_id = d.current_version_id
+    </sql>
+
+    <select id="selectDatasetList" resultMap="DatasetResult">
+        select x.*, f.folder_id,
+            case when f.folder_id is null then null else fi.lock_version end as folder_item_version,
+            <choose>
+                <when test="admin">15</when>
+                <otherwise>
+                    case when x.owner_user_id = #{userId} then 15 else coalesce((
+                        select bit_or(a.permission_mask) from dh_dataset_acl a
+                        where a.dataset_id = x.dataset_id and (
+                            (a.subject_type = 'USER' and a.subject_id = #{userId}) or
+                            (a.subject_type = 'ROLE' and exists (
+                                select 1 from sys_user_role ur
+                                join sys_role r on r.role_id = ur.role_id and r.status = '0' and r.del_flag = '0'
+                                where ur.user_id = #{userId} and ur.role_id = a.subject_id
+                            ))
+                        )
+                    ), 0) end
+                </otherwise>
+            </choose> as access_mask
+        from (<include refid="datasetSelect"/>) x
+        left join dh_folder_item fi on fi.dataset_id = x.dataset_id and fi.owner_user_id = #{userId}
+        left join dh_folder f on f.folder_id = fi.folder_id and f.owner_user_id = #{userId} and f.del_flag = '0'
+        where x.del_flag = '0' and x.status = 'ACTIVE'
+        <if test="!admin">
+            and (x.owner_user_id = #{userId} or exists (
+                select 1 from dh_dataset_acl a where a.dataset_id = x.dataset_id
+                  and mod(a.permission_mask, 2) = 1 and (
+                    (a.subject_type = 'USER' and a.subject_id = #{userId}) or
+                    (a.subject_type = 'ROLE' and exists (
+                        select 1 from sys_user_role ur
+                        join sys_role r on r.role_id = ur.role_id and r.status = '0' and r.del_flag = '0'
+                        where ur.user_id = #{userId} and ur.role_id = a.subject_id
+                    ))
+                )
+            ))
+        </if>
+        <if test="query != null and query.displayName != null and query.displayName != ''">
+            and x.display_name like concat('%', #{query.displayName}, '%')
+        </if>
+        <if test="query != null and query.folderScope == 'FOLDER'">
+            and f.folder_id = #{query.folderId}
+        </if>
+        <if test="query != null and query.folderScope == 'UNCLASSIFIED'">
+            and f.folder_id is null
+        </if>
+        <if test="query != null and query.folderScope == 'OWNED'">
+            and x.owner_user_id = #{userId}
+        </if>
+        <if test="query != null and query.folderScope == 'SHARED'">
+            and x.owner_user_id != #{userId}
+            and exists (
+                select 1 from dh_dataset_acl shared_acl
+                where shared_acl.dataset_id = x.dataset_id and mod(shared_acl.permission_mask, 2) = 1 and (
+                    (shared_acl.subject_type = 'USER' and shared_acl.subject_id = #{userId}) or
+                    (shared_acl.subject_type = 'ROLE' and exists (
+                        select 1 from sys_user_role shared_ur
+                        join sys_role shared_r on shared_r.role_id = shared_ur.role_id
+                            and shared_r.status = '0' and shared_r.del_flag = '0'
+                        where shared_ur.user_id = #{userId} and shared_ur.role_id = shared_acl.subject_id
+                    ))
+                )
+            )
+        </if>
+        order by x.dataset_id desc
+    </select>
+
+    <select id="selectDatasetById" resultMap="DatasetResult">
+        <include refid="datasetSelect"/>
+        where d.dataset_id = #{datasetId} and d.del_flag = '0' and d.status = 'ACTIVE'
+    </select>
+
+    <select id="selectCurrentVersion" resultMap="VersionResult">
+        select v.* from dh_dataset d join dh_dataset_version v on v.version_id = d.current_version_id
+        where d.dataset_id = #{datasetId} and v.dataset_id = d.dataset_id
+          and d.del_flag = '0' and d.status = 'ACTIVE'
+    </select>
+
+    <select id="selectCurrentColumns" resultMap="ColumnResult">
+        select c.* from dh_dataset d join dh_dataset_column c on c.schema_id = d.current_schema_id
+        where d.dataset_id = #{datasetId} and c.dataset_id = d.dataset_id
+          and d.del_flag = '0' and d.status = 'ACTIVE'
+        order by c.ordinal_position
+    </select>
+
+    <select id="selectColumnsBySchemaId" resultMap="ColumnResult">
+        select * from dh_dataset_column
+        where dataset_id = #{datasetId} and schema_id = #{schemaId}
+        order by ordinal_position
+    </select>
+
+    <select id="selectAccessMask" resultType="int">
+        select case when d.owner_user_id = #{userId} then 15 else coalesce((
+            select bit_or(a.permission_mask) from dh_dataset_acl a
+            where a.dataset_id = d.dataset_id and (
+                (a.subject_type = 'USER' and a.subject_id = #{userId}) or
+                (a.subject_type = 'ROLE' and exists (
+                    select 1 from sys_user_role ur
+                    join sys_role r on r.role_id = ur.role_id and r.status = '0' and r.del_flag = '0'
+                    where ur.user_id = #{userId} and ur.role_id = a.subject_id
+                ))
+            )
+        ), 0) end
+        from dh_dataset d where d.dataset_id = #{datasetId} and d.del_flag = '0' and d.status = 'ACTIVE'
+    </select>
+
+    <select id="selectAclList" resultMap="AclResult">
+        select a.*,
+               case when a.subject_type = 'USER' then u.user_name else r.role_name end as subject_name
+        from dh_dataset_acl a
+        left join sys_user u on a.subject_type = 'USER' and u.user_id = a.subject_id
+        left join sys_role r on a.subject_type = 'ROLE' and r.role_id = a.subject_id
+        where a.dataset_id = #{datasetId}
+        order by a.subject_type, a.acl_id
+    </select>
+
+    <delete id="deleteAclByDatasetId">
+        delete from dh_dataset_acl where dataset_id = #{datasetId}
+    </delete>
+
+    <insert id="insertAclList">
+        insert into dh_dataset_acl(dataset_id, subject_type, subject_id, permission_mask, create_by, create_time)
+        values
+        <foreach collection="entries" item="item" separator=",">
+            (#{item.datasetId}, #{item.subjectType}, #{item.subjectId}, #{item.permissionMask}, #{item.createBy}, sysdate(3))
+        </foreach>
+    </insert>
+
+    <select id="countActiveUser" resultType="int">
+        select count(1) from sys_user where user_id = #{userId} and status = '0' and del_flag = '0'
+    </select>
+
+    <select id="countActiveRole" resultType="int">
+        select count(1) from sys_role where role_id = #{roleId} and status = '0' and del_flag = '0'
+    </select>
+
+    <select id="selectUserOptions" resultType="map">
+        select user_id as subjectId, user_name as subjectName, nick_name as description
+        from sys_user where status = '0' and del_flag = '0'
+        <if test="keyword != null and keyword != ''">
+            and (user_name like concat('%', #{keyword}, '%') or nick_name like concat('%', #{keyword}, '%'))
+        </if>
+        order by user_id limit 50
+    </select>
+
+    <select id="selectRoleOptions" resultType="map">
+        select role_id as subjectId, role_name as subjectName, role_key as description
+        from sys_role where status = '0' and del_flag = '0'
+        <if test="keyword != null and keyword != ''">
+            and (role_name like concat('%', #{keyword}, '%') or role_key like concat('%', #{keyword}, '%'))
+        </if>
+        order by role_sort, role_id limit 50
+    </select>
+
+    <select id="selectNameDictionary" resultType="map">
+        select source_name as sourceName, english_name as englishName
+        from dh_name_dictionary where status = '0' order by priority, length(source_name) desc
+    </select>
+</mapper>
