@@ -151,10 +151,8 @@ pnpm build:prod
 | `MYSQL_PORT`     | MySQL 端口   | 3306          |
 | `MYSQL_DATABASE` | 数据库名     | xinkeerp      |
 | `MYSQL_USERNAME` | 数据库用户   | root          |
-| `MYSQL_PASSWORD` | 数据库密码   | —             |
 | `REDIS_HOST`     | Redis 地址   | 47.116.62.234 |
 | `REDIS_PORT`     | Redis 端口   | 6379          |
-| `REDIS_PASSWORD` | Redis 密码   | —             |
 | `JWT_SECRET`     | JWT 签名密钥 | —             |
 
 ## SQL 脚本说明
