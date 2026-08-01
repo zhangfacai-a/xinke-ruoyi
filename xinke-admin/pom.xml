@@ -59,6 +59,12 @@
             <artifactId>xinke-erp</artifactId>
         </dependency>
 
+        <!-- 数据表导入模块 -->
+        <dependency>
+            <groupId>com.xinke</groupId>
+            <artifactId>xinke-datahub</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

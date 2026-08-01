@@ -169,6 +169,34 @@ export const dynamicRoutes = [
         meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
       }
     ]
+  },
+  {
+    path: '/datahub/dataset-create',
+    component: Layout,
+    hidden: true,
+    permissions: ['datahub:dataset:add'],
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/datahub/dataset/create'),
+        name: 'DataHubDatasetCreate',
+        meta: { title: '创建数据表', activeMenu: '/datahub/dataset' }
+      }
+    ]
+  },
+  {
+    path: '/datahub/dataset-detail',
+    component: Layout,
+    hidden: true,
+    permissions: ['datahub:dataset:query'],
+    children: [
+      {
+        path: 'index/:datasetId(\\d+)',
+        component: () => import('@/views/datahub/dataset/detail'),
+        name: 'DataHubDatasetDetail',
+        meta: { title: '数据表详情', activeMenu: '/datahub/dataset' }
+      }
+    ]
   }
 ]
 

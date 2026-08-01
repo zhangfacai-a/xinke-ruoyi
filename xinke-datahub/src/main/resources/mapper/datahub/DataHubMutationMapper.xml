@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.datahub.mapper.DataHubMutationMapper">
+
+    <resultMap id="MutationJobResult" type="com.xinke.datahub.domain.DataHubImportJob">
+        <id property="jobId" column="job_id"/>
+        <result property="jobNo" column="job_no"/>
+        <result property="previewId" column="preview_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="operationType" column="operation_type"/>
+        <result property="sourceVersionId" column="source_version_id"/>
+        <result property="sourceLockVersion" column="source_lock_version"/>
+        <result property="targetVersionId" column="target_version_id"/>
+        <result property="rollbackTargetVersionId" column="rollback_target_version_id"/>
+        <result property="retryOfJobId" column="retry_of_job_id"/>
+        <result property="status" column="status"/>
+        <result property="phase" column="phase"/>
+        <result property="sourceFileName" column="source_file_name"/>
+        <result property="storedFilePath" column="stored_file_path"/>
+        <result property="fileType" column="file_type"/>
+        <result property="fileHash" column="file_hash"/>
+        <result property="dedupKey" column="dedup_key"/>
+        <result property="sheetName" column="sheet_name"/>
+        <result property="proposedDisplayName" column="proposed_display_name"/>
+        <result property="proposedPhysicalName" column="proposed_physical_name"/>
+        <result property="schemaSnapshotJson" column="schema_snapshot_json"/>
+        <result property="operationPayloadJson" column="operation_payload_json"/>
+        <result property="stagingTableName" column="staging_table_name"/>
+        <result property="targetTableName" column="target_table_name"/>
+        <result property="totalRows" column="total_rows"/>
+        <result property="processedRows" column="processed_rows"/>
+        <result property="successRows" column="success_rows"/>
+        <result property="failedRows" column="failed_rows"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="uploadUserId" column="upload_user_id"/>
+        <result property="uploadUserName" column="upload_user_name"/>
+        <result property="expireTime" column="expire_time"/>
+        <result property="startTime" column="start_time"/>
+        <result property="finishTime" column="finish_time"/>
+        <result property="cancelRequested" column="cancel_requested"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <resultMap id="MutationDatasetResult" type="com.xinke.datahub.domain.DataHubDataset">
+        <id property="datasetId" column="dataset_id"/>
+        <result property="displayName" column="display_name"/>
+        <result property="normalizedName" column="normalized_name"/>
+        <result property="datasetCode" column="dataset_code"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="ownerUserName" column="owner_user_name"/>
+        <result property="currentSchemaId" column="current_schema_id"/>
+        <result property="currentVersionId" column="current_version_id"/>
+        <result property="rowCount" column="row_count"/>
+        <result property="columnCount" column="column_count"/>
+        <result property="status" column="status"/>
+        <result property="activeJobId" column="active_job_id"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <resultMap id="MutationVersionResult" type="com.xinke.datahub.domain.DataHubDataVersion">
+        <id property="versionId" column="version_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="parentVersionId" column="parent_version_id"/>
+        <result property="schemaId" column="schema_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="versionType" column="version_type"/>
+        <result property="physicalTableName" column="physical_table_name"/>
+        <result property="rowCount" column="row_count"/>
+        <result property="status" column="status"/>
+        <result property="retentionUntil" column="retention_until"/>
+        <result property="purgeClaimedAt" column="purge_claimed_at"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="MutationColumnResult" type="com.xinke.datahub.domain.DataHubColumn">
+        <id property="columnId" column="column_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="schemaId" column="schema_id"/>
+        <result property="sourceIndex" column="source_index"/>
+        <result property="ordinalPosition" column="ordinal_position"/>
+        <result property="sourceName" column="source_name"/>
+        <result property="displayName" column="display_name"/>
+        <result property="physicalName" column="physical_name"/>
+        <result property="dataType" column="data_type"/>
+        <result property="columnLength" column="column_length"/>
+        <result property="numericPrecision" column="numeric_precision"/>
+        <result property="numericScale" column="numeric_scale"/>
+        <result property="nullable" column="is_nullable" javaType="boolean"/>
+        <result property="businessKey" column="is_business_key" javaType="boolean"/>
+        <result property="translationSource" column="translation_source"/>
+        <result property="samplesJson" column="samples_json"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <insert id="insertMutationJob" parameterType="com.xinke.datahub.domain.DataHubImportJob"
+            useGeneratedKeys="true" keyProperty="jobId">
+        insert into dh_import_job(
+            job_no, preview_id, dataset_id, operation_type, source_version_id, source_lock_version,
+            target_version_id, rollback_target_version_id, retry_of_job_id, status, phase,
+            source_file_name, stored_file_path, file_type, file_hash, dedup_key, sheet_name,
+            proposed_display_name, proposed_physical_name, schema_snapshot_json, operation_payload_json,
+            total_rows, processed_rows, success_rows, failed_rows, upload_user_id, upload_user_name,
+            expire_time, cancel_requested, create_time, update_time
+        ) values (
+            #{jobNo}, #{previewId}, #{datasetId}, #{operationType}, #{sourceVersionId}, #{sourceLockVersion},
+            #{targetVersionId}, #{rollbackTargetVersionId}, #{retryOfJobId}, #{status}, #{phase},
+            #{sourceFileName}, #{storedFilePath}, #{fileType}, #{fileHash}, #{dedupKey}, #{sheetName},
+            #{proposedDisplayName}, #{proposedPhysicalName}, #{schemaSnapshotJson}, #{operationPayloadJson},
+            coalesce(#{totalRows}, 0), coalesce(#{processedRows}, 0), coalesce(#{successRows}, 0),
+            coalesce(#{failedRows}, 0), #{uploadUserId}, #{uploadUserName}, #{expireTime},
+            coalesce(#{cancelRequested}, '0'), sysdate(3), sysdate(3)
+        )
+    </insert>
+
+    <select id="selectMutationJob" resultMap="MutationJobResult">
+        select * from dh_import_job where preview_id = #{previewId}
+    </select>
+
+    <select id="selectMutationDataset" resultMap="MutationDatasetResult">
+        select * from dh_dataset
+        where dataset_id = #{datasetId} and del_flag = '0' and status = 'ACTIVE'
+    </select>
+
+    <select id="selectDatasetVersion" resultMap="MutationVersionResult">
+        select * from dh_dataset_version
+        where dataset_id = #{datasetId} and version_id = #{versionId}
+    </select>
+
+    <select id="selectVersionByJobId" resultMap="MutationVersionResult">
+        select * from dh_dataset_version where job_id = #{jobId}
+    </select>
+
+    <select id="selectDatasetVersions" resultMap="MutationVersionResult">
+        select * from dh_dataset_version where dataset_id = #{datasetId}
+        order by version_no desc
+    </select>
+
+    <select id="selectSchemaColumns" resultMap="MutationColumnResult">
+        select * from dh_dataset_column
+        where dataset_id = #{datasetId} and schema_id = #{schemaId}
+        order by ordinal_position
+    </select>
+
+    <update id="updateMutationPreview" parameterType="com.xinke.datahub.domain.DataHubImportJob">
+        update dh_import_job
+        set status = 'PENDING_CONFIRM', phase = '等待确认', sheet_name = #{sheetName},
+            schema_snapshot_json = #{schemaSnapshotJson}, operation_payload_json = #{operationPayloadJson},
+            total_rows = #{totalRows},
+            processed_rows = 0, success_rows = 0, failed_rows = 0, error_message = null,
+            start_time = null, finish_time = null, update_time = sysdate(3)
+        where job_id = #{jobId}
+          and status in ('PARSING', 'PENDING_CONFIRM', 'VALIDATION_FAILED', 'FAILED')
+          and expire_time &gt; sysdate(3)
+    </update>
+
+    <update id="markMutationPreviewFailed">
+        update dh_import_job
+        set status = 'FAILED', phase = '预览失败', error_message = #{message},
+            finish_time = #{finishTime}, update_time = sysdate(3)
+        where job_id = #{jobId} and status = 'PARSING'
+    </update>
+
+    <update id="acquireDatasetJob">
+        update dh_dataset
+        set active_job_id = #{jobId}, lock_version = lock_version + 1, update_time = sysdate(3)
+        where dataset_id = #{datasetId} and del_flag = '0' and status = 'ACTIVE'
+          and active_job_id is null and current_version_id = #{sourceVersionId}
+          and lock_version = #{sourceLockVersion}
+    </update>
+
+    <update id="queueMutationJob">
+        update dh_import_job
+        set status = 'QUEUED', phase = '等待执行', source_lock_version = #{sourceLockVersion},
+            sheet_name = #{sheetName}, schema_snapshot_json = #{schemaJson}, error_message = null,
+            processed_rows = 0, success_rows = 0, failed_rows = 0,
+            start_time = null, finish_time = null, update_time = sysdate(3)
+        where job_id = #{jobId} and upload_user_id = #{userId} and source_version_id = #{sourceVersionId}
+          and status in ('PENDING_CONFIRM', 'VALIDATION_FAILED', 'FAILED')
+          and (expire_time is null or expire_time &gt; sysdate(3))
+    </update>
+
+    <update id="releaseDatasetJob">
+        update dh_dataset
+        set active_job_id = null, lock_version = lock_version + 1, update_time = sysdate(3)
+        where dataset_id = #{datasetId} and active_job_id = #{jobId}
+    </update>
+
+    <select id="selectNextVersionNo" resultType="int">
+        select coalesce(max(version_no), 0) + 1 from dh_dataset_version where dataset_id = #{datasetId}
+    </select>
+
+    <insert id="insertMutationVersion" parameterType="com.xinke.datahub.domain.DataHubDataVersion"
+            useGeneratedKeys="true" keyProperty="versionId">
+        insert into dh_dataset_version(
+            dataset_id, parent_version_id, schema_id, job_id, version_no, version_type,
+            physical_table_name, row_count, status, retention_until, create_time
+        ) values (
+            #{datasetId}, #{parentVersionId}, #{schemaId}, #{jobId}, #{versionNo}, #{versionType},
+            #{physicalTableName}, #{rowCount}, #{status}, #{retentionUntil}, sysdate(3)
+        )
+    </insert>
+
+    <update id="archiveVersion">
+        update dh_dataset_version
+        set status = 'ARCHIVED', retention_until = #{retentionUntil}
+        where version_id = #{versionId} and status = 'ACTIVE'
+    </update>
+
+    <update id="activateVersion">
+        update dh_dataset_version
+        set status = 'ACTIVE', retention_until = null
+        where version_id = #{versionId} and status in ('ACTIVE', 'ARCHIVED')
+    </update>
+
+    <update id="publishNewVersion">
+        update dh_dataset
+        set current_version_id = #{targetVersionId}, current_schema_id = #{schemaId},
+            row_count = #{rowCount}, active_job_id = null, lock_version = lock_version + 1,
+            update_by = #{username}, update_time = sysdate(3)
+        where dataset_id = #{datasetId} and active_job_id = #{jobId}
+          and current_version_id = #{sourceVersionId} and lock_version = #{expectedLockVersion}
+          and del_flag = '0' and status = 'ACTIVE'
+    </update>
+
+    <update id="publishRollback">
+        update dh_dataset
+        set current_version_id = #{targetVersionId}, current_schema_id = #{schemaId},
+            row_count = #{rowCount}, active_job_id = null, lock_version = lock_version + 1,
+            update_by = #{username}, update_time = sysdate(3)
+        where dataset_id = #{datasetId} and active_job_id = #{jobId}
+          and current_version_id = #{sourceVersionId} and lock_version = #{expectedLockVersion}
+          and del_flag = '0' and status = 'ACTIVE'
+    </update>
+
+    <update id="completeMutationJob">
+        update dh_import_job
+        set target_version_id = #{targetVersionId}, status = 'SUCCESS', phase = '变更完成',
+            processed_rows = #{processedRows}, success_rows = #{processedRows}, failed_rows = 0,
+            finish_time = #{finishTime}, update_time = sysdate(3)
+        where job_id = #{jobId} and lock_version = #{lockVersion} and status = 'COMMITTING'
+    </update>
+
+    <update id="reconcileCompletedJob">
+        update dh_import_job
+        set target_version_id = #{targetVersionId}, status = 'SUCCESS', phase = '变更完成',
+            processed_rows = #{processedRows}, success_rows = #{processedRows}, failed_rows = 0,
+            finish_time = coalesce(finish_time, #{finishTime}), update_time = sysdate(3)
+        where job_id = #{jobId} and status != 'SUCCESS'
+    </update>
+
+    <insert id="insertDataChanges">
+        insert into dh_data_change(
+            dataset_id, job_id, target_version_id, client_mutation_id, row_id,
+            action, before_json, after_json, create_by, create_time
+        ) values
+        <foreach collection="changes" item="item" separator=",">
+            (#{item.datasetId}, #{item.jobId}, #{item.targetVersionId}, #{item.clientMutationId},
+             #{item.rowId}, #{item.action}, #{item.beforeJson}, #{item.afterJson},
+             #{item.createBy}, sysdate(3))
+        </foreach>
+    </insert>
+
+    <select id="selectPurgeCandidates" resultMap="MutationVersionResult">
+        select v.* from dh_dataset_version v
+        where v.status = 'ARCHIVED' and v.retention_until &lt; sysdate(3)
+          and not exists (
+            select 1 from dh_dataset d where d.current_version_id = v.version_id and d.del_flag = '0'
+          )
+          and not exists (
+            select 1 from dh_import_job j
+            where j.status in ('QUEUED', 'VALIDATING', 'STAGING', 'COMMITTING', 'RECOVERING')
+              and (j.source_version_id = v.version_id or j.rollback_target_version_id = v.version_id)
+          )
+        order by v.retention_until, v.version_id
+        limit #{limit}
+    </select>
+
+    <update id="claimVersionForPurge">
+        update dh_dataset_version
+        set status = 'PURGING', purge_claimed_at = sysdate(3)
+        where version_id = #{versionId} and status = 'ARCHIVED'
+          and retention_until &lt; sysdate(3)
+          and not exists (
+            select 1 from dh_dataset d where d.current_version_id = dh_dataset_version.version_id and d.del_flag = '0'
+          )
+          and not exists (
+            select 1 from dh_import_job j
+            where j.status in ('QUEUED', 'VALIDATING', 'STAGING', 'COMMITTING', 'RECOVERING')
+              and (j.source_version_id = dh_dataset_version.version_id
+                   or j.rollback_target_version_id = dh_dataset_version.version_id)
+          )
+    </update>
+
+    <select id="selectStalePurgingVersions" resultMap="MutationVersionResult">
+        select * from dh_dataset_version
+        where status = 'PURGING'
+          and (purge_claimed_at is null or purge_claimed_at &lt; #{staleBefore})
+        order by purge_claimed_at, version_id
+        limit #{limit}
+    </select>
+
+    <update id="reclaimStaleVersionForPurge">
+        update dh_dataset_version
+        set purge_claimed_at = sysdate(3)
+        where version_id = #{versionId} and status = 'PURGING'
+          and (purge_claimed_at is null or purge_claimed_at &lt; #{staleBefore})
+    </update>
+
+    <update id="markVersionPurged">
+        update dh_dataset_version set status = 'PURGED', purge_claimed_at = null
+        where version_id = #{versionId} and status = 'PURGING'
+    </update>
+
+</mapper>

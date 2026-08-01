@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.datahub.mapper.DataHubFolderMapper">
+
+    <resultMap id="FolderResult" type="com.xinke.datahub.domain.DataHubFolder">
+        <id property="folderId" column="folder_id"/>
+        <result property="parentFolderId" column="parent_folder_id"/>
+        <result property="folderName" column="folder_name"/>
+        <result property="normalizedName" column="normalized_name"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="ownerUserName" column="owner_user_name"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="itemCount" column="item_count"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="FolderItemResult" type="com.xinke.datahub.domain.DataHubFolderItem">
+        <id property="itemId" column="item_id"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="folderId" column="folder_id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="visibleDatasetPredicate">
+        d.del_flag = '0' and d.status = 'ACTIVE'
+        <if test="!admin">
+            and (d.owner_user_id = #{userId} or exists (
+                select 1 from dh_dataset_acl a
+                where a.dataset_id = d.dataset_id and mod(a.permission_mask, 2) = 1 and (
+                    (a.subject_type = 'USER' and a.subject_id = #{userId}) or
+                    (a.subject_type = 'ROLE' and exists (
+                        select 1 from sys_user_role ur
+                        join sys_role r on r.role_id = ur.role_id and r.status = '0' and r.del_flag = '0'
+                        where ur.user_id = #{userId} and ur.role_id = a.subject_id
+                    ))
+                )
+            ))
+        </if>
+    </sql>
+
+    <select id="selectOwnedFolderList" resultMap="FolderResult">
+        select f.*, (
+            select count(1)
+            from dh_folder_item i
+            join dh_dataset d on d.dataset_id = i.dataset_id
+            where i.owner_user_id = #{userId} and i.folder_id = f.folder_id
+              and <include refid="visibleDatasetPredicate"/>
+        ) as item_count
+        from dh_folder f
+        where f.owner_user_id = #{userId} and f.del_flag = '0'
+        order by f.sort_order, f.folder_id
+    </select>
+
+    <select id="selectOwnedFolderListForUpdate" resultMap="FolderResult">
+        select * from dh_folder
+        where owner_user_id = #{userId} and del_flag = '0'
+        order by folder_id
+        for update
+    </select>
+
+    <select id="selectOwnedFolderForUpdate" resultMap="FolderResult">
+        select * from dh_folder
+        where folder_id = #{folderId} and owner_user_id = #{userId} and del_flag = '0'
+        for update
+    </select>
+
+    <insert id="insertFolder" parameterType="com.xinke.datahub.domain.DataHubFolder"
+            useGeneratedKeys="true" keyProperty="folderId">
+        insert into dh_folder(
+            parent_folder_id, folder_name, normalized_name, owner_user_id, owner_user_name,
+            sort_order, lock_version, del_flag, create_by, create_time, update_by, update_time, remark
+        ) values (
+            #{parentFolderId}, #{folderName}, #{normalizedName}, #{ownerUserId}, #{ownerUserName},
+            #{sortOrder}, 0, '0', #{createBy}, sysdate(3), #{updateBy}, sysdate(3), #{remark}
+        )
+    </insert>
+
+    <update id="updateFolder" parameterType="com.xinke.datahub.domain.DataHubFolder">
+        update dh_folder
+        set parent_folder_id = #{parentFolderId}, folder_name = #{folderName},
+            normalized_name = #{normalizedName}, sort_order = #{sortOrder},
+            lock_version = lock_version + 1, update_by = #{updateBy}, update_time = sysdate(3)
+        where folder_id = #{folderId} and owner_user_id = #{ownerUserId}
+          and lock_version = #{lockVersion} and del_flag = '0'
+    </update>
+
+    <update id="softDeleteFolder">
+        update dh_folder
+        set del_flag = '1', lock_version = lock_version + 1,
+            update_by = #{username}, update_time = sysdate(3)
+        where folder_id = #{folderId} and owner_user_id = #{userId}
+          and lock_version = #{lockVersion} and del_flag = '0'
+    </update>
+
+    <select id="countActiveChildren" resultType="int">
+        select count(1) from dh_folder
+        where parent_folder_id = #{folderId} and owner_user_id = #{userId} and del_flag = '0'
+    </select>
+
+    <delete id="deleteInvisibleFolderItems">
+        delete i from dh_folder_item i
+        left join dh_dataset d on d.dataset_id = i.dataset_id
+        where i.folder_id = #{folderId} and i.owner_user_id = #{userId}
+          and (
+            d.dataset_id is null or d.del_flag != '0' or d.status != 'ACTIVE'
+            <if test="!admin">
+                or (d.owner_user_id != #{userId} and not exists (
+                    select 1 from dh_dataset_acl a
+                    where a.dataset_id = d.dataset_id and mod(a.permission_mask, 2) = 1 and (
+                        (a.subject_type = 'USER' and a.subject_id = #{userId}) or
+                        (a.subject_type = 'ROLE' and exists (
+                            select 1 from sys_user_role ur
+                            join sys_role r on r.role_id = ur.role_id and r.status = '0' and r.del_flag = '0'
+                            where ur.user_id = #{userId} and ur.role_id = a.subject_id
+                        ))
+                    )
+                ))
+            </if>
+          )
+    </delete>
+
+    <select id="countFolderItems" resultType="int">
+        select count(1) from dh_folder_item
+        where folder_id = #{folderId} and owner_user_id = #{userId}
+    </select>
+
+    <select id="countVisibleDataset" resultType="int">
+        select count(1) from dh_dataset d
+        where d.dataset_id = #{datasetId} and <include refid="visibleDatasetPredicate"/>
+    </select>
+
+    <select id="selectFolderItemForUpdate" resultMap="FolderItemResult">
+        select * from dh_folder_item
+        where dataset_id = #{datasetId} and owner_user_id = #{userId}
+        for update
+    </select>
+
+    <insert id="insertFolderItem" parameterType="com.xinke.datahub.domain.DataHubFolderItem"
+            useGeneratedKeys="true" keyProperty="itemId">
+        insert into dh_folder_item(
+            owner_user_id, folder_id, dataset_id, lock_version,
+            create_by, create_time, update_by, update_time
+        ) values (
+            #{ownerUserId}, #{folderId}, #{datasetId}, 0,
+            #{createBy}, sysdate(3), #{updateBy}, sysdate(3)
+        )
+    </insert>
+
+    <insert id="insertFolderItemIfOwnedActive">
+        insert into dh_folder_item(
+            owner_user_id, folder_id, dataset_id, lock_version,
+            create_by, create_time, update_by, update_time
+        )
+        select #{userId}, f.folder_id, #{datasetId}, 0,
+               #{username}, sysdate(3), #{username}, sysdate(3)
+        from dh_folder f
+        where f.folder_id = #{folderId} and f.owner_user_id = #{userId} and f.del_flag = '0'
+    </insert>
+
+    <update id="updateFolderItem">
+        update dh_folder_item
+        set folder_id = #{folderId}, lock_version = lock_version + 1,
+            update_by = #{username}, update_time = sysdate(3)
+        where dataset_id = #{datasetId} and owner_user_id = #{userId}
+          and lock_version = #{lockVersion}
+    </update>
+
+    <delete id="deleteFolderItem">
+        delete from dh_folder_item
+        where dataset_id = #{datasetId} and owner_user_id = #{userId}
+          and lock_version = #{lockVersion}
+    </delete>
+</mapper>
