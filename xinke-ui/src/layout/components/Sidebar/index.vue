@@ -83,8 +83,8 @@ const activeMenu = computed(() => {
     
     .el-menu-item, .el-sub-menu__title {
       &:hover {
-        background-color: rgba(108, 92, 231, 0.055) !important;
-        color: #6c5ce7 !important;
+        background-color: #f5f6f8 !important;
+        color: #1f2937 !important;
       }
     }
 
@@ -92,10 +92,10 @@ const activeMenu = computed(() => {
       color: v-bind(getMenuTextColor);
       
       &.is-active {
-        color: #6c5ce7 !important;
-        border-color: rgba(108, 92, 231, 0.14);
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 247, 255, 0.94)) !important;
-        box-shadow: 0 7px 16px rgba(55, 62, 97, 0.07);
+        color: #f26b21 !important;
+        border-color: transparent;
+        background: #fff1e9 !important;
+        box-shadow: none;
       }
     }
 

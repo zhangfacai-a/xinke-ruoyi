@@ -1,10 +1,10 @@
-﻿@use './mixin.scss';
+@use './mixin.scss';
 @use './transition.scss';
 @use './element-ui.scss';
 @use './sidebar.scss';
 @use './btn.scss';
 @use './xinke.scss';
-@use './soft-ui.scss';
+@use './enterprise-ui.scss';
 
 body {
   height: 100%;
@@ -112,11 +112,11 @@ aside {
   -moz-osx-font-smoothing: grayscale;
 
   a {
-    color: var(--erp-accent, #6c5ce7);
+    color: var(--erp-accent, #f26b21);
     cursor: pointer;
 
     &:hover {
-      color: var(--erp-accent, #6c5ce7);
+      color: var(--erp-accent, #f26b21);
     }
   }
 }
@@ -161,11 +161,11 @@ aside {
 
 .link-type,
 .link-type:focus {
-  color: var(--erp-accent, #6c5ce7);
+  color: var(--erp-accent, #f26b21);
   cursor: pointer;
 
   &:hover {
-    color: var(--erp-accent, #6c5ce7);
+    color: var(--erp-accent, #f26b21);
   }
 }
 

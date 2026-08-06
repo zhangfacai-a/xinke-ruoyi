@@ -2,7 +2,7 @@
   <div class="app-container live-room-page">
     <section class="room-hero">
       <div>
-        <p class="eyebrow">Live Room Mapping</p>
+        <p class="eyebrow">直播运营 / 基础配置</p>
         <h2>直播间映射</h2>
         <p>把插件采集到的直播间 ID 维护成业务名称，追单列表会优先展示这里配置的名称。</p>
       </div>
@@ -200,8 +200,8 @@ getList()
 <style scoped lang="scss">
 .live-room-page {
   background:
-    radial-gradient(circle at 10% 10%, rgba(108, 92, 231, 0.14), transparent 24rem),
-    radial-gradient(circle at 92% 8%, rgba(162, 155, 254, 0.2), transparent 22rem);
+    radial-gradient(circle at 10% 10%, rgba(242, 107, 33, 0.14), transparent 24rem),
+    radial-gradient(circle at 92% 8%, rgba(245, 154, 95, 0.2), transparent 22rem);
 }
 
 .room-hero,
@@ -239,8 +239,8 @@ getList()
   margin: 0;
   padding: 6px 12px;
   border-radius: 999px;
-  color: #6c5ce7;
-  background: rgba(108, 92, 231, 0.1);
+  color: #f26b21;
+  background: rgba(242, 107, 33, 0.1);
   font-weight: 700;
 }
 

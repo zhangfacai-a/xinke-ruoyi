@@ -2,7 +2,7 @@
   <div class="app-container inventory-page">
     <section class="inventory-summary">
       <div class="summary-title">
-        <span>INVENTORY CONTROL</span>
+        <span>供应链 / 库存管理</span>
         <h2>库存控制台</h2>
         <p>ERP 流水是账面库存，云仓快照用于对账，不直接覆盖账面数量。</p>
       </div>
@@ -189,21 +189,21 @@ getList()
 
 <style scoped>
 .inventory-page { display: flex; flex-direction: column; gap: 16px; }
-.inventory-summary, .filter-panel, .table-panel { border: 1px solid rgba(108,92,231,.1); background: rgba(255,255,255,.93); box-shadow: 0 12px 32px rgba(51,46,112,.07); }
+.inventory-summary, .filter-panel, .table-panel { border: 1px solid rgba(242,107,33,.1); background: rgba(255,255,255,.93); box-shadow: 0 12px 32px rgba(51,46,112,.07); }
 .inventory-summary { display: grid; grid-template-columns: minmax(230px, 1.1fr) repeat(5, minmax(130px, .8fr)); gap: 10px; padding: 18px; border-radius: 16px; }
 .summary-title { padding: 4px 10px; }
-.summary-title > span { color: #6c5ce7; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.summary-title > span { color: #f26b21; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
 .summary-title h2 { margin: 5px 0 3px; color: #24283b; font-size: 23px; }
 .summary-title p { margin: 0; color: #9299ad; font-size: 12px; line-height: 1.5; }
 .summary-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-width: 0; padding: 12px 14px; border: 1px solid #ececf5; border-radius: 12px; background: #fafafe; color: #737a91; text-align: left; }
-button.summary-card { cursor: pointer; transition: .2s ease; } button.summary-card:hover { transform: translateY(-2px); border-color: #c2bbff; box-shadow: 0 8px 18px rgba(108,92,231,.1); }
+button.summary-card { cursor: pointer; transition: .2s ease; } button.summary-card:hover { transform: translateY(-2px); border-color: #c2bbff; box-shadow: 0 8px 18px rgba(242,107,33,.1); }
 .summary-card strong { margin: 3px 0 1px; color: #292e43; font-size: 22px; }.summary-card small { overflow: hidden; width: 100%; color: #a0a6b8; text-overflow: ellipsis; white-space: nowrap; }
-.summary-card.physical strong { color: #00a88f; }.summary-card.cloud strong { color: #6c5ce7; }.summary-card.cloud-external strong { color: #3586ed; }.summary-card.warning strong { color: #e58a26; }.summary-card.danger strong { color: #e25564; }
+.summary-card.physical strong { color: #00a88f; }.summary-card.cloud strong { color: #f26b21; }.summary-card.cloud-external strong { color: #3586ed; }.summary-card.warning strong { color: #e58a26; }.summary-card.danger strong { color: #e25564; }
 .filter-panel { padding: 14px 18px 2px; border-radius: 14px; }.filter-panel :deep(.el-form-item) { margin-right: 16px; }.filter-panel :deep(.el-input), .filter-panel :deep(.el-select) { width: 170px; }
 .table-panel { overflow: hidden; border-radius: 16px; }.table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #eceef5; }.toolbar-copy strong, .toolbar-copy span { display: block; }.toolbar-copy span { margin-top: 3px; color: #969db0; font-size: 12px; }.toolbar-actions { display: flex; align-items: center; gap: 8px; }
 .warehouse-cell { display: flex; align-items: center; gap: 9px; }.warehouse-cell strong, .warehouse-cell span, .sku-cell strong, .sku-cell span { display: block; }.warehouse-cell span, .sku-cell span { margin-top: 2px; color: #969db0; font-size: 12px; }.sku-cell strong { color: #34394d; }
 .low-stock { color: #e36a39; }.muted { color: #b0b5c4; }.sync-dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #aeb3c3; }.sync-dot.matched { background: #00b894; }.sync-dot.difference { background: #f39c3d; }.sync-dot.failed { background: #ea5a68; }
-.sync-notice { display: flex; gap: 11px; margin-bottom: 16px; padding: 13px 15px; border-radius: 10px; background: #f0eeff; color: #6c5ce7; }.sync-notice strong, .sync-notice span { display: block; }.sync-notice span { margin-top: 3px; color: #727a94; font-size: 12px; }.sync-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }.parse-result { display: flex; justify-content: space-between; color: #6f768d; font-size: 12px; }.parse-result .error { color: #e25564; }.log-filter { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.sync-notice { display: flex; gap: 11px; margin-bottom: 16px; padding: 13px 15px; border-radius: 10px; background: #fff1e9; color: #f26b21; }.sync-notice strong, .sync-notice span { display: block; }.sync-notice span { margin-top: 3px; color: #727a94; font-size: 12px; }.sync-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }.parse-result { display: flex; justify-content: space-between; color: #6f768d; font-size: 12px; }.parse-result .error { color: #e25564; }.log-filter { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 @media (max-width: 1350px) { .inventory-summary { grid-template-columns: repeat(3, 1fr); }.summary-title { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .inventory-summary { grid-template-columns: repeat(2, 1fr); }.table-toolbar { align-items: flex-start; flex-direction: column; }.sync-form-grid { grid-template-columns: 1fr; } }
 </style>

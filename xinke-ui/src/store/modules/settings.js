@@ -19,7 +19,7 @@ const {
 const useSettingsStore = defineStore('settings', {
   state: () => ({
     title: '',
-    theme: '#6C5CE7',
+    theme: '#F26B21',
     sideTheme,
     showSettings,
     navType,

@@ -2,7 +2,7 @@
   <div class="finance-center" v-loading="overviewLoading">
     <section class="finance-hero">
       <div>
-        <span class="eyebrow">FINANCE OPERATIONS</span>
+        <span class="eyebrow">财务中心 / 经营分析</span>
         <h1>财务运营中心</h1>
         <p>先处理资金和单据待办，再核对利润与关账。每个数字都可以进入对应业务页面。</p>
       </div>
@@ -222,8 +222,8 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resizeChart); cashC
 
 <style scoped>
 .finance-center { min-height: calc(100vh - 84px); padding: 20px; background: #f4f6fb; color: #20263a; }
-.finance-hero { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 26px 30px; background: linear-gradient(120deg, #fff 55%, #eeebff); border: 1px solid #ebeaf6; border-radius: 16px; }
-.eyebrow { display: inline-block; padding: 5px 10px; color: #6657e8; background: #f0edff; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.finance-hero { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 26px 30px; background: linear-gradient(120deg, #fff 55%, #fff1e9); border: 1px solid #ebeaf6; border-radius: 16px; }
+.eyebrow { display: inline-block; padding: 5px 10px; color: #e85f18; background: #fff1e9; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .finance-hero h1 { margin: 10px 0 4px; font-size: 28px; }
 .finance-hero p, .panel-heading p { margin: 0; color: #7b849d; }
 .hero-actions { display: flex; align-items: center; gap: 10px; }
@@ -243,13 +243,13 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resizeChart); cashC
 .todo-panel { padding-bottom: 10px; }
 .todo-row, .activity-row { width: calc(100% - 24px); margin: 0 12px; padding: 12px 8px; display: flex; align-items: center; gap: 10px; text-align: left; border: 0; border-bottom: 1px solid #f0f1f6; background: transparent; cursor: pointer; }
 .todo-row:last-child, .activity-row:last-child { border-bottom: 0; }
-.todo-icon { width: 34px; height: 34px; display: grid; place-items: center; color: #6657e8; background: #f0edff; border-radius: 9px; }.todo-icon.warning { color: #d98916; background: #fff4dc; }.todo-icon.danger { color: #e95e71; background: #ffedf0; }
+.todo-icon { width: 34px; height: 34px; display: grid; place-items: center; color: #e85f18; background: #fff1e9; border-radius: 9px; }.todo-icon.warning { color: #d98916; background: #fff4dc; }.todo-icon.danger { color: #e95e71; background: #ffedf0; }
 .todo-content, .activity-row > span:first-child { flex: 1; min-width: 0; }.todo-content strong, .todo-content small, .activity-row strong, .activity-row small { display: block; }.todo-content small, .activity-row small { margin-top: 3px; color: #8a92a8; font-size: 12px; }
 .todo-row b { font-size: 14px; color: #596177; }.todo-row b.warning { color: #d98916; }.todo-row b.danger, .danger { color: #e24c62 !important; }
 .workflow-panel { margin-top: 14px; padding-bottom: 18px; }.workflow-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 4px 18px; }
 .workflow-step { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 14px; text-align: left; border: 1px solid #ececf4; border-radius: 10px; background: #fbfbfe; cursor: pointer; transition: .2s; }.workflow-step div { flex: 1; min-width: 0; }.workflow-step strong, .workflow-step small { display: block; }.workflow-step small { margin-top: 4px; color: #8991a6; font-size: 12px; line-height: 1.45; }.step-index { flex: 0 0 26px; height: 26px; display: grid; place-items: center; color: #fff; background: #7567ef; border-radius: 8px; font-weight: 700; }
 .bottom-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(360px, .75fr); gap: 14px; margin-top: 14px; }.module-panel, .activity-panel { padding-bottom: 14px; }
-.module-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 4px 18px; }.module-card { display: flex; gap: 10px; align-items: flex-start; min-width: 0; padding: 13px; text-align: left; border: 1px solid #ececf4; border-radius: 10px; background: #fff; cursor: pointer; transition: .2s; }.module-card > .el-icon { flex: 0 0 auto; margin-top: 2px; color: #6c5ce7; font-size: 20px; }.module-card strong, .module-card small { display: block; }.module-card small { margin-top: 4px; color: #8a92a8; font-size: 12px; line-height: 1.4; }
+.module-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 4px 18px; }.module-card { display: flex; gap: 10px; align-items: flex-start; min-width: 0; padding: 13px; text-align: left; border: 1px solid #ececf4; border-radius: 10px; background: #fff; cursor: pointer; transition: .2s; }.module-card > .el-icon { flex: 0 0 auto; margin-top: 2px; color: #f26b21; font-size: 20px; }.module-card strong, .module-card small { display: block; }.module-card small { margin-top: 4px; color: #8a92a8; font-size: 12px; line-height: 1.4; }
 .activity-value { flex: 0 0 auto; text-align: right; }.activity-value b { display: block; margin-bottom: 5px; }
 .report-panel { padding: 18px; }.report-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }.report-toolbar .el-form-item { margin-bottom: 0; }
 @media (max-width: 1300px) { .workflow-grid { grid-template-columns: repeat(3, 1fr); }.module-grid { grid-template-columns: repeat(2, 1fr); } }

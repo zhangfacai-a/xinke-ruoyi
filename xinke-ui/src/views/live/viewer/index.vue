@@ -2,7 +2,7 @@
   <div class="app-container viewer-page">
     <section class="viewer-hero">
       <div>
-        <p class="eyebrow">Douyin Live CRM</p>
+        <p class="eyebrow">直播运营 / 客户追单</p>
         <h2>直播观众追单池</h2>
         <p class="hero-desc">按直播间和观众去重建档；有评论的客户自动标为高意向，运营优先跟进。</p>
       </div>
@@ -594,57 +594,42 @@ getList()
 
 <style scoped lang="scss">
 .viewer-page {
-  background:
-    radial-gradient(circle at 10% 10%, rgba(108, 92, 231, 0.14), transparent 24rem),
-    radial-gradient(circle at 92% 8%, rgba(162, 155, 254, 0.22), transparent 22rem);
-}
-
-.viewer-hero,
-.search-panel,
-.table-panel,
-.metric-card {
-  border: 1px solid rgba(132, 119, 255, 0.12);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 18px 45px rgba(74, 72, 128, 0.08);
-  backdrop-filter: blur(16px);
+  padding: 22px 24px;
+  background: #fff;
 }
 
 .viewer-hero {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  padding: 24px 28px;
-  margin-bottom: 16px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid #e5e7eb;
 
   h2 {
-    margin: 8px 0 10px;
-    color: #20233a;
-    font-size: 30px;
-    font-weight: 800;
+    margin: 5px 0 7px;
+    color: #1f2933;
+    font-size: 22px;
+    font-weight: 650;
   }
 }
 
 .eyebrow {
-  display: inline-flex;
   margin: 0;
-  padding: 6px 12px;
-  border-radius: 999px;
-  color: #6c5ce7;
-  background: rgba(108, 92, 231, 0.1);
-  font-weight: 700;
+  color: #f26b21;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .hero-desc {
   margin: 0;
-  color: #707893;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .hero-status {
-  min-width: 180px;
-  padding: 18px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(108, 92, 231, 0.1), rgba(162, 155, 254, 0.16));
+  min-width: 170px;
+  padding-left: 16px;
+  border-left: 2px solid #f7a06f;
 
   span,
   strong {
@@ -652,47 +637,55 @@ getList()
   }
 
   span {
-    color: #7a8198;
-    margin-bottom: 8px;
+    color: #8a949f;
+    margin-bottom: 4px;
+    font-size: 12px;
   }
 
   strong {
-    color: #20233a;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 600;
   }
 }
 
 .metric-row {
-  margin-bottom: 16px;
+  margin: 0 !important;
+  padding: 14px 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
+
+  :deep(.el-col) { padding: 0 !important; }
 }
 
 .metric-card {
-  padding: 18px;
-  min-height: 110px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-
-  &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 22px 52px rgba(108, 92, 231, 0.14);
-  }
+  min-height: 76px;
+  padding: 8px 18px;
+  border-right: 1px solid #e5e7eb;
 
   span,
   small {
     display: block;
-    color: #7c849c;
+    color: #77818c;
+    font-size: 12px;
   }
 
   strong {
     display: block;
-    margin: 10px 0 6px;
-    color: #20233a;
-    font-size: 26px;
+    margin: 5px 0 3px;
+    color: #1f2933;
+    font-size: 22px;
+    font-weight: 650;
   }
 }
 
-.search-panel,
+.search-panel {
+  padding: 16px 0 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .table-panel {
-  padding: 18px;
-  margin-bottom: 16px;
+  padding: 16px 0 0;
 }
 
 .search-form {
@@ -709,7 +702,7 @@ getList()
 
   strong {
     overflow: hidden;
-    color: #20233a;
+    color: #1f2933;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -723,7 +716,7 @@ getList()
 
   span {
     overflow: hidden;
-    color: #4f566b;
+    color: #4b5563;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -732,7 +725,7 @@ getList()
 .detail-wrap {
   h4 {
     margin: 24px 0 12px;
-    color: #20233a;
+    color: #1f2933;
   }
 }
 
@@ -748,7 +741,7 @@ getList()
 
   p {
     margin: 0;
-    color: #7c849c;
+    color: #77818c;
   }
 }
 
@@ -757,7 +750,7 @@ getList()
   max-width: 540px;
   margin-top: 4px;
   overflow: hidden;
-  color: #7c849c;
+  color: #77818c;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -767,15 +760,22 @@ getList()
   place-items: center;
   width: 52px;
   height: 52px;
-  border-radius: 16px;
+  border-radius: 4px;
   color: #fff;
-  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  background: #f26b21;
   font-size: 20px;
-  font-weight: 800;
-  box-shadow: 0 16px 34px rgba(108, 92, 231, 0.24);
+  font-weight: 650;
+  box-shadow: none;
 }
 
 .mb12 {
   margin-bottom: 12px;
+}
+
+@media (max-width: 768px) {
+  .viewer-page { padding: 14px 12px; }
+  .viewer-hero { align-items: flex-start; gap: 14px; }
+  .hero-status { display: none; }
+  .metric-card { border-bottom: 1px solid #e5e7eb; }
 }
 </style>

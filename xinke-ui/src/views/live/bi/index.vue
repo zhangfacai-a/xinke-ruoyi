@@ -3,7 +3,7 @@
     <div class="bi-board">
       <section class="bi-hero">
         <div>
-          <span class="eyebrow">Live Operations BI</span>
+          <span class="eyebrow">直播运营 / 数据分析</span>
           <h2>直播追单经营看板</h2>
           <p>把直播间流量、评论意向、负责人跟进和订单转化放在同一张运营桌面里。</p>
         </div>
@@ -366,7 +366,7 @@ function issueLabel(type) {
 }
 
 const wordColors = {
-  购买信号: '#6c5ce7',
+  购买信号: '#f26b21',
   价格敏感: '#e17055',
   型号对比: '#0984e3',
   赠品活动: '#d68910',
@@ -379,7 +379,7 @@ function wordStyle(item) {
   const maxScore = Math.max(...signalWords.value.map((row) => num(row.score)), 1)
   const ratio = Math.max(num(item.score) / maxScore, 0.18)
   return {
-    '--word-color': wordColors[item.category] || '#6c5ce7',
+      '--word-color': wordColors[item.category] || '#f26b21',
     fontSize: `${13 + ratio * 18}px`,
     opacity: 0.72 + ratio * 0.28
   }
@@ -453,7 +453,7 @@ function renderCharts() {
 function renderTrend() {
   const dates = trend.value.map((item) => item.statDate)
   trendChart.setOption({
-    color: ['#6c5ce7', '#00b894', '#fdcb6e', '#0984e3'],
+    color: ['#f26b21', '#00a878', '#f4b740', '#2487d8'],
     tooltip: { trigger: 'axis' },
     legend: { top: 0, right: 8, data: ['观众', '高意向', '未分配', '追后成交'] },
     grid: { left: 34, right: 20, top: 42, bottom: 28 },
@@ -470,7 +470,7 @@ function renderTrend() {
 
 function renderFunnel() {
   funnelChart.setOption({
-    color: ['#6c5ce7', '#74b9ff', '#55efc4', '#fdcb6e', '#00b894'],
+    color: ['#f26b21', '#4b9be8', '#50c878', '#f4b740', '#00a878'],
     tooltip: { trigger: 'item' },
     series: [{
       type: 'funnel',
@@ -494,7 +494,7 @@ function renderHour() {
   const map = new Map(hourHeat.value.map((item) => [Number(item.statHour), num(item.commentCount)]))
   const hours = Array.from({ length: 24 }, (_, index) => index)
   hourChart.setOption({
-    color: ['#a29bfe'],
+    color: ['#f59a5f'],
     tooltip: { trigger: 'axis' },
     grid: { left: 34, right: 12, top: 24, bottom: 28 },
     xAxis: { type: 'category', data: hours.map((h) => `${h}:00`) },
@@ -506,7 +506,7 @@ function renderHour() {
 function renderShop() {
   const rows = shopRank.value.slice(0, 8).reverse()
   shopChart.setOption({
-    color: ['#6c5ce7', '#00b894', '#fdcb6e'],
+    color: ['#f26b21', '#00a878', '#f4b740'],
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { top: 0, right: 8, data: ['评分', '高意向', '追后成交'] },
     grid: { left: 92, right: 24, top: 42, bottom: 24 },
@@ -551,7 +551,7 @@ onBeforeUnmount(() => {
   overflow-x: hidden;
   padding: clamp(10px, 1.1vw, 18px);
   background:
-    radial-gradient(circle at 16% 0%, rgba(108, 92, 231, .13), transparent 26%),
+    radial-gradient(circle at 16% 0%, rgba(242, 107, 33, .13), transparent 26%),
     linear-gradient(180deg, #f7f8ff 0%, #f4f6fb 100%);
   color: #22263a;
 }
@@ -602,8 +602,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(108, 92, 231, .10);
-  color: #6c5ce7;
+  background: rgba(242, 107, 33, .10);
+  color: #f26b21;
   font-weight: 700;
 }
 
@@ -764,11 +764,11 @@ onBeforeUnmount(() => {
   .shop-top {
     margin-bottom: 12px;
     padding: 14px;
-    border: 1px solid rgba(108, 92, 231, .16);
+    border: 1px solid rgba(242, 107, 33, .16);
     border-radius: 16px;
     background:
-      radial-gradient(circle at 85% 0%, rgba(162, 155, 254, .28), transparent 42%),
-      linear-gradient(135deg, rgba(108, 92, 231, .10), rgba(255, 255, 255, .92));
+      radial-gradient(circle at 85% 0%, rgba(245, 154, 95, .28), transparent 42%),
+      linear-gradient(135deg, rgba(242, 107, 33, .10), rgba(255, 255, 255, .92));
 
     span,
     strong,
@@ -777,7 +777,7 @@ onBeforeUnmount(() => {
     }
 
     span {
-      color: #6c5ce7;
+      color: #f26b21;
       font-size: 12px;
       font-weight: 800;
     }
@@ -808,9 +808,9 @@ onBeforeUnmount(() => {
   div {
     min-width: 0;
     padding: 12px;
-    border: 1px solid rgba(108, 92, 231, .14);
+    border: 1px solid rgba(242, 107, 33, .14);
     border-radius: 14px;
-    background: linear-gradient(135deg, rgba(108, 92, 231, .10), rgba(255, 255, 255, .86));
+    background: linear-gradient(135deg, rgba(242, 107, 33, .10), rgba(255, 255, 255, .86));
   }
 
   span,
@@ -820,7 +820,7 @@ onBeforeUnmount(() => {
   }
 
   span {
-    color: #6c5ce7;
+    color: #f26b21;
     font-size: 11px;
     font-weight: 800;
   }

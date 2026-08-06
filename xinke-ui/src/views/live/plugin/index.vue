@@ -307,7 +307,7 @@ onMounted(() => {
   gap: 16px;
   padding: 22px 24px;
   background:
-    radial-gradient(circle at 86% 0%, rgba(162, 155, 254, .22), transparent 34%),
+    radial-gradient(circle at 86% 0%, rgba(245, 154, 95, .22), transparent 34%),
     rgba(255, 255, 255, .92);
 
   h2 {
@@ -325,8 +325,8 @@ onMounted(() => {
   display: inline-flex;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(108, 92, 231, .1);
-  color: #6c5ce7;
+  background: rgba(242, 107, 33, .1);
+  color: #f26b21;
   font-weight: 800;
 }
 
@@ -365,7 +365,7 @@ onMounted(() => {
   gap: 8px;
   padding: 18px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(20, 184, 166, .12), rgba(108, 92, 231, .08));
+  background: linear-gradient(135deg, rgba(20, 184, 166, .12), rgba(242, 107, 33, .08));
   color: #0f766e;
 
   strong {

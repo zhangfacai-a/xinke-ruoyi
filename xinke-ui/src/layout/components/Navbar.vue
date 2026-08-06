@@ -4,14 +4,6 @@
       <hamburger :is-active="appStore.sidebar.opened" @toggleClick="toggleSideBar" />
     </div>
 
-    <div v-if="settingsStore.navType == 1" class="toolbar-context">
-      <div class="toolbar-row">
-        <div class="toolbar-title">经营工作台</div>
-        <span class="live-pill">在线</span>
-      </div>
-      <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
-    </div>
-
     <top-nav v-if="settingsStore.navType == 2" id="topmenu-container" class="topmenu-container" />
     <template v-if="settingsStore.navType == 3">
       <logo v-show="settingsStore.sidebarLogo" :collapse="false" />
@@ -20,7 +12,6 @@
 
     <div class="right-menu">
       <template v-if="appStore.device !== 'mobile'">
-        <div class="today-chip">{{ todayText }}</div>
         <!-- <header-search id="header-search" class="right-menu-item" />
         <screenfull id="screenfull" class="right-menu-item hover-effect" /> -->
 
@@ -54,7 +45,6 @@
 
 <script setup>
 import { ElMessageBox } from 'element-plus'
-import Breadcrumb from '@/components/Breadcrumb'
 import TopNav from './TopNav'
 import TopBar from './TopBar'
 import Logo from './Sidebar/Logo'
@@ -73,11 +63,6 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 const lockStore = useLockStore()
 const settingsStore = useSettingsStore()
-
-const todayText = computed(() => {
-  const now = new Date()
-  return `${now.getMonth() + 1}月${now.getDate()}日`
-})
 
 function toggleSideBar() {
   appStore.toggleSideBar()
@@ -161,7 +146,7 @@ function lockScreen() {
     overflow: hidden;
     color: #1f2433;
     font-size: 15px;
-    font-weight: 850;
+    font-weight: 650;
     letter-spacing: 0;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -173,9 +158,9 @@ function lockScreen() {
     align-items: center;
     gap: 5px;
     padding: 0 8px;
-    border-radius: 999px;
-    color: #00a783;
-    background: rgba(0, 184, 148, 0.10);
+    border-radius: 3px;
+    color: #287a52;
+    background: #edf7f1;
     font-size: 11px;
     font-weight: 800;
     white-space: nowrap;
@@ -186,7 +171,7 @@ function lockScreen() {
       height: 6px;
       border-radius: 999px;
       background: #00b894;
-      box-shadow: 0 0 0 4px rgba(0, 184, 148, 0.12);
+      box-shadow: none;
     }
   }
 
@@ -225,13 +210,13 @@ function lockScreen() {
       display: inline-flex;
       align-items: center;
       padding: 0 12px;
-      border-radius: 999px;
-      color: #6c5ce7;
-      background: rgba(108, 92, 231, 0.08);
+      border-radius: 3px;
+      color: #66727f;
+      background: #f3f5f7;
       font-size: 12px;
       font-weight: 750;
       white-space: nowrap;
-      box-shadow: inset 0 0 0 1px rgba(108, 92, 231, 0.08);
+      box-shadow: inset 0 0 0 1px #e3e7eb;
     }
 
     .right-menu-item {
@@ -251,8 +236,8 @@ function lockScreen() {
         transition: background 0.2s, color 0.2s, transform 0.2s;
 
         &:hover {
-          background: rgba(108, 92, 231, 0.10);
-          color: #6c5ce7;
+          background: #fff1e9;
+          color: #f26b21;
           transform: translateY(-1px);
         }
       }

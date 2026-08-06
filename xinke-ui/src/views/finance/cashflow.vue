@@ -2,7 +2,7 @@
   <div class="app-container cash-ledger-page">
     <section class="ledger-hero">
       <div>
-        <span class="eyebrow">CASH LEDGER</span>
+        <span class="eyebrow">财务中心 / 资金流水</span>
         <h1>资金出入账中心</h1>
         <p>统一记录银行与平台账户流水，控制草稿、入账、核销、凭证和冲销。</p>
       </div>
@@ -213,16 +213,16 @@ refreshAll()
 
 <style scoped>
 .cash-ledger-page { min-width: 0; }
-.ledger-hero, .ledger-panel { background: rgba(255,255,255,.92); border: 1px solid rgba(108,92,231,.10); border-radius: 14px; box-shadow: 0 10px 30px rgba(57,48,125,.07); }
+.ledger-hero, .ledger-panel { background: rgba(255,255,255,.92); border: 1px solid rgba(242,107,33,.10); border-radius: 14px; box-shadow: 0 10px 30px rgba(57,48,125,.07); }
 .ledger-hero { display:flex; justify-content:space-between; align-items:center; padding:22px 26px; margin-bottom:16px; }
-.eyebrow { color:#6c5ce7; font-size:12px; font-weight:750; letter-spacing:.04em; }
+.eyebrow { color:#f26b21; font-size:12px; font-weight:750; letter-spacing:.04em; }
 .ledger-hero h1 { margin:5px 0 4px; font-size:25px; color:#252a3d; }
 .ledger-hero p { margin:0; color:#7b849e; }
 .hero-actions { display:flex; gap:10px; }
 .metric-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
 .metric-card { position:relative; min-width:0; padding:16px 18px; background:#fff; border:1px solid #eceefa; border-radius:12px; overflow:hidden; }
-.metric-card::before { content:''; position:absolute; left:0; top:0; width:4px; height:100%; background:#6c5ce7; }
-.metric-card.income::before { background:#00b894; }.metric-card.expense::before { background:#ff7675; }.metric-card.net::before { background:#6c5ce7; }.metric-card.pending::before { background:#fdcb6e; }.metric-card.draft::before { background:#74b9ff; }
+.metric-card::before { content:''; position:absolute; left:0; top:0; width:4px; height:100%; background:#f26b21; }
+.metric-card.income::before { background:#00b894; }.metric-card.expense::before { background:#ff7675; }.metric-card.net::before { background:#f26b21; }.metric-card.pending::before { background:#fdcb6e; }.metric-card.draft::before { background:#74b9ff; }
 .metric-card span,.metric-card small { display:block; color:#7d879f; }.metric-card strong { display:block; margin:7px 0 5px; font-size:23px; color:#252a3d; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ledger-panel { padding:16px; }.filter-bar { padding:2px 4px 8px; }.filter-bar :deep(.el-form-item) { margin-bottom:10px; }
 .primary-cell { color:#30364b; font-weight:600; }.secondary-cell { margin-top:3px; color:#929bb0; font-size:12px; }.voucher-check { margin-left:20px; }.mb16 { margin-bottom:16px; }

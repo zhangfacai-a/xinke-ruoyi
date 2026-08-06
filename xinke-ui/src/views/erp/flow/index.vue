@@ -2,7 +2,7 @@
   <div class="app-container flow-workbench">
     <section class="flow-header soft-card">
       <div>
-        <p>Company Operation Flow</p>
+        <p>供应链 / 经营协同</p>
         <h2>经营闭环工作台</h2>
       </div>
       <div class="flow-actions">
@@ -558,8 +558,8 @@ getList()
 
     &:hover,
     &.active {
-      background: rgba(108, 92, 231, 0.08);
-      color: #6c5ce7;
+      background: rgba(242, 107, 33, 0.08);
+      color: #f26b21;
     }
   }
 

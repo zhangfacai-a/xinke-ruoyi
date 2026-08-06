@@ -10,7 +10,7 @@
       <!-- 文字 -->
       <span v-if="!collapse" class="brand-copy">
         <strong>Xinke ERP</strong>
-        <small>OpsPlatform</small>
+        <small>经营管理平台</small>
       </span>
 
     </router-link>
@@ -36,11 +36,8 @@ defineProps({
   box-sizing: border-box;
   overflow: hidden;
 
-  background: linear-gradient(180deg,
-      rgba(255, 255, 255, 0.94),
-      rgba(255, 255, 255, 0.76));
-
-  border-bottom: 1px solid rgba(112, 115, 145, 0.08);
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 /* ===== 核心修复区（关键） ===== */
@@ -108,16 +105,16 @@ defineProps({
 /* 标题 */
 .brand-copy strong {
   font-size: 15px;
-  font-weight: 850;
-  color: #202437;
+  font-weight: 700;
+  color: #17202a;
 }
 
 /* 副标题 */
 .brand-copy small {
   margin-top: 4px;
   font-size: 11px;
-  font-weight: 750;
-  color: #8a91a6;
+  font-weight: 400;
+  color: #8a949f;
 }
 
 /* collapse 模式 */

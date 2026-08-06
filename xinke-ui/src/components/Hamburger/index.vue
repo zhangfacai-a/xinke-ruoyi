@@ -37,19 +37,19 @@ const toggleClick = () => {
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid rgba(108, 92, 231, 0.10);
-  border-radius: 13px;
-  color: #6c5ce7;
-  background: rgba(108, 92, 231, 0.075);
+  border: 0;
+  border-radius: 4px;
+  color: #657080;
+  background: transparent;
   cursor: pointer;
   transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .sidebar-toggle:hover {
-  border-color: rgba(108, 92, 231, 0.18);
-  background: rgba(108, 92, 231, 0.12);
-  box-shadow: 0 8px 18px rgba(108, 92, 231, 0.12);
-  transform: translateY(-1px);
+  color: #f26b21;
+  background: #fff1e9;
+  box-shadow: none;
+  transform: none;
 }
 
 .sidebar-toggle svg {

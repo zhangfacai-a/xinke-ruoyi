@@ -2,7 +2,7 @@
   <div class="app-container warehouse-page">
     <section class="warehouse-overview">
       <div class="overview-copy">
-        <span class="overview-label">WAREHOUSE NETWORK</span>
+        <span class="overview-label">供应链 / 仓库管理</span>
         <h2>仓网管理</h2>
         <p>实体仓管库位和作业，云仓管服务商库存与账实差异。</p>
       </div>
@@ -317,17 +317,17 @@ getList()
 
 <style scoped>
 .warehouse-page { display: flex; flex-direction: column; gap: 16px; }
-.warehouse-overview, .filter-panel, .table-panel { border: 1px solid rgba(108, 92, 231, .1); background: rgba(255,255,255,.92); box-shadow: 0 12px 32px rgba(51, 46, 112, .07); }
+.warehouse-overview, .filter-panel, .table-panel { border: 1px solid rgba(242, 107, 33, .1); background: rgba(255,255,255,.92); box-shadow: 0 12px 32px rgba(51, 46, 112, .07); }
 .warehouse-overview { display: grid; grid-template-columns: minmax(250px, .8fr) minmax(640px, 2fr); gap: 24px; padding: 22px 24px; border-radius: 16px; }
-.overview-label { color: #6c5ce7; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.overview-label { color: #f26b21; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
 .overview-copy h2 { margin: 6px 0 4px; color: #22263a; font-size: 25px; }
 .overview-copy p { margin: 0; color: #7b829c; font-size: 13px; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; }
 .metric-item { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 13px 15px; border: 1px solid #ececf6; border-radius: 12px; background: #fafafe; color: #6b7288; cursor: pointer; text-align: left; transition: .2s ease; }
-.metric-item:hover, .metric-item.active { transform: translateY(-2px); border-color: #b9b1ff; box-shadow: 0 9px 20px rgba(108,92,231,.12); }
+.metric-item:hover, .metric-item.active { transform: translateY(-2px); border-color: #b9b1ff; box-shadow: 0 9px 20px rgba(242,107,33,.12); }
 .metric-item strong { margin: 3px 0 1px; color: #23283c; font-size: 23px; }
 .metric-item small { overflow: hidden; width: 100%; color: #9aa0b4; text-overflow: ellipsis; white-space: nowrap; }
-.metric-item.physical strong { color: #00a88f; } .metric-item.cloud strong { color: #6c5ce7; } .metric-item.warning strong { color: #ef8b2c; }
+.metric-item.physical strong { color: #00a88f; } .metric-item.cloud strong { color: #f26b21; } .metric-item.warning strong { color: #ef8b2c; }
 .filter-panel { padding: 14px 18px 2px; border-radius: 14px; }
 .filter-panel :deep(.el-form-item) { margin-right: 18px; }
 .filter-panel :deep(.el-input), .filter-panel :deep(.el-select) { width: 190px; }
@@ -336,14 +336,14 @@ getList()
 .toolbar-actions { display: flex; gap: 8px; }
 .warehouse-cell { display: flex; align-items: center; gap: 11px; }
 .warehouse-icon { display: grid; flex: 0 0 38px; width: 38px; height: 38px; place-items: center; border-radius: 10px; background: #e9fbf6; color: #00a88f; }
-.warehouse-icon.cloud { background: #eeebff; color: #6c5ce7; }
+.warehouse-icon.cloud { background: #fff1e9; color: #f26b21; }
 .warehouse-cell strong, .warehouse-cell span, .cell-main, .cell-sub { display: block; }
 .warehouse-cell strong, .cell-main { color: #30354b; font-size: 13px; }
 .warehouse-cell div > span, .cell-sub { margin-top: 3px; color: #969db0; font-size: 12px; }
 .usage-text { margin-left: 7px; color: #73798d; font-size: 12px; }
 .muted { color: #a0a6b8; font-size: 12px; }
 .warehouse-form { max-height: 65vh; overflow-y: auto; padding: 0 4px; }
-.form-section-title { margin: 4px 0 12px; padding-left: 9px; border-left: 3px solid #6c5ce7; color: #34394e; font-weight: 700; }
+.form-section-title { margin: 4px 0 12px; padding-left: 9px; border-left: 3px solid #f26b21; color: #34394e; font-weight: 700; }
 .form-section-title:not(:first-child) { margin-top: 18px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
 .span-2 { grid-column: 1 / -1; }

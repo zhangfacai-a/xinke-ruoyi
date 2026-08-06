@@ -2,7 +2,7 @@
   <div class="app-container purchase-page">
     <section class="page-intro">
       <div>
-        <span class="eyebrow">PURCHASE CONTROL</span>
+        <span class="eyebrow">供应链 / 采购管理</span>
         <h2>采购订单工作台</h2>
         <p>统一管理供应商、采购明细、审批与到货进度，订单金额由 SKU 明细自动计算。</p>
       </div>
@@ -329,8 +329,8 @@ refreshPage()
 </script>
 
 <style scoped>
-.purchase-page { --accent: #6c5ce7; }
-.page-intro, .filter-panel, .table-panel { background: rgba(255,255,255,.92); border: 1px solid rgba(108,92,231,.09); box-shadow: 0 12px 30px rgba(42,39,90,.06); }
+.purchase-page { --accent: #f26b21; }
+.page-intro, .filter-panel, .table-panel { background: rgba(255,255,255,.92); border: 1px solid rgba(242,107,33,.09); box-shadow: 0 12px 30px rgba(42,39,90,.06); }
 .page-intro { display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-radius:16px; margin-bottom:14px; }
 .eyebrow { color:var(--accent); font-size:12px; font-weight:800; letter-spacing:.08em; }
 .page-intro h2 { margin:4px 0 2px; font-size:24px; color:#24283a; }

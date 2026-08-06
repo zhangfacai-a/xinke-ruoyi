@@ -2,7 +2,7 @@
   <div class="app-container supplier-page">
     <section class="page-intro">
       <div>
-        <span class="eyebrow">SUPPLIER PERFORMANCE</span>
+        <span class="eyebrow">供应链 / 供应商管理</span>
         <h2>供应商履约档案</h2>
         <p>沉淀供货周期、起订额、账期和履约评分，为采购选商与智能补货提供依据。</p>
       </div>
@@ -123,10 +123,10 @@ getList()
 </script>
 
 <style scoped>
-.supplier-page{--accent:#6c5ce7}.page-intro,.filter-panel,.table-panel{background:rgba(255,255,255,.93);border:1px solid rgba(108,92,231,.09);box-shadow:0 12px 30px rgba(42,39,90,.06)}
+.supplier-page{--accent:#f26b21}.page-intro,.filter-panel,.table-panel{background:rgba(255,255,255,.93);border:1px solid rgba(242,107,33,.09);box-shadow:0 12px 30px rgba(42,39,90,.06)}
 .page-intro{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-radius:16px;margin-bottom:14px}.eyebrow{color:var(--accent);font-size:12px;font-weight:800;letter-spacing:.08em}.page-intro h2{margin:4px 0 2px;font-size:24px;color:#24283a}.page-intro p{margin:0;color:#7b849e}
 .filter-panel{border-radius:14px;padding:15px 18px 0;margin-bottom:14px}.filter-panel :deep(.el-input),.filter-panel :deep(.el-select){width:172px}.table-panel{border-radius:16px;padding:14px 14px 4px}.table-toolbar,.toolbar-actions,.supplier-name,.score-line{display:flex;align-items:center}.table-toolbar{justify-content:space-between;margin-bottom:12px}.toolbar-actions{gap:8px}.supplier-name{gap:7px}.cell-meta{margin-top:4px;color:#959db2;font-size:12px}.score-line{gap:9px}.score-line :deep(.el-progress){flex:1}.score-line strong{color:#00a889}
-.level-badge{display:inline-flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:9px;font-weight:800;background:#f0efff;color:#6c5ce7}.level-A{background:#e9faf5;color:#00a889}.level-C{background:#fff6e7;color:#cf8217}.level-D{background:#fff0f2;color:#dd5269}
+.level-badge{display:inline-flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:9px;font-weight:800;background:#f0efff;color:#f26b21}.level-A{background:#e9faf5;color:#00a889}.level-C{background:#fff6e7;color:#cf8217}.level-D{background:#fff0f2;color:#dd5269}
 .form-section-title{margin:4px 0 14px;padding-left:10px;border-left:3px solid var(--accent);font-weight:700;color:#34394d}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.score-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 8px}.score-grid :deep(.el-form-item__label){width:82px!important}.score-grid :deep(.el-form-item__content){margin-left:82px!important}.score-grid :deep(.el-input-number),.form-grid :deep(.el-input-number){width:100%}.input-suffix{margin-left:8px;color:#8d95aa}
 @media (max-width:850px){.form-grid,.score-grid{grid-template-columns:1fr}.page-intro p{display:none}}
 </style>

@@ -137,7 +137,7 @@ const notes = [
 function buildLineChart() {
   lineChart = echarts.init(lineChartRef.value)
   lineChart.setOption({
-    color: ['#6C5CE7', '#00B894', '#FDCB6E'],
+    color: ['#F26B21', '#2563A5', '#51805B'],
     tooltip: { trigger: 'axis' },
     grid: { top: 34, right: 20, bottom: 28, left: 42 },
     xAxis: {
@@ -163,7 +163,7 @@ function buildLineChart() {
 function buildBarChart() {
   barChart = echarts.init(barChartRef.value)
   barChart.setOption({
-    color: ['#6C5CE7'],
+    color: ['#F26B21'],
     tooltip: { trigger: 'axis' },
     grid: { top: 28, right: 16, bottom: 26, left: 46 },
     xAxis: {
@@ -185,11 +185,8 @@ function buildBarChart() {
         barWidth: 22,
         data: [386, 312, 246, 198, 126],
         itemStyle: {
-          borderRadius: [8, 8, 0, 0],
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#A29BFE' },
-            { offset: 1, color: '#6C5CE7' }
-          ])
+          borderRadius: [2, 2, 0, 0],
+          color: '#F26B21'
         }
       }
     ]
@@ -247,7 +244,7 @@ onBeforeUnmount(() => {
   border-radius: 24px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 82% 20%, rgba(162, 155, 254, 0.34), transparent 34%),
+    radial-gradient(circle at 82% 20%, rgba(245, 154, 95, 0.34), transparent 34%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.70));
 }
 
@@ -261,8 +258,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   padding: 7px 12px;
   border-radius: 999px;
-  color: #6c5ce7;
-  background: rgba(108, 92, 231, 0.09);
+  color: #f26b21;
+  background: rgba(242, 107, 33, 0.09);
   font-size: 12px;
   font-weight: 850;
 }
@@ -309,8 +306,8 @@ h1 {
     width: 88px;
     height: 88px;
     border-radius: 18px;
-    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
-    box-shadow: 0 24px 46px rgba(108, 92, 231, 0.22);
+    background: linear-gradient(135deg, #f26b21, #f59a5f);
+    box-shadow: 0 24px 46px rgba(242, 107, 33, 0.22);
     transform: rotate(45deg) skew(-12deg, -12deg);
   }
 
@@ -428,7 +425,7 @@ h1 {
   }
 
   em.down {
-    color: #6c5ce7;
+    color: #f26b21;
   }
 }
 
@@ -441,8 +438,8 @@ h1 {
   flex: 0 0 46px;
   border-radius: 16px;
   color: #ffffff;
-  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
-  box-shadow: 0 14px 26px rgba(108, 92, 231, 0.22);
+  background: linear-gradient(135deg, #f26b21, #f59a5f);
+  box-shadow: 0 14px 26px rgba(242, 107, 33, 0.22);
 
   svg {
     width: 21px;
@@ -543,7 +540,7 @@ h1 {
 }
 
 .task-dot.running {
-  background: #6c5ce7;
+  background: #f26b21;
 }
 
 .task-main {
@@ -593,8 +590,8 @@ h1 {
   transition: all 0.2s ease;
 
   &:hover {
-    color: #6c5ce7;
-    background: #f0edff;
+    color: #f26b21;
+    background: #fff1e9;
     transform: translateY(-1px);
   }
 }
@@ -604,13 +601,13 @@ h1 {
 }
 
 .calendar-day.event {
-  box-shadow: inset 0 -3px 0 rgba(108, 92, 231, 0.30);
+  box-shadow: inset 0 -3px 0 rgba(242, 107, 33, 0.30);
 }
 
 .calendar-day.active {
   color: #ffffff;
-  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
-  box-shadow: 0 10px 20px rgba(108, 92, 231, 0.26);
+  background: linear-gradient(135deg, #f26b21, #f59a5f);
+  box-shadow: 0 10px 20px rgba(242, 107, 33, 0.26);
 }
 
 .schedule-list {
@@ -653,8 +650,8 @@ h1 {
     display: inline-flex;
     padding: 4px 9px;
     border-radius: 999px;
-    color: #6c5ce7;
-    background: rgba(108, 92, 231, 0.10);
+    color: #f26b21;
+    background: rgba(242, 107, 33, 0.10);
     font-size: 12px;
     font-weight: 800;
   }
@@ -720,5 +717,90 @@ h1 {
   .chart-box {
     height: 260px;
   }
+}
+</style>
+
+<style scoped lang="scss">
+.home-dashboard { padding: 16px; }
+
+.hero-card,
+.panel,
+.metric-card {
+  border: 1px solid #dfe3e8;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.hero-card {
+  min-height: auto;
+  display: block;
+  padding: 20px 22px;
+  border-radius: 6px;
+  border-left: 4px solid #f26b21;
+  background: #fff;
+}
+
+.hero-kicker {
+  padding: 0;
+  border-radius: 0;
+  color: #f26b21;
+  background: transparent;
+  font-weight: 600;
+}
+
+h1 { margin-top: 7px; color: #17202a; font-size: 24px; font-weight: 700; }
+.hero-copy p { margin-top: 7px; color: #66727f; font-size: 13px; line-height: 1.6; }
+.hero-visual { display: none; }
+
+.metrics-grid { gap: 12px; margin-top: 12px; }
+.metric-card {
+  gap: 12px;
+  padding: 15px;
+  border-radius: 6px;
+  transition: border-color .15s ease;
+  &:hover { transform: none; border-color: #aeb7c1; box-shadow: none; }
+}
+
+.metric-icon,
+.metric-card.blue .metric-icon,
+.metric-card.green .metric-icon,
+.metric-card.orange .metric-icon,
+.metric-card.red .metric-icon {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 4px;
+  color: #f26b21;
+  background: #fbf0e8;
+  box-shadow: none;
+  svg { width: 18px; height: 18px; }
+}
+.metric-card.blue .metric-icon { color: #2563a5; background: #edf4fa; }
+.metric-card.green .metric-icon { color: #287a52; background: #edf7f1; }
+.metric-card.orange .metric-icon { color: #a65f16; background: #fcf3e8; }
+.metric-card.red .metric-icon { color: #b54747; background: #fbeded; }
+.metric-body strong { color: #17202a; font-size: 19px; font-weight: 700; }
+.metric-body em { color: #287a52; font-weight: 600; }
+
+.content-grid { gap: 12px; margin-top: 12px; }
+.panel { padding: 18px; border-radius: 6px; }
+.panel-head h2 { color: #17202a; font-weight: 650; }
+.panel-head p { margin-top: 4px; color: #7a8591; }
+.note-card {
+  min-height: 120px;
+  padding: 14px;
+  border-color: #e4e7eb;
+  border-radius: 4px;
+  background: #fafbfc;
+  span { border-radius: 3px; color: #f26b21; background: #fff1e9; font-weight: 600; }
+  h3 { margin-top: 12px; color: #29333d; }
+  p { color: #66727f; line-height: 1.6; }
+}
+
+@media (max-width: 900px) {
+  .home-dashboard { padding: 10px; }
+  .hero-card { padding: 16px; border-radius: 4px; }
+  h1 { font-size: 21px; }
 }
 </style>

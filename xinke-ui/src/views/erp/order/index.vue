@@ -2,7 +2,7 @@
   <div class="app-container fulfillment-page">
     <section class="page-hero">
       <div>
-        <div class="eyebrow">SALES FULFILLMENT</div>
+        <div class="eyebrow">订单中心 / 销售履约</div>
         <h1>销售履约中心</h1>
         <p>按主订单管理支付，按子订单管理商品，用包裹连接仓库、物流、售后与利润。</p>
       </div>
@@ -479,15 +479,15 @@ refreshAll()
 
 <style scoped>
 .fulfillment-page { min-width: 0; }
-.page-hero, .work-panel { background: rgba(255,255,255,.94); border: 1px solid rgba(108,92,231,.11); border-radius: 14px; box-shadow: 0 10px 30px rgba(57,48,125,.07); }
+.page-hero, .work-panel { background: rgba(255,255,255,.94); border: 1px solid rgba(242,107,33,.11); border-radius: 14px; box-shadow: 0 10px 30px rgba(57,48,125,.07); }
 .page-hero { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:22px 26px; margin-bottom:14px; }
-.eyebrow { color:#6c5ce7; font-size:12px; font-weight:800; letter-spacing:.06em; }
+.eyebrow { color:#f26b21; font-size:12px; font-weight:800; letter-spacing:.06em; }
 .page-hero h1 { margin:5px 0 4px; color:#252a3d; font-size:25px; }
 .page-hero p { margin:0; color:#7c869e; }
 .hero-actions { display:flex; flex:none; gap:10px; }
 .metric-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
 .metric-card { position:relative; min-width:0; padding:15px 17px; overflow:hidden; background:#fff; border:1px solid #eceefa; border-radius:12px; }
-.metric-card::before { position:absolute; inset:0 auto 0 0; width:4px; content:''; background:#6c5ce7; }
+.metric-card::before { position:absolute; inset:0 auto 0 0; width:4px; content:''; background:#f26b21; }
 .metric-card.amount::before { background:#00b894; }.metric-card.pending::before { background:#fdcb6e; }.metric-card.shipping::before { background:#74b9ff; }.metric-card.after-sale::before { background:#ff7675; }
 .metric-card span,.metric-card small { display:block; color:#8490a8; }.metric-card strong { display:block; margin:6px 0 4px; overflow:hidden; color:#252a3d; font-size:23px; white-space:nowrap; text-overflow:ellipsis; }
 .work-panel { padding:16px; }.filter-form { padding:2px 2px 6px; }.filter-form :deep(.el-form-item) { margin-bottom:10px; }
@@ -496,7 +496,7 @@ refreshAll()
 .cell-meta { margin-top:3px; color:#929bb0; font-size:12px; }.refund-text { color:#e66a77; }
 .progress-meta { display:flex; justify-content:space-between; gap:8px; margin-top:6px; color:#7f899f; font-size:11px; }
 .drawer-content { min-height:100%; background:#f6f7fc; }.drawer-header { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:22px 26px; background:#fff; border-bottom:1px solid #e9ebf5; }
-.drawer-kicker { color:#6c5ce7; font-size:12px; font-weight:750; }.drawer-header h2 { margin:5px 0 8px; color:#252a3d; font-size:23px; }.drawer-meta { display:flex; align-items:center; flex-wrap:wrap; gap:12px; color:#7e879e; font-size:13px; }.drawer-actions { display:flex; gap:9px; }
+.drawer-kicker { color:#f26b21; font-size:12px; font-weight:750; }.drawer-header h2 { margin:5px 0 8px; color:#252a3d; font-size:23px; }.drawer-meta { display:flex; align-items:center; flex-wrap:wrap; gap:12px; color:#7e879e; font-size:13px; }.drawer-actions { display:flex; gap:9px; }
 .detail-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:16px 26px 0; }.detail-metrics div { padding:13px 16px; background:#fff; border:1px solid #e9ebf5; border-radius:10px; }.detail-metrics span { display:block; color:#8992a9; font-size:12px; }.detail-metrics strong { display:block; margin-top:4px; color:#2a3043; font-size:20px; }
 .detail-tabs { margin:16px 26px 26px; padding:0 16px 18px; background:#fff; border:1px solid #e9ebf5; border-radius:12px; }.tab-toolbar { display:flex; justify-content:flex-end; padding:0 0 10px; }
 .log-timeline { max-width:820px; padding:12px 20px; }.log-title { color:#34394d; font-weight:650; }

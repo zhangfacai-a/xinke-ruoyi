@@ -1,18 +1,18 @@
 <template>
   <div class="login">
     <div class="login-visual">
-      <div class="brand-pill">Crucible ERP BI</div>
-      <h1>电商数据操作系统</h1>
+      <div class="brand-pill">XINKE ERP</div>
+      <h1>让经营数据回到业务现场</h1>
       <p>统一管理 ERP、BI、财务核算与经营决策，让运营和财务基于同一套数据工作。</p>
       <div class="visual-metrics">
-        <span><strong>80.0%</strong>数据链路</span>
-        <span><strong>24h</strong>财务看板</span>
-        <span><strong>ROI</strong>经营分析</span>
+        <span><strong>统一</strong>业务口径</span>
+        <span><strong>实时</strong>经营数据</span>
+        <span><strong>闭环</strong>财务协同</span>
       </div>
     </div>
     <el-form ref="loginRef" :model="loginForm" :rules="loginRules" class="login-form">
       <h3 class="title">{{ title }}</h3>
-      <p class="subtitle">登录到企业级经营分析后台</p>
+      <p class="subtitle">登录经营管理平台</p>
       <el-form-item prop="username">
         <el-input v-model="loginForm.username" type="text" size="large" auto-complete="off" placeholder="账号">
           <template #prefix><svg-icon icon-class="user" class="el-input__icon input-icon" /></template>
@@ -128,8 +128,8 @@ getCookie()
   height: 100%;
   padding: 64px 9vw;
   background:
-    radial-gradient(circle at 12% 18%, rgba(162, 155, 254, 0.36), transparent 30%),
-    radial-gradient(circle at 84% 16%, rgba(108, 92, 231, 0.18), transparent 28%),
+    radial-gradient(circle at 12% 18%, rgba(245, 154, 95, 0.36), transparent 30%),
+    radial-gradient(circle at 84% 16%, rgba(242, 107, 33, 0.18), transparent 28%),
     linear-gradient(135deg, #f7f8ff 0%, #eef1fb 100%);
   overflow: hidden;
 }
@@ -141,7 +141,7 @@ getCookie()
   width: 360px;
   height: 360px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(108, 92, 231, 0.20), rgba(162, 155, 254, 0.14));
+  background: linear-gradient(135deg, rgba(242, 107, 33, 0.20), rgba(245, 154, 95, 0.14));
   filter: blur(8px);
 }
 
@@ -155,9 +155,9 @@ getCookie()
   display: inline-flex;
   padding: 8px 14px;
   border-radius: 999px;
-  color: #6c5ce7;
+  color: #f26b21;
   background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(108, 92, 231, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(242, 107, 33, 0.14);
   font-size: 13px;
   font-weight: 800;
 }
@@ -239,7 +239,7 @@ getCookie()
     height: 45px;
     width: 14px;
     margin-left: 0px;
-    color: #6c5ce7;
+    color: #f26b21;
   }
 }
 
@@ -292,5 +292,65 @@ getCookie()
   .login-form {
     width: min(420px, 100%);
   }
+}
+</style>
+
+<style lang="scss" scoped>
+.login {
+  gap: 8vw;
+  padding: 56px 10vw;
+  background: #eef2f3;
+}
+.login::before {
+  inset: 0 auto 0 0;
+  width: 44%;
+  height: 100%;
+  border-radius: 0;
+  background: #172033;
+  filter: none;
+}
+.login-visual { max-width: 520px; color: #fff; }
+.brand-pill {
+  padding: 0 0 10px;
+  border-bottom: 2px solid #f26b21;
+  border-radius: 0;
+  color: #ffb184;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.login-visual h1 { margin-top: 28px; color: #fff; font-size: 38px; font-weight: 650; }
+.login-visual p { color: #c6cfdd; font-size: 15px; line-height: 1.8; }
+.visual-metrics { gap: 0; margin-top: 42px; border-top: 1px solid rgba(255,255,255,.16); }
+.visual-metrics span {
+  min-width: 126px;
+  padding: 18px 24px 0 0;
+  border: 0;
+  border-radius: 0;
+  color: #aeb9ca;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.visual-metrics strong { color: #fff; font-size: 18px; font-weight: 600; }
+.login-form {
+  width: 390px;
+  padding: 32px 32px 20px;
+  border: 1px solid #d8dde1;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(23, 32, 42, .09);
+  backdrop-filter: none;
+}
+.title { color: #17202a; font-size: 22px; font-weight: 650; text-align: left; }
+.subtitle { color: #7a8591; text-align: left; }
+.login-form .input-icon { color: #66727f; }
+.el-login-footer { color: #8a949f; letter-spacing: 0; }
+
+@media (max-width: 960px) {
+  .login { background: #eef2f3; }
+  .login::before { display: none; }
+  .login-form { width: min(390px, 100%); }
 }
 </style>

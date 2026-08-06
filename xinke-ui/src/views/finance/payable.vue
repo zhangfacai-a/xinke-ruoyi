@@ -2,7 +2,7 @@
   <div class="app-container payable-center">
     <section class="page-heading">
       <div>
-        <span class="eyebrow">ACCOUNTS PAYABLE</span>
+        <span class="eyebrow">财务中心 / 应付管理</span>
         <h1>应付与供应商发票中心</h1>
         <p>统一处理采购发票三单匹配、应付账龄、付款审批、银行付款和自动核销。</p>
       </div>
@@ -630,15 +630,15 @@ onMounted(refreshAll)
 
 <style scoped>
 .payable-center { color: #20243a; }
-.page-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 24px; margin-bottom: 14px; border: 1px solid rgba(108, 92, 231, .12); border-radius: 14px; background: linear-gradient(110deg, #fff 58%, #f0eeff); box-shadow: 0 10px 28px rgba(67, 62, 118, .07); }
-.eyebrow { display: inline-block; margin-bottom: 5px; color: #6c5ce7; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.page-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 24px; margin-bottom: 14px; border: 1px solid rgba(242, 107, 33, .12); border-radius: 14px; background: linear-gradient(110deg, #fff 58%, #fff1e9); box-shadow: 0 10px 28px rgba(67, 62, 118, .07); }
+.eyebrow { display: inline-block; margin-bottom: 5px; color: #f26b21; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
 .page-heading h1 { margin: 0; font-size: 24px; line-height: 1.25; }
 .page-heading p { margin: 7px 0 0; color: #7b849f; font-size: 13px; }
 .heading-actions { display: flex; flex: none; gap: 8px; }
 .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px; }
 .metric-card { min-width: 0; padding: 16px 18px; text-align: left; color: inherit; border: 1px solid #eceef7; border-radius: 12px; background: #fff; box-shadow: 0 8px 22px rgba(45, 50, 80, .05); cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
 .metric-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(75, 68, 142, .11); }
-.metric-card::before { content: ''; display: block; width: 28px; height: 3px; margin-bottom: 12px; border-radius: 3px; background: #6c5ce7; }
+.metric-card::before { content: ''; display: block; width: 28px; height: 3px; margin-bottom: 12px; border-radius: 3px; background: #f26b21; }
 .metric-card.danger::before { background: #ef6b75; }.metric-card.warning::before { background: #f0a94b; }.metric-card.purple::before { background: #9b72e8; }.metric-card.teal::before { background: #14b8a6; }
 .metric-label { display: block; color: #7c849c; font-size: 12px; }
 .metric-card strong { display: block; margin: 6px 0 5px; font-size: 22px; line-height: 1.1; }
@@ -646,7 +646,7 @@ onMounted(refreshAll)
 .aging-strip { display: grid; grid-template-columns: 170px repeat(5, minmax(130px, 1fr)); align-items: center; gap: 18px; padding: 13px 18px; margin-bottom: 12px; border: 1px solid #eceef7; border-radius: 12px; background: #fff; }
 .aging-title { display: flex; flex-direction: column; }.aging-title strong { font-size: 14px; }.aging-title span { margin-top: 3px; color: #9299ad; font-size: 11px; }
 .aging-meta { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: #6e768f; font-size: 11px; }.aging-meta b { color: #353b54; font-weight: 650; }
-.aging-track { height: 5px; overflow: hidden; border-radius: 4px; background: #eff1f7; }.aging-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6c5ce7, #a29bfe); }
+.aging-track { height: 5px; overflow: hidden; border-radius: 4px; background: #eff1f7; }.aging-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f26b21, #f59a5f); }
 .workbench { overflow: hidden; border: 1px solid #e9ebf4; border-radius: 14px; background: #fff; box-shadow: 0 12px 30px rgba(43, 48, 76, .06); }
 .tabs-row { padding: 0 20px; border-bottom: 1px solid #eff0f5; }.tabs-row :deep(.el-tabs__header) { margin: 0; }.tabs-row :deep(.el-tabs__nav-wrap::after) { display: none; }.tabs-row :deep(.el-tabs__item) { height: 48px; font-weight: 650; }
 .search-form { display: flex; align-items: center; gap: 2px; padding: 14px 18px 2px; background: #fbfbfe; border-bottom: 1px solid #eff0f5; }
@@ -660,7 +660,7 @@ onMounted(refreshAll)
 .invoice-context { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 12px 14px; margin: 0 0 14px 110px; border-radius: 10px; background: #f7f7fd; }.invoice-context div { min-width: 0; }.invoice-context span { display: block; color: #9299ad; font-size: 11px; }.invoice-context b { display: block; margin-top: 4px; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .invoice-lines { margin-bottom: 14px; }.invoice-lines :deep(.el-input-number) { width: 116px; }
 .invoice-footer-grid { display: grid; grid-template-columns: 1fr 220px; gap: 16px; margin: 0 0 14px 110px; }.tolerance-box { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #f8f9fc; }.tolerance-box > span { color: #7b849f; font-size: 12px; font-weight: 700; }.tolerance-box label { display: flex; align-items: center; gap: 5px; color: #6f778f; font-size: 11px; }.tolerance-box :deep(.el-input-number) { width: 82px; }
-.invoice-total { display: flex; flex-direction: column; align-items: flex-end; padding: 10px 14px; border-radius: 10px; background: #f0eeff; }.invoice-total span { color: #7b749f; font-size: 11px; }.invoice-total strong { margin: 2px 0; color: #5f50da; font-size: 19px; }.invoice-total small { color: #858da4; }
+.invoice-total { display: flex; flex-direction: column; align-items: flex-end; padding: 10px 14px; border-radius: 10px; background: #fff1e9; }.invoice-total span { color: #7d6b61; font-size: 11px; }.invoice-total strong { margin: 2px 0; color: #e85f18; font-size: 19px; }.invoice-total small { color: #858da4; }
 .dialog-form { margin-top: 18px; }
 @media (max-width: 1400px) { .metric-grid { grid-template-columns: repeat(3, 1fr); }.aging-strip { grid-template-columns: 150px repeat(3, 1fr); }.aging-item:nth-last-child(-n+2) { display: none; } }
 @media (max-width: 900px) { .page-heading { align-items: flex-start; flex-direction: column; }.metric-grid { grid-template-columns: repeat(2, 1fr); }.aging-strip { grid-template-columns: 1fr 1fr; }.aging-title { grid-column: 1 / -1; }.search-form { align-items: stretch; flex-direction: column; }.search-actions { margin-left: 0; }.form-grid { grid-template-columns: 1fr; }.form-grid .span-2 { grid-column: span 1; }.invoice-context, .invoice-footer-grid { grid-template-columns: 1fr; margin-left: 0; } }

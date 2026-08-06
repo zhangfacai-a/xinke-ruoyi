@@ -1,7 +1,7 @@
 <template>
   <div class="register">
     <div class="register-visual">
-      <div class="brand-pill">Crucible ERP BI</div>
+      <div class="brand-pill">XINKE ERP</div>
       <h1>建立统一的数据工作台</h1>
       <p>为运营、财务、仓储和管理者提供一致的业务口径与清晰的分析界面。</p>
     </div>
@@ -169,8 +169,8 @@ getCode()
   height: 100%;
   padding: 64px 9vw;
   background:
-    radial-gradient(circle at 12% 18%, rgba(162, 155, 254, 0.36), transparent 30%),
-    radial-gradient(circle at 84% 16%, rgba(108, 92, 231, 0.18), transparent 28%),
+    radial-gradient(circle at 12% 18%, rgba(245, 154, 95, 0.36), transparent 30%),
+    radial-gradient(circle at 84% 16%, rgba(242, 107, 33, 0.18), transparent 28%),
     linear-gradient(135deg, #f7f8ff 0%, #eef1fb 100%);
   overflow: hidden;
 }
@@ -183,9 +183,9 @@ getCode()
   display: inline-flex;
   padding: 8px 14px;
   border-radius: 999px;
-  color: #6c5ce7;
+  color: #f26b21;
   background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(108, 92, 231, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(242, 107, 33, 0.14);
   font-size: 13px;
   font-weight: 800;
 }
@@ -236,7 +236,7 @@ getCode()
     height: 45px;
     width: 14px;
     margin-left: 0px;
-    color: #6c5ce7;
+    color: #f26b21;
   }
 }
 .register-tip {
@@ -282,5 +282,43 @@ getCode()
   .register-form {
     width: min(420px, 100%);
   }
+}
+</style>
+
+<style lang="scss" scoped>
+.register {
+  gap: 8vw;
+  padding: 56px 10vw;
+  background: linear-gradient(90deg, #172033 0 44%, #f2f5f8 44% 100%);
+}
+.register-visual { max-width: 520px; }
+.brand-pill {
+  padding: 0 0 10px;
+  border-bottom: 2px solid #f26b21;
+  border-radius: 0;
+  color: #ffb184;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.register-visual h1 { color: #fff; font-size: 38px; font-weight: 650; }
+.register-visual p { color: #c6cfdd; font-size: 15px; }
+.register-form {
+  width: 400px;
+  padding: 30px 32px 18px;
+  border: 1px solid #d8dde3;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(23, 32, 51, .09);
+  backdrop-filter: none;
+}
+.title { color: #172033; font-size: 22px; font-weight: 650; text-align: left; }
+.subtitle { color: #77818e; text-align: left; }
+.register-form .input-icon { color: #667085; }
+.el-register-footer { color: #8a949f; letter-spacing: 0; }
+@media (max-width: 960px) {
+  .register { background: #f2f5f8; }
+  .register-form { width: min(400px, 100%); }
 }
 </style>

@@ -318,7 +318,7 @@ onBeforeUnmount(() => {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #f58f57, #d95713);
   border: none;
   color: #fff;
   font-size: 18px;
@@ -371,4 +371,23 @@ onBeforeUnmount(() => {
 .lock-footer a:hover {
   color: rgba(255,255,255,0.8);
 }
+</style>
+
+<style lang="scss" scoped>
+.lock-container { background: #172033; }
+.particle-bg { display: none; }
+.lock-time { font-size: 64px; font-weight: 500; letter-spacing: 0; text-shadow: none; }
+.lock-date { margin-bottom: 32px; letter-spacing: 0; }
+.lock-card {
+  width: 360px;
+  padding: 32px 36px;
+  border: 1px solid #344058;
+  border-radius: 6px;
+  background: #202b40;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+  backdrop-filter: none;
+}
+.lock-icon { background: #f26b21; backdrop-filter: none; }
+.input-wrap { border-radius: 4px; background: #172033; }
+.unlock-btn { background: #f26b21; }
 </style>
