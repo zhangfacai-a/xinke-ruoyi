@@ -27,6 +27,8 @@ import com.xinke.common.exception.ServiceException;
 import com.xinke.erp.domain.RpaRoomBindingRequest;
 import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
+import com.xinke.erp.domain.RpaTrackingConfigRequest;
+import com.xinke.erp.domain.RpaViewerTrackingRequest;
 import com.xinke.erp.mapper.RpaOutreachMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -200,6 +202,39 @@ class RpaOutreachServiceImplTest
         assertEquals(0, count);
         verify(rpaOutreachMapper).deleteRoomBindings(3L);
         verify(rpaOutreachMapper, never()).upsertRoomBindings(anyLong(), any());
+    }
+
+    @Test
+    void trackingConfigIsNormalizedAndPrunesPendingTasks()
+    {
+        when(rpaOutreachMapper.updateTrackingConfig(any())).thenReturn(1);
+        when(rpaOutreachMapper.selectTrackingConfig()).thenReturn(Map.of(
+                "enabled", 0,
+                "lookbackDays", 7));
+        RpaTrackingConfigRequest request = new RpaTrackingConfigRequest();
+        request.setEnabled(false);
+        request.setLookbackDays(7);
+
+        Map<String, Object> result = service.updateTrackingConfig(request);
+
+        assertEquals(false, result.get("enabled"));
+        assertEquals(7, result.get("lookbackDays"));
+        verify(rpaOutreachMapper).removeIneligiblePendingTasks();
+    }
+
+    @Test
+    void viewerExclusionReplacesOverrideAndDropsPendingTasks()
+    {
+        RpaViewerTrackingRequest request = new RpaViewerTrackingRequest();
+        request.setViewerIds(List.of(2L, 3L, 3L));
+        request.setMode("EXCLUDE");
+
+        int count = service.updateViewerTracking(request);
+
+        assertEquals(2, count);
+        verify(rpaOutreachMapper).deleteViewerTrackingRules(List.of(2L, 3L));
+        verify(rpaOutreachMapper).insertViewerTrackingRules(any());
+        verify(rpaOutreachMapper).deletePendingTasksByViewerIds(List.of(2L, 3L));
     }
 
     private Map<String, Object> leasedTask()

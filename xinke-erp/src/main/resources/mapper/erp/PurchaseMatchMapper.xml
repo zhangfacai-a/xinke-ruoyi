@@ -146,6 +146,17 @@
         where supplier_id=#{supplierId} and order_no=#{orderNo} and del_flag='0'
     </select>
 
+    <select id="selectManualCandidates" resultType="java.util.HashMap">
+        select m.manual_order_id manualOrderId, m.order_no orderNo, m.product_model productModel,
+               m.quantity, m.logistics_no logisticsNo, m.order_date orderDate,
+               exists(select 1 from purchase_summary s
+                      where s.del_flag='0' and s.match_status='SUCCESS'
+                        and s.matched_order_id=m.manual_order_id and s.summary_id != #{summaryId}) occupied
+        from purchase_manual_order m
+        where m.supplier_id=#{supplierId} and m.order_no=#{orderNo} and m.del_flag='0'
+        order by occupied asc, m.manual_order_id desc
+    </select>
+
     <insert id="insertManual" parameterType="map" useGeneratedKeys="true" keyProperty="manualOrderId">
         insert into purchase_manual_order(
             supplier_id, supplier_name_snapshot, active_unique_key, order_date, order_no, product_model, unit_price, quantity,
@@ -263,6 +274,13 @@
         from purchase_summary where active_unique_key=#{activeUniqueKey} and del_flag='0' limit 1
     </select>
 
+    <select id="selectSummariesByMatchedOrderId" resultType="java.util.HashMap">
+        select <include refid="summaryCols"/>
+        from purchase_summary
+        where del_flag='0' and matched_order_id=#{manualOrderId} and match_status='SUCCESS'
+        <if test="excludeSummaryId != null">and summary_id != #{excludeSummaryId}</if>
+    </select>
+
     <select id="selectSummariesByBusinessKey" resultType="java.util.HashMap">
         select <include refid="summaryCols"/>
         from purchase_summary
@@ -272,19 +290,29 @@
 
     <select id="selectFailedSummaries" parameterType="map" resultType="java.util.HashMap">
         select <include refid="summaryCols"/>
-        from purchase_summary where del_flag='0' and match_status != 'SUCCESS'
+        from purchase_summary where del_flag='0' and match_status not in ('SUCCESS', 'REVIEW')
         <if test="matchStatus != null and matchStatus != ''">and match_status=#{matchStatus}</if>
     </select>
 
     <select id="selectSummaryStats" parameterType="map" resultType="java.util.HashMap">
         select count(1) totalCount,
                sum(match_status='SUCCESS') successCount,
+               sum(match_status='REVIEW') reviewCount,
                sum(match_status='NOT_FOUND') notFoundCount,
                sum(match_status='LOGISTICS_EMPTY') logisticsEmptyCount,
                sum(match_status='LOGISTICS_EMPTY') emptyCount,
                sum(match_status='SUPPLIER_NOT_FOUND') supplierNotFoundCount,
                sum(match_status='CONFLICT') conflictCount
         from purchase_summary where del_flag='0'
+        <if test="documentSupplierId != null">and document_supplier_id=#{documentSupplierId}</if>
+        <if test="documentSupplierName != null and documentSupplierName != ''">and document_supplier_name like concat('%', #{documentSupplierName}, '%')</if>
+        <if test="purchaseOrderRemark != null and purchaseOrderRemark != ''">and purchase_order_remark like concat('%', #{purchaseOrderRemark}, '%')</if>
+        <if test="contractRemark != null and contractRemark != ''">and contract_remark like concat('%', #{contractRemark}, '%')</if>
+        <if test="merchantCode != null and merchantCode != ''">and merchant_code like concat('%', #{merchantCode}, '%')</if>
+        <if test="matchedLogisticsNo != null and matchedLogisticsNo != ''">and matched_logistics_no like concat('%', #{matchedLogisticsNo}, '%')</if>
+        <if test="originalLogisticsNo != null and originalLogisticsNo != ''">and original_logistics_no like concat('%', #{originalLogisticsNo}, '%')</if>
+        <if test="matchStatus != null and matchStatus != ''">and match_status=#{matchStatus}</if>
+        <if test="dataStatus != null and dataStatus != ''">and data_status=#{dataStatus}</if>
     </select>
 
     <insert id="insertSummary" parameterType="map" useGeneratedKeys="true" keyProperty="summaryId">

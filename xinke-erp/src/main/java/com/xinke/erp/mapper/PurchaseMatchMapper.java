@@ -24,6 +24,8 @@ public interface PurchaseMatchMapper
     Map<String, Object> selectManualById(Long manualOrderId);
     Map<String, Object> selectManualByActiveKey(String activeUniqueKey);
     List<Map<String, Object>> selectManualByBusinessKey(@Param("supplierId") Long supplierId, @Param("orderNo") String orderNo);
+    List<Map<String, Object>> selectManualCandidates(@Param("supplierId") Long supplierId, @Param("orderNo") String orderNo,
+                                                     @Param("summaryId") Long summaryId);
     int insertManual(Map<String, Object> data);
     int updateManual(Map<String, Object> data);
     int fillManualEmptyFields(Map<String, Object> data);
@@ -32,6 +34,7 @@ public interface PurchaseMatchMapper
     List<Map<String, Object>> selectSummaries(Map<String, Object> query);
     Map<String, Object> selectSummaryById(Long summaryId);
     Map<String, Object> selectSummaryByActiveKey(String activeUniqueKey);
+    List<Map<String, Object>> selectSummariesByMatchedOrderId(@Param("manualOrderId") Long manualOrderId, @Param("excludeSummaryId") Long excludeSummaryId);
     List<Map<String, Object>> selectSummariesByBusinessKey(@Param("supplierId") Long supplierId, @Param("orderNo") String orderNo);
     List<Map<String, Object>> selectFailedSummaries(Map<String, Object> query);
     Map<String, Object> selectSummaryStats(Map<String, Object> query);

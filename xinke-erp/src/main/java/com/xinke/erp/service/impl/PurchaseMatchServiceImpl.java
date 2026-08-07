@@ -241,19 +241,45 @@ public class PurchaseMatchServiceImpl implements PurchaseMatchService
         Map<String, Object> order = mapper.selectManualById(manualOrderId);
         if (order == null) throw new ServiceException("手工订单不存在");
         Map<String, Object> summary = mapper.selectSummaryById(summaryId);
+        if (summary == null) throw new ServiceException("采购汇总不存在");
+        if (!Objects.equals(longValue(summary.get("document_supplier_id")), longValue(order.get("supplier_id")))
+                || !text(summary.get("purchase_order_remark")).equals(text(order.get("order_no"))))
+        {
+            throw new ServiceException("只能绑定同一供应商且订单号一致的手工订单");
+        }
+        if (!mapper.selectSummariesByMatchedOrderId(manualOrderId, summaryId).isEmpty())
+        {
+            throw new ServiceException("该手工订单已被其他采购汇总绑定，不能重复占用");
+        }
         Map<String, Object> update = new HashMap<>();
         update.put("summaryId", summaryId);
         update.put("matchedOrderId", manualOrderId);
         update.put("matchedLogisticsNo", order.get("logistics_no"));
         update.put("matchStatus", hasText(order.get("logistics_no")) ? "SUCCESS" : "LOGISTICS_EMPTY");
         update.put("matchType", "MANUAL");
-        update.put("matchMessage", "手工指定匹配");
+        String manualMessage = quantityMatches(summary.get("purchase_quantity"), order.get("quantity"))
+                ? "手工确认匹配" : "手工确认匹配（采购数量不一致）";
+        update.put("matchMessage", manualMessage);
         update.put("updateBy", username);
         int rows = mapper.updateSummaryMatch(update);
         insertMatchLog(summaryId, manualOrderId, longValue(order.get("supplier_id")), text(order.get("order_no")),
                 summary == null ? null : text(summary.get("matched_logistics_no")), text(order.get("logistics_no")),
-                text(update.get("matchStatus")), "MANUAL", "手工指定匹配", userId, username);
+                text(update.get("matchStatus")), "MANUAL", manualMessage, userId, username);
         return rows;
+    }
+
+    @Override
+    public List<Map<String, Object>> listMatchCandidates(Long summaryId)
+    {
+        Map<String, Object> summary = mapper.selectSummaryById(summaryId);
+        if (summary == null) throw new ServiceException("采购汇总不存在");
+        List<Map<String, Object>> candidates = mapper.selectManualCandidates(
+                longValue(summary.get("document_supplier_id")), text(summary.get("purchase_order_remark")), summaryId);
+        for (Map<String, Object> candidate : candidates)
+        {
+            candidate.put("quantityMatched", quantityMatches(summary.get("purchase_quantity"), candidate.get("quantity")));
+        }
+        return candidates;
     }
 
     @Override
@@ -652,11 +678,22 @@ public class PurchaseMatchServiceImpl implements PurchaseMatchService
         if (supplierId == null) return new MatchResult("SUPPLIER_NOT_FOUND", null, null, "AUTO", "供应商未识别");
         List<Map<String, Object>> orders = mapper.selectManualByBusinessKey(supplierId, orderNo);
         if (orders.isEmpty()) return new MatchResult("NOT_FOUND", null, null, "AUTO", "未找到供应商+订单号对应的手工订单");
-        if (orders.size() > 1) return new MatchResult("MULTIPLE", null, null, "AUTO", "匹配到多条手工订单");
+        if (orders.size() > 1) return new MatchResult("REVIEW", null, null, "AUTO", "找到多条候选订单，请人工确认");
         Map<String, Object> order = orders.get(0);
+        if (!quantityMatches(summary.get("purchase_quantity"), order.get("quantity")))
+            return new MatchResult("REVIEW", null, null, "AUTO", "订单号一致，但采购数量不一致，请人工确认");
+        if (!mapper.selectSummariesByMatchedOrderId(longValue(order.get("manual_order_id")), longValue(summary.get("summary_id"))).isEmpty())
+            return new MatchResult("REVIEW", null, null, "AUTO", "候选订单已被其他采购汇总占用，请人工确认");
         String logistics = text(order.get("logistics_no"));
         if (!hasText(logistics)) return new MatchResult("LOGISTICS_EMPTY", longValue(order.get("manual_order_id")), null, "AUTO", "找到订单但物流单号为空");
         return new MatchResult("SUCCESS", longValue(order.get("manual_order_id")), logistics, "AUTO", "匹配成功");
+    }
+
+    private boolean quantityMatches(Object summaryQuantity, Object manualQuantity)
+    {
+        BigDecimal summary = decimal(summaryQuantity);
+        BigDecimal manual = decimal(manualQuantity);
+        return summary == null || manual == null || summary.compareTo(manual) == 0;
     }
 
     private void rematchAffectedSupplier(Long supplierId, String orderNo, Long userId, String username)

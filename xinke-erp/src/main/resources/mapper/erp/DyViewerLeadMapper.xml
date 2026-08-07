@@ -665,6 +665,15 @@
             v.first_comment_time, v.last_comment_time, v.last_comment_content,
             ifnull(v.status, 'new') as status,
             ifnull(v.intent, 'unknown') as intent,
+            ifnull(vr.tracking_mode, 'AUTO') as rpa_tracking_mode,
+            case
+                when cfg.enabled = 0 then 0
+                when ifnull(v.status, 'new') != 'new' then 0
+                when vr.tracking_mode = 'EXCLUDE' then 0
+                when vr.tracking_mode = 'INCLUDE' then 1
+                when datediff(curdate(), ifnull(v.last_seen_date, latest.lead_date)) &lt; cfg.lookback_days then 1
+                else 0
+            end as rpa_tracking_eligible,
             v.owner_id, v.owner_name, v.owner_assigned_time, v.order_no, v.remark,
             v.last_follow_time, null as next_follow_time, v.manual_update_time,
             v.first_seen_date, v.last_seen_date,
@@ -704,6 +713,8 @@
             ) picked on picked.lead_id = l.lead_id
         ) latest
         inner join dy_viewer v on v.viewer_id = latest.viewer_id
+        inner join dy_rpa_tracking_config cfg on cfg.config_id = 1
+        left join dy_rpa_viewer_rule vr on vr.viewer_id = latest.viewer_id
         left join dy_live_room r on r.room_key = latest.room_key
         left join (
             select l.viewer_id, count(distinct l.lead_date) as visit_count, min(l.lead_date) as first_visit_date, max(l.lead_date) as last_visit_date
@@ -779,6 +790,39 @@
             </if>
             <if test="orderNo != null and orderNo != ''">
                 and v.order_no like concat('%', #{orderNo}, '%')
+            </if>
+            <if test="rpaTracking != null and rpaTracking != ''">
+                <choose>
+                    <when test="rpaTracking == 'eligible'">
+                        and cfg.enabled = 1
+                        and ifnull(v.status, 'new') = 'new'
+                        and ifnull(vr.tracking_mode, 'AUTO') != 'EXCLUDE'
+                        and (
+                            vr.tracking_mode = 'INCLUDE'
+                            or datediff(curdate(), ifnull(v.last_seen_date, latest.lead_date)) &lt; cfg.lookback_days
+                        )
+                    </when>
+                    <when test="rpaTracking == 'not_eligible'">
+                        and (
+                            cfg.enabled = 0
+                            or ifnull(v.status, 'new') != 'new'
+                            or vr.tracking_mode = 'EXCLUDE'
+                            or (
+                                ifnull(vr.tracking_mode, 'AUTO') != 'INCLUDE'
+                                and datediff(curdate(), ifnull(v.last_seen_date, latest.lead_date)) &gt;= cfg.lookback_days
+                            )
+                        )
+                    </when>
+                    <when test="rpaTracking == 'include'">
+                        and vr.tracking_mode = 'INCLUDE'
+                    </when>
+                    <when test="rpaTracking == 'exclude'">
+                        and vr.tracking_mode = 'EXCLUDE'
+                    </when>
+                    <when test="rpaTracking == 'auto'">
+                        and vr.tracking_mode is null
+                    </when>
+                </choose>
             </if>
         </where>
         order by ifnull(v.has_comment, 0) desc, v.last_comment_time desc, latest.update_time desc

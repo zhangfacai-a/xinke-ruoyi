@@ -92,6 +92,10 @@ export function manualBind(data) {
   return request({ url: `/purchase/summary/${data.summaryId}/manual-bind/${data.manualOrderId}`, method: 'post' })
 }
 
+export function listMatchCandidates(summaryId) {
+  return request({ url: `/purchase/summary/${summaryId}/candidates`, method: 'get' })
+}
+
 export function exportSummary(query) {
   return request({ url: '/purchase/summary/export', method: 'post', data: query, responseType: 'blob', timeout: 60000 })
 }

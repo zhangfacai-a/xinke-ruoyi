@@ -19,7 +19,6 @@ import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
 import com.xinke.erp.service.IRpaOutreachService;
 
-@Anonymous
 @RestController
 @RequestMapping("/open-api/rpa/outreach")
 public class RpaOutreachController extends BaseController
@@ -34,6 +33,7 @@ public class RpaOutreachController extends BaseController
     private String rpaApiKey;
 
     @GetMapping("/health")
+    @Anonymous
     public AjaxResult health(@RequestHeader(value = "X-RPA-Key", required = false) String requestKey)
     {
         AjaxResult denied = authenticate(requestKey);
@@ -46,6 +46,7 @@ public class RpaOutreachController extends BaseController
     }
 
     @PostMapping("/task/claim")
+    @Anonymous
     public AjaxResult claim(@RequestHeader(value = "X-RPA-Key", required = false) String requestKey,
             @Valid @RequestBody RpaTaskClaimRequest request)
     {
@@ -59,6 +60,7 @@ public class RpaOutreachController extends BaseController
     }
 
     @PostMapping("/batch/heartbeat")
+    @Anonymous
     public AjaxResult heartbeat(@RequestHeader(value = "X-RPA-Key", required = false) String requestKey,
             @Valid @RequestBody RpaBatchRequest request)
     {
@@ -72,6 +74,7 @@ public class RpaOutreachController extends BaseController
     }
 
     @PostMapping("/task/result")
+    @Anonymous
     public AjaxResult result(@RequestHeader(value = "X-RPA-Key", required = false) String requestKey,
             @Valid @RequestBody RpaTaskResultRequest request)
     {
@@ -85,6 +88,7 @@ public class RpaOutreachController extends BaseController
     }
 
     @PostMapping("/batch/release")
+    @Anonymous
     public AjaxResult release(@RequestHeader(value = "X-RPA-Key", required = false) String requestKey,
             @Valid @RequestBody RpaBatchRequest request)
     {

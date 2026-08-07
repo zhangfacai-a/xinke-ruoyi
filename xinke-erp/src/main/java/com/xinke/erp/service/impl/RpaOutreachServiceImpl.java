@@ -19,6 +19,8 @@ import com.xinke.erp.domain.RpaRoomBindingRequest;
 import com.xinke.erp.domain.RpaShopConfigRequest;
 import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
+import com.xinke.erp.domain.RpaTrackingConfigRequest;
+import com.xinke.erp.domain.RpaViewerTrackingRequest;
 import com.xinke.erp.mapper.RpaOutreachMapper;
 import com.xinke.erp.service.IRpaOutreachService;
 
@@ -52,6 +54,9 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
             rpaOutreachMapper.createRoomShopTable();
             rpaOutreachMapper.createTaskTable();
             rpaOutreachMapper.createBatchTable();
+            rpaOutreachMapper.createTrackingConfigTable();
+            rpaOutreachMapper.createViewerTrackingRuleTable();
+            rpaOutreachMapper.initializeTrackingConfig();
             rpaOutreachMapper.upgradeRoomShopKeyLength();
             rpaOutreachMapper.upgradeTaskSecUidLength();
             schemaReady = true;
@@ -75,6 +80,7 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
     public Map<String, Object> claim(RpaTaskClaimRequest request)
     {
         cleanupExpiredLeases();
+        rpaOutreachMapper.removeIneligiblePendingTasks();
         rpaOutreachMapper.prepareTasks();
 
         int requestedLimit = request.getLimit() == null ? DEFAULT_BATCH_SIZE : request.getLimit();
@@ -319,6 +325,70 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
             return 0;
         }
         return rpaOutreachMapper.upsertRoomBindings(shopConfigId, roomKeys);
+    }
+
+    @Override
+    public Map<String, Object> getTrackingConfig()
+    {
+        Map<String, Object> config = rpaOutreachMapper.selectTrackingConfig();
+        if (config == null || config.isEmpty())
+        {
+            Map<String, Object> defaults = new LinkedHashMap<>();
+            defaults.put("enabled", true);
+            defaults.put("lookbackDays", 1);
+            return defaults;
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("enabled", asInt(config.get("enabled")) == 1);
+        result.put("lookbackDays", Math.max(1, asInt(config.get("lookbackDays"))));
+        result.put("updateTime", config.get("updateTime"));
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> updateTrackingConfig(RpaTrackingConfigRequest request)
+    {
+        Map<String, Object> data = new HashMap<>();
+        data.put("enabled", Boolean.TRUE.equals(request.getEnabled()) ? 1 : 0);
+        data.put("lookbackDays", request.getLookbackDays());
+        if (rpaOutreachMapper.updateTrackingConfig(data) <= 0)
+        {
+            throw new ServiceException("自动追踪设置保存失败");
+        }
+        rpaOutreachMapper.removeIneligiblePendingTasks();
+        return getTrackingConfig();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int updateViewerTracking(RpaViewerTrackingRequest request)
+    {
+        List<Long> viewerIds = request.getViewerIds().stream()
+                .filter(value -> value != null && value > 0)
+                .distinct()
+                .toList();
+        if (viewerIds.isEmpty())
+        {
+            throw new ServiceException("viewerIds不能为空");
+        }
+        String mode = trim(request.getMode(), 16).toUpperCase(Locale.ROOT);
+        if (!List.of("AUTO", "INCLUDE", "EXCLUDE").contains(mode))
+        {
+            throw new ServiceException("不支持的追踪模式：" + mode);
+        }
+
+        rpaOutreachMapper.deleteViewerTrackingRules(viewerIds);
+        if (!"AUTO".equals(mode))
+        {
+            Map<String, Object> data = new HashMap<>();
+            data.put("viewerIds", viewerIds);
+            data.put("mode", mode);
+            data.put("remark", trim(request.getRemark(), 500));
+            rpaOutreachMapper.insertViewerTrackingRules(data);
+        }
+        rpaOutreachMapper.deletePendingTasksByViewerIds(viewerIds);
+        return viewerIds.size();
     }
 
     private void cleanupExpiredLeases()

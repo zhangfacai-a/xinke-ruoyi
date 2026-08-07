@@ -211,6 +211,13 @@ public class PurchaseMatchController extends BaseController
         return toAjax(service.manualBind(summaryId, manualOrderId, getUserId(), getUsername()));
     }
 
+    @PreAuthorize("@ss.hasPermi('purchase:match:manual')")
+    @GetMapping("/summary/{id}/candidates")
+    public AjaxResult matchCandidates(@PathVariable Long id)
+    {
+        return success(service.listMatchCandidates(id));
+    }
+
     @PreAuthorize("@ss.hasAnyPermi('purchase:manual:import,purchase:summary:import')")
     @PostMapping("/import/preview")
     public AjaxResult preview(@RequestParam String importType, @RequestParam(required = false) Long supplierId, @RequestParam MultipartFile file) throws Exception

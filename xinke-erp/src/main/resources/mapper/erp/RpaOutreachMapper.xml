@@ -95,6 +95,34 @@
         ) engine=InnoDB default charset=utf8mb4 comment='RPA outreach leased batches'
     </update>
 
+    <update id="createTrackingConfigTable">
+        create table if not exists dy_rpa_tracking_config (
+            config_id tinyint not null,
+            enabled tinyint not null default 1,
+            lookback_days int not null default 1,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (config_id)
+        ) engine=InnoDB default charset=utf8mb4 comment='RPA viewer tracking policy'
+    </update>
+
+    <update id="createViewerTrackingRuleTable">
+        create table if not exists dy_rpa_viewer_rule (
+            viewer_id bigint not null,
+            tracking_mode varchar(16) not null,
+            remark varchar(500) default null,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (viewer_id),
+            key idx_dy_rpa_viewer_rule_mode (tracking_mode)
+        ) engine=InnoDB default charset=utf8mb4 comment='RPA per-viewer tracking override'
+    </update>
+
+    <insert id="initializeTrackingConfig">
+        insert ignore into dy_rpa_tracking_config(config_id, enabled, lookback_days, create_time, update_time)
+        values(1, 1, 1, sysdate(), sysdate())
+    </insert>
+
     <update id="upgradeRoomShopKeyLength">
         alter table dy_rpa_room_shop modify column room_key varchar(128) not null
     </update>
@@ -127,6 +155,26 @@
           and lease_expire_time &lt; sysdate()
     </update>
 
+    <delete id="removeIneligiblePendingTasks">
+        delete t
+        from dy_rpa_outreach_task t
+        inner join dy_viewer v on v.viewer_id = t.viewer_id
+        inner join dy_rpa_shop_config sc on sc.shop_config_id = t.shop_config_id
+        inner join dy_rpa_tracking_config cfg on cfg.config_id = 1
+        left join dy_rpa_viewer_rule vr on vr.viewer_id = t.viewer_id
+        where t.status = 'pending'
+          and (
+              cfg.enabled = 0
+              or sc.status != '0'
+              or ifnull(v.status, 'new') != 'new'
+              or vr.tracking_mode = 'EXCLUDE'
+              or (
+                  ifnull(vr.tracking_mode, 'AUTO') != 'INCLUDE'
+                  and datediff(curdate(), ifnull(v.last_seen_date, curdate())) &gt;= cfg.lookback_days
+              )
+          )
+    </delete>
+
     <insert id="prepareTasks">
         insert ignore into dy_rpa_outreach_task(
             task_no, viewer_id, lead_id, shop_config_id, sec_uid, profile_url,
@@ -147,10 +195,16 @@
             inner join dy_viewer v on v.viewer_id = l.viewer_id
             inner join dy_rpa_room_shop rs on rs.room_key = l.room_key
             inner join dy_rpa_shop_config sc on sc.shop_config_id = rs.shop_config_id and sc.status = '0'
+            inner join dy_rpa_tracking_config cfg on cfg.config_id = 1 and cfg.enabled = 1
+            left join dy_rpa_viewer_rule vr on vr.viewer_id = l.viewer_id
             where v.sec_uid is not null
               and trim(v.sec_uid) != ''
               and ifnull(v.status, 'new') = 'new'
-              and (v.last_seen_date is null or v.last_seen_date &gt;= date_sub(curdate(), interval 30 day))
+              and ifnull(vr.tracking_mode, 'AUTO') != 'EXCLUDE'
+              and (
+                  vr.tracking_mode = 'INCLUDE'
+                  or datediff(curdate(), ifnull(v.last_seen_date, l.lead_date)) &lt; cfg.lookback_days
+              )
         ) ranked
         where ranked.rn = 1
         order by ranked.priority desc, ranked.lead_id asc
@@ -491,4 +545,42 @@
         </foreach>
         on duplicate key update shop_config_id = values(shop_config_id), update_time = sysdate()
     </insert>
+
+    <select id="selectTrackingConfig" resultType="java.util.HashMap">
+        select enabled, lookback_days as lookbackDays, create_time as createTime, update_time as updateTime
+        from dy_rpa_tracking_config
+        where config_id = 1
+        limit 1
+    </select>
+
+    <update id="updateTrackingConfig">
+        update dy_rpa_tracking_config
+        set enabled = #{enabled}, lookback_days = #{lookbackDays}, update_time = sysdate()
+        where config_id = 1
+    </update>
+
+    <delete id="deleteViewerTrackingRules">
+        delete from dy_rpa_viewer_rule
+        where viewer_id in
+        <foreach collection="viewerIds" item="viewerId" open="(" separator="," close=")">
+            #{viewerId}
+        </foreach>
+    </delete>
+
+    <insert id="insertViewerTrackingRules">
+        insert into dy_rpa_viewer_rule(viewer_id, tracking_mode, remark, create_time, update_time)
+        values
+        <foreach collection="viewerIds" item="viewerId" separator=",">
+            (#{viewerId}, #{mode}, nullif(#{remark}, ''), sysdate(), sysdate())
+        </foreach>
+    </insert>
+
+    <delete id="deletePendingTasksByViewerIds">
+        delete from dy_rpa_outreach_task
+        where status = 'pending'
+          and viewer_id in
+        <foreach collection="viewerIds" item="viewerId" open="(" separator="," close=")">
+            #{viewerId}
+        </foreach>
+    </delete>
 </mapper>

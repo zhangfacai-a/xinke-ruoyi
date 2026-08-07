@@ -31,6 +31,7 @@ public interface PurchaseMatchService
     int matchOne(Long summaryId, Long userId, String username);
     int rematchFailed(Map<String, Object> query, Long userId, String username);
     int manualBind(Long summaryId, Long manualOrderId, Long userId, String username);
+    List<Map<String, Object>> listMatchCandidates(Long summaryId);
 
     Map<String, Object> preview(String importType, Long supplierId, MultipartFile file) throws Exception;
     Map<String, Object> importExcel(String importType, Long supplierId, MultipartFile file, String sheetName, Long userId, String username) throws Exception;

@@ -50,6 +50,15 @@
             <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
+        <el-form-item label="影刀追踪" prop="rpaTracking">
+          <el-select v-model="queryParams.rpaTracking" clearable placeholder="全部" style="width: 140px">
+            <el-option label="当前会追踪" value="eligible" />
+            <el-option label="当前不追踪" value="not_eligible" />
+            <el-option label="强制追踪" value="include" />
+            <el-option label="永不追踪" value="exclude" />
+            <el-option label="跟随规则" value="auto" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="追单池" prop="excludeOrdered">
           <el-switch v-model="queryParams.excludeOrdered" active-value="1" inactive-value="0" active-text="隐藏已下单"
             @change="handleQuery" />
@@ -67,10 +76,37 @@
         <el-col :span="1.5">
           <el-button type="primary" plain icon="Refresh" @click="getList">刷新线索</el-button>
         </el-col>
+        <el-col :span="1.5">
+          <el-button icon="Setting" @click="openTrackingConfig" v-hasPermi="['live:viewer:edit']">
+            追踪规则
+          </el-button>
+        </el-col>
+        <el-col :span="1.5">
+          <el-dropdown :disabled="selectedViewerIds.length === 0" @command="updateSelectedTracking"
+            v-hasPermi="['live:viewer:edit']">
+            <el-button :disabled="selectedViewerIds.length === 0" icon="Operation">
+              批量设置<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="INCLUDE">强制追踪</el-dropdown-item>
+                <el-dropdown-item command="EXCLUDE">永不追踪</el-dropdown-item>
+                <el-dropdown-item command="AUTO" divided>恢复自动规则</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </el-col>
+        <el-col :span="1.5" class="tracking-policy-status">
+          <el-tag :type="trackingConfig.enabled ? 'success' : 'info'" effect="plain">
+            {{ trackingConfig.enabled ? `最近 ${trackingConfig.lookbackDays} 日` : '自动追踪已停用' }}
+          </el-tag>
+        </el-col>
         <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
       </el-row>
 
-      <el-table v-loading="loading" :data="leadList" row-key="lead_id" height="560" border stripe>
+      <el-table v-loading="loading" :data="leadList" row-key="lead_id" height="560" border stripe
+        @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="48" fixed />
         <el-table-column label="客户" min-width="200" fixed show-overflow-tooltip>
           <template #default="scope">
             <div class="customer-cell">
@@ -101,6 +137,25 @@
         <el-table-column label="意向" width="100" align="center">
           <template #default="scope">
             <el-tag :type="intentTag(scope.row.intent)" effect="light">{{ intentLabel(scope.row.intent) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="影刀追踪" width="132" align="center">
+          <template #default="scope">
+            <div class="tracking-cell">
+              <el-tag :type="trackingTag(scope.row)" effect="plain" size="small">
+                {{ trackingLabel(scope.row) }}
+              </el-tag>
+              <el-dropdown @command="mode => updateRowTracking(scope.row, mode)" v-hasPermi="['live:viewer:edit']">
+                <el-button link icon="Setting" title="设置追踪方式" aria-label="设置追踪方式" />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="INCLUDE">强制追踪</el-dropdown-item>
+                    <el-dropdown-item command="EXCLUDE">永不追踪</el-dropdown-item>
+                    <el-dropdown-item command="AUTO" divided>恢复自动规则</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="110" align="center">
@@ -240,17 +295,36 @@
         <el-button type="success" @click="submitMarkPreOrdered">确认追前已购</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="trackingConfigOpen" title="影刀自动追踪规则" width="480px" append-to-body>
+      <el-form :model="trackingConfigForm" label-width="110px">
+        <el-form-item label="自动追踪">
+          <el-switch v-model="trackingConfigForm.enabled" />
+        </el-form-item>
+        <el-form-item label="最近自然日">
+          <el-input-number v-model="trackingConfigForm.lookbackDays" :min="1" :max="365" controls-position="right" />
+          <span class="input-suffix">日</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="trackingConfigOpen = false">取消</el-button>
+        <el-button type="primary" :loading="trackingSaving" @click="saveTrackingConfig">保存规则</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="LiveViewerLead">
 import {
   addViewerFollow,
+  getRpaTrackingConfig,
   getViewerLead,
   getViewerSummary,
   listViewerOwnerSuggestions,
   listViewerLeads,
   listViewerRoomSuggestions,
+  updateRpaTrackingConfig,
+  updateRpaViewerTracking,
   updateViewerLead
 } from '@/api/live/viewer'
 
@@ -269,9 +343,14 @@ const summary = ref({})
 const detailOpen = ref(false)
 const followOpen = ref(false)
 const orderedOpen = ref(false)
+const trackingConfigOpen = ref(false)
+const trackingSaving = ref(false)
 const currentLead = ref(null)
 const orderedLead = ref(null)
 const detail = ref({ lead: null, comments: [], visits: [], stays: [], followRecords: [] })
+const selectedViewerIds = ref([])
+const trackingConfig = reactive({ enabled: true, lookbackDays: 1 })
+const trackingConfigForm = reactive({ enabled: true, lookbackDays: 1 })
 
 const queryParams = reactive({
   pageNum: 1,
@@ -282,6 +361,7 @@ const queryParams = reactive({
   ownerName: undefined,
   hasComment: undefined,
   status: undefined,
+  rpaTracking: undefined,
   excludeOrdered: '1'
 })
 
@@ -397,6 +477,7 @@ function buildQuery() {
     ownerName: queryParams.ownerName,
     hasComment: queryParams.hasComment,
     status: queryParams.status,
+    rpaTracking: queryParams.rpaTracking,
     excludeOrdered
   })
 }
@@ -497,6 +578,80 @@ function isSoldStatus(status) {
   return status === 'ordered' || status === 'pre_ordered'
 }
 
+function trackingMode(row) {
+  return String(row?.rpa_tracking_mode || 'AUTO').toUpperCase()
+}
+
+function trackingEligible(row) {
+  return Number(row?.rpa_tracking_eligible || 0) === 1
+}
+
+function trackingLabel(row) {
+  const mode = trackingMode(row)
+  if (mode === 'EXCLUDE') return '永不追踪'
+  if (mode === 'INCLUDE') return '强制追踪'
+  return trackingEligible(row) ? '按规则追踪' : '不在范围'
+}
+
+function trackingTag(row) {
+  const mode = trackingMode(row)
+  if (mode === 'EXCLUDE') return 'danger'
+  if (mode === 'INCLUDE') return trackingEligible(row) ? 'warning' : 'info'
+  return trackingEligible(row) ? 'success' : 'info'
+}
+
+function handleSelectionChange(rows) {
+  selectedViewerIds.value = [...new Set((rows || []).map((row) => Number(row.viewer_id)).filter(Boolean))]
+}
+
+function loadTrackingConfig() {
+  return getRpaTrackingConfig().then((res) => {
+    const data = res.data || {}
+    trackingConfig.enabled = Boolean(data.enabled)
+    trackingConfig.lookbackDays = Math.max(1, Number(data.lookbackDays || 1))
+  })
+}
+
+function openTrackingConfig() {
+  trackingConfigForm.enabled = trackingConfig.enabled
+  trackingConfigForm.lookbackDays = trackingConfig.lookbackDays
+  trackingConfigOpen.value = true
+}
+
+function saveTrackingConfig() {
+  trackingSaving.value = true
+  updateRpaTrackingConfig({
+    enabled: trackingConfigForm.enabled,
+    lookbackDays: trackingConfigForm.lookbackDays
+  }).then((res) => {
+    const data = res.data || trackingConfigForm
+    trackingConfig.enabled = Boolean(data.enabled)
+    trackingConfig.lookbackDays = Math.max(1, Number(data.lookbackDays || 1))
+    trackingConfigOpen.value = false
+    proxy.$modal.msgSuccess('追踪规则已保存')
+    getList()
+  }).finally(() => {
+    trackingSaving.value = false
+  })
+}
+
+function updateTracking(viewerIds, mode) {
+  if (!viewerIds.length) return Promise.resolve()
+  return updateRpaViewerTracking({ viewerIds, mode }).then(() => {
+    const message = ({ INCLUDE: '已设为强制追踪', EXCLUDE: '已设为永不追踪', AUTO: '已恢复自动规则' })[mode]
+    proxy.$modal.msgSuccess(message)
+    getList()
+  })
+}
+
+function updateRowTracking(row, mode) {
+  return updateTracking([Number(row.viewer_id)], mode)
+}
+
+function updateSelectedTracking(mode) {
+  return updateTracking(selectedViewerIds.value, mode)
+}
+
 function getList() {
   loading.value = true
   listViewerLeads(buildQuery())
@@ -543,6 +698,7 @@ function resetQuery() {
   queryParams.dateRange = undefined
   queryParams.roomName = undefined
   queryParams.ownerName = undefined
+  queryParams.rpaTracking = undefined
   queryParams.excludeOrdered = '1'
   getList()
 }
@@ -620,7 +776,7 @@ function submitFollow() {
   })
 }
 
-getList()
+loadTrackingConfig().finally(getList)
 </script>
 
 <style scoped lang="scss">
@@ -717,6 +873,26 @@ getList()
 
 .table-panel {
   padding: 16px 0 0;
+}
+
+.tracking-policy-status {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+.tracking-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+}
+
+.input-suffix {
+  margin-left: 8px;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .search-form {

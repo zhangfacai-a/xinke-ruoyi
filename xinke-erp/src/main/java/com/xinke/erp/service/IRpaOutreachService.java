@@ -7,6 +7,8 @@ import com.xinke.erp.domain.RpaRoomBindingRequest;
 import com.xinke.erp.domain.RpaShopConfigRequest;
 import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
+import com.xinke.erp.domain.RpaTrackingConfigRequest;
+import com.xinke.erp.domain.RpaViewerTrackingRequest;
 
 public interface IRpaOutreachService
 {
@@ -29,4 +31,10 @@ public interface IRpaOutreachService
     long saveShopConfig(Long shopConfigId, RpaShopConfigRequest request);
 
     int bindRooms(Long shopConfigId, RpaRoomBindingRequest request);
+
+    Map<String, Object> getTrackingConfig();
+
+    Map<String, Object> updateTrackingConfig(RpaTrackingConfigRequest request);
+
+    int updateViewerTracking(RpaViewerTrackingRequest request);
 }

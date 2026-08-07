@@ -100,3 +100,26 @@ export function deleteLiveRoom(roomKey) {
     method: 'delete'
   })
 }
+
+export function getRpaTrackingConfig() {
+  return request({
+    url: '/live/rpa/tracking/config',
+    method: 'get'
+  })
+}
+
+export function updateRpaTrackingConfig(data) {
+  return request({
+    url: '/live/rpa/tracking/config',
+    method: 'put',
+    data
+  })
+}
+
+export function updateRpaViewerTracking(data) {
+  return request({
+    url: '/live/rpa/tracking/viewers',
+    method: 'put',
+    data
+  })
+}

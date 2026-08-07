@@ -16,6 +16,8 @@ import com.xinke.common.core.domain.AjaxResult;
 import com.xinke.common.enums.BusinessType;
 import com.xinke.erp.domain.RpaRoomBindingRequest;
 import com.xinke.erp.domain.RpaShopConfigRequest;
+import com.xinke.erp.domain.RpaTrackingConfigRequest;
+import com.xinke.erp.domain.RpaViewerTrackingRequest;
 import com.xinke.erp.service.IRpaOutreachService;
 
 @RestController
@@ -66,5 +68,31 @@ public class RpaOutreachAdminController extends BaseController
     {
         rpaOutreachService.ensureSchema();
         return success(rpaOutreachService.bindRooms(shopConfigId, request));
+    }
+
+    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @GetMapping("/tracking/config")
+    public AjaxResult trackingConfig()
+    {
+        rpaOutreachService.ensureSchema();
+        return success(rpaOutreachService.getTrackingConfig());
+    }
+
+    @PreAuthorize("@ss.hasPermi('live:viewer:edit')")
+    @Log(title = "RPA自动追踪规则", businessType = BusinessType.UPDATE)
+    @PutMapping("/tracking/config")
+    public AjaxResult updateTrackingConfig(@Valid @RequestBody RpaTrackingConfigRequest request)
+    {
+        rpaOutreachService.ensureSchema();
+        return success(rpaOutreachService.updateTrackingConfig(request));
+    }
+
+    @PreAuthorize("@ss.hasPermi('live:viewer:edit')")
+    @Log(title = "RPA用户追踪规则", businessType = BusinessType.UPDATE)
+    @PutMapping("/tracking/viewers")
+    public AjaxResult updateViewerTracking(@Valid @RequestBody RpaViewerTrackingRequest request)
+    {
+        rpaOutreachService.ensureSchema();
+        return success(rpaOutreachService.updateViewerTracking(request));
     }
 }

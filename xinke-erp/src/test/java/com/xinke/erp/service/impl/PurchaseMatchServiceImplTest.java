@@ -71,6 +71,17 @@ class PurchaseMatchServiceImplTest
         assertEquals("AMOUNT_MISMATCH", method.invoke(service, row));
     }
 
+    @Test
+    void quantityMatchRequiresEqualKnownQuantities() throws Exception
+    {
+        Method method = PurchaseMatchServiceImpl.class.getDeclaredMethod("quantityMatches", Object.class, Object.class);
+        method.setAccessible(true);
+
+        assertEquals(true, method.invoke(service, "10", new BigDecimal("10.00")));
+        assertEquals(false, method.invoke(service, "10", "9"));
+        assertEquals(true, method.invoke(service, null, "9"));
+    }
+
     private String invokeCellText(Cell cell, FormulaEvaluator evaluator) throws Exception
     {
         Method method = PurchaseMatchServiceImpl.class.getDeclaredMethod("cellText", Cell.class, FormulaEvaluator.class);

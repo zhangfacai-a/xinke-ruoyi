@@ -32,6 +32,7 @@ import com.xinke.erp.domain.DyCaptureReport;
 import com.xinke.erp.domain.DyViewerLeadExport;
 import com.xinke.erp.mapper.DyViewerLeadMapper;
 import com.xinke.erp.service.IDyViewerLeadService;
+import com.xinke.erp.service.IRpaOutreachService;
 import com.xinke.system.domain.SysConfig;
 import com.xinke.system.service.ISysConfigService;
 
@@ -50,6 +51,9 @@ public class DyViewerLeadController extends BaseController
 
     @Autowired
     private IDyViewerLeadService dyViewerLeadService;
+
+    @Autowired
+    private IRpaOutreachService rpaOutreachService;
 
     @Autowired
     private ISysConfigService configService;
@@ -196,6 +200,7 @@ public class DyViewerLeadController extends BaseController
     @GetMapping("/live/viewer/lead/list")
     public TableDataInfo list(@RequestParam Map<String, Object> query)
     {
+        rpaOutreachService.ensureSchema();
         startPage();
         List<Map<String, Object>> list = dyViewerLeadService.listLeads(query);
         return getDataTable(list);
@@ -206,6 +211,7 @@ public class DyViewerLeadController extends BaseController
     @PostMapping("/live/viewer/lead/export")
     public void export(HttpServletResponse response, @RequestParam Map<String, Object> query)
     {
+        rpaOutreachService.ensureSchema();
         List<DyViewerLeadExport> list = dyViewerLeadService.exportLeads(query);
         ExcelUtil<DyViewerLeadExport> util = new ExcelUtil<>(DyViewerLeadExport.class);
         util.exportExcel(response, list, "live_viewer_leads");

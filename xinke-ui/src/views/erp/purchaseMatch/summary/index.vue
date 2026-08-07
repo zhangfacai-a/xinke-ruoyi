@@ -10,6 +10,7 @@
     <el-row :gutter="10" class="mb8 stat-row">
       <el-col :span="3"><el-statistic title="总数据量" :value="stats.totalCount || 0" /></el-col>
       <el-col :span="3"><el-statistic title="匹配成功" :value="stats.successCount || 0" /></el-col>
+      <el-col :span="3"><el-statistic title="待人工确认" :value="stats.reviewCount || 0" /></el-col>
       <el-col :span="3"><el-statistic title="未找到订单" :value="stats.notFoundCount || 0" /></el-col>
       <el-col :span="3"><el-statistic title="物流为空" :value="stats.emptyCount || 0" /></el-col>
       <el-col :span="3"><el-statistic title="供应商未识别" :value="stats.supplierNotFoundCount || 0" /></el-col>
@@ -46,8 +47,17 @@
     </el-table>
     <pagination v-show="total>0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
-    <el-dialog v-model="bindOpen" title="手工指定手工订单" width="420px">
-      <el-form label-width="110px"><el-form-item label="手工订单ID"><el-input v-model="bindForm.manualOrderId" placeholder="请输入手工订单ID" /></el-form-item></el-form>
+    <el-dialog v-model="bindOpen" title="确认匹配订单" width="620px">
+      <el-alert title="仅显示同一供应商、同一订单号的候选订单；已被其他汇总占用的订单不能再次绑定。" type="info" :closable="false" class="mb8" />
+      <el-table :data="candidates" border size="small" max-height="320" @current-change="selectCandidate" highlight-current-row>
+        <el-table-column label="选择" width="70" align="center"><template #default="scope"><el-radio v-model="bindForm.manualOrderId" :label="scope.row.manualOrderId" :disabled="scope.row.occupied">&nbsp;</el-radio></template></el-table-column>
+        <el-table-column label="订单号" prop="orderNo" min-width="160" />
+        <el-table-column label="型号" prop="productModel" min-width="120" />
+        <el-table-column label="数量" prop="quantity" width="90" align="right" />
+        <el-table-column label="物流单号" prop="logisticsNo" min-width="160" />
+        <el-table-column label="校验" width="110"><template #default="scope"><el-tag :type="scope.row.occupied ? 'danger' : (scope.row.quantityMatched ? 'success' : 'warning')">{{ scope.row.occupied ? '已占用' : (scope.row.quantityMatched ? '数量一致' : '数量待核') }}</el-tag></template></el-table-column>
+      </el-table>
+      <el-empty v-if="!candidatesLoading && candidates.length === 0" description="未找到可匹配的手工订单" :image-size="70" />
       <template #footer><el-button @click="bindOpen=false">取消</el-button><el-button type="primary" @click="submitBind">确定</el-button></template>
     </el-dialog>
 
@@ -86,7 +96,7 @@
 
 <script setup name="PurchaseSummary">
 import { saveAs } from 'file-saver'
-import { listSummary, summaryStats, delSummary, rematchFailed, manualBind, exportSummary, downloadSummaryTemplate as getSummaryTemplate, supplierOptions, previewImport, confirmImport } from '@/api/erp/purchaseMatch'
+import { listSummary, summaryStats, delSummary, rematchFailed, manualBind, listMatchCandidates, exportSummary, downloadSummaryTemplate as getSummaryTemplate, supplierOptions, previewImport, confirmImport } from '@/api/erp/purchaseMatch'
 const { proxy } = getCurrentInstance()
 const matchStatusMap = {
   SUCCESS: '匹配成功',
@@ -95,22 +105,37 @@ const matchStatusMap = {
   MULTIPLE: '多条匹配',
   SUPPLIER_NOT_FOUND: '供应商未识别',
   CONFLICT: '数据冲突',
+  REVIEW: '待人工确认',
   PENDING: '待匹配'
 }
 const statuses = Object.entries(matchStatusMap).map(([value, label]) => ({ value, label }))
 const suppliers = ref([]), rows = ref([])
-const stats = ref({}), loading = ref(false), total = ref(0), bindOpen = ref(false), uploadOpen = ref(false)
+const stats = ref({}), loading = ref(false), total = ref(0), bindOpen = ref(false), uploadOpen = ref(false), candidatesLoading = ref(false)
 const bindForm = ref({})
+const candidates = ref([])
 const uploadForm = reactive({ file: undefined, preview: undefined, busy: false, phase: '', progress: 0, progressStatus: '', message: '' })
 const queryParams = ref({ pageNum: 1, pageSize: 10 })
 function statusLabel(s){ return matchStatusMap[s] || s || '-' }
-function tagType(s){ return ({SUCCESS:'success',NOT_FOUND:'danger',LOGISTICS_EMPTY:'warning',SUPPLIER_NOT_FOUND:'info',CONFLICT:'danger',MULTIPLE:'warning',PENDING:'info'})[s] || 'info' }
+function tagType(s){ return ({SUCCESS:'success',REVIEW:'warning',NOT_FOUND:'danger',LOGISTICS_EMPTY:'warning',SUPPLIER_NOT_FOUND:'info',CONFLICT:'danger',MULTIPLE:'warning',PENDING:'info'})[s] || 'info' }
 function getList(){ loading.value=true; listSummary(queryParams.value).then(r=>{rows.value=r.rows; total.value=r.total; loading.value=false}); summaryStats(queryParams.value).then(r=>stats.value=r.data||{}) }
 function handleQuery(){ queryParams.value.pageNum=1; getList() }
 function resetQuery(){ proxy.resetForm('queryRef'); handleQuery() }
-function rematch(){ rematchFailed(queryParams.value).then(r=>{ proxy.$modal.msgSuccess(`已处理${r.data || 0}条`); getList() }) }
-function openBind(row){ bindForm.value={ summaryId: row.summaryId }; bindOpen.value=true }
-function submitBind(){ manualBind(bindForm.value).then(()=>{ proxy.$modal.msgSuccess('绑定成功'); bindOpen.value=false; getList() }) }
+function rematch(){ proxy.$modal.confirm('将按当前筛选条件重新匹配所有未成功记录，确认继续？').then(()=>rematchFailed(queryParams.value)).then(r=>{ proxy.$modal.msgSuccess(`已处理${r.data || 0}条`); getList() }) }
+function openBind(row){
+  bindForm.value={ summaryId: row.summaryId, manualOrderId: undefined }
+  candidates.value=[]
+  bindOpen.value=true
+  candidatesLoading.value=true
+  listMatchCandidates(row.summaryId).then(r=>{ candidates.value=r.data || [] }).finally(()=>{ candidatesLoading.value=false })
+}
+function selectCandidate(row){ if (row && !row.occupied) bindForm.value.manualOrderId=row.manualOrderId }
+function submitBind(){
+  if (!bindForm.value.manualOrderId) return proxy.$modal.msgWarning('请选择一个未占用的候选订单')
+  const candidate = candidates.value.find(item => item.manualOrderId === bindForm.value.manualOrderId)
+  const submit = () => manualBind(bindForm.value).then(()=>{ proxy.$modal.msgSuccess('绑定成功'); bindOpen.value=false; getList() })
+  if (candidate && !candidate.quantityMatched) return proxy.$modal.confirm('候选订单与采购汇总的数量不一致，确认仍要手工绑定？').then(submit)
+  submit()
+}
 function remove(row){ proxy.$modal.confirm('确认删除该采购汇总？').then(()=>delSummary(row.summaryId)).then(()=>{ proxy.$modal.msgSuccess('删除成功'); getList() }) }
 function handleExport(){ exportSummary(queryParams.value).then(blob => saveAs(blob, '采购汇总总表.xlsx')) }
 function openUpload(){ clearUpload(); uploadOpen.value = true }

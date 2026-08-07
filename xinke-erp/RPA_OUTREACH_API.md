@@ -11,7 +11,7 @@ Content-Type: application/json
 X-RPA-Key: 本机配置的接口密钥
 ```
 
-不要把 `X-RPA-Key`、`leaseToken` 或抖音登录信息打印到影刀日志。每台运行影刀的电脑设置一个固定且唯一的 `workerId`，例如 `yingdao-pc-01`，重启后不要改变。
+`X-RPA-Key` 是影刀和若依后端之间的共享接口密码，只用于识别合法的影刀请求，不是抖音密码。不要把 `X-RPA-Key`、`leaseToken` 或抖音登录信息打印到影刀日志。每台运行影刀的电脑设置一个固定且唯一的 `workerId`，例如 `yingdao-pc-01`，重启后不要改变。
 
 开始前要在若依后台完成两项配置：
 
@@ -20,7 +20,16 @@ X-RPA-Key: 本机配置的接口密钥
 
 当前数据库没有店铺配置，因此在配置完成前，领取接口会正常返回 `available: false`。
 
-## 2. 推荐执行流程
+## 2. 追踪范围
+
+“直播观众追单池”页面提供两层控制：
+
+- 自动规则：可暂停自动追踪，并设置最近 1 至 365 个自然日。设置为 1 时，只处理今天出现的新用户。
+- 用户例外：单个或批量设置为“强制追踪”“永不追踪”或“恢复自动规则”。
+
+用户例外优先于最近天数，但不会覆盖安全状态：已下单、追单前已下单、无效或已经跟进中的用户不会再次进入首次触达队列。关闭全局自动追踪时，强制追踪也暂停。
+
+## 3. 推荐执行流程
 
 1. 调用领取接口，一次领取最多 10 人。接口保证同一批全部属于同一个店铺。
 2. 保存响应中的 `batchNo`、`leaseToken` 和 `workerId`，不要自行修改。
@@ -34,7 +43,7 @@ X-RPA-Key: 本机配置的接口密钥
 
 每批租约默认 30 分钟。租约到期后，未完成任务会自动回到队列，最多尝试 5 次。
 
-## 3. 健康检查
+## 4. 健康检查
 
 ```http
 GET /open-api/rpa/outreach/health
@@ -58,7 +67,7 @@ GET /open-api/rpa/outreach/health
 
 影刀启动时先调用一次。`code` 不是 `200` 时不要继续领取任务。
 
-## 4. 领取一批任务
+## 5. 领取一批任务
 
 ```http
 POST /open-api/rpa/outreach/task/claim
@@ -132,7 +141,7 @@ POST /open-api/rpa/outreach/task/claim
 
 影刀按 `retryAfterSeconds` 等待后再领取，不要高频循环请求。
 
-## 5. 批次心跳
+## 6. 批次心跳
 
 ```http
 POST /open-api/rpa/outreach/batch/heartbeat
@@ -148,7 +157,7 @@ POST /open-api/rpa/outreach/batch/heartbeat
 
 建议在独立子流程中每 15 分钟执行一次。心跳失败后停止当前批次，不要继续操作用户，重新领取任务。
 
-## 6. 逐个回传结果
+## 7. 逐个回传结果
 
 ```http
 POST /open-api/rpa/outreach/task/result
@@ -202,7 +211,7 @@ POST /open-api/rpa/outreach/task/result
 
 成功响应中的 `idempotent: true` 表示这个 `requestId` 已处理过，影刀应当视为成功，不要再次执行关注、私信或查单。
 
-## 7. 主动释放未完成批次
+## 8. 主动释放未完成批次
 
 ```http
 POST /open-api/rpa/outreach/batch/release
@@ -218,7 +227,7 @@ POST /open-api/rpa/outreach/batch/release
 
 仅在影刀被人工停止、账号掉线或浏览器无法恢复时调用。已逐条完成的任务不会被释放，剩余任务会回到队列。
 
-## 8. 错误处理
+## 9. 错误处理
 
 - HTTP 请求成功后仍要判断响应体的 `code`。
 - `code = 200` 才表示接口接受请求。

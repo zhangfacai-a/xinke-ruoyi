@@ -12,11 +12,15 @@ public interface RpaOutreachMapper
     int createRoomShopTable();
     int createTaskTable();
     int createBatchTable();
+    int createTrackingConfigTable();
+    int createViewerTrackingRuleTable();
+    int initializeTrackingConfig();
     int upgradeRoomShopKeyLength();
     int upgradeTaskSecUidLength();
 
     int releaseExpiredTasks();
     int expireBatches();
+    int removeIneligiblePendingTasks();
     int prepareTasks();
     Map<String, Object> selectClaimableShop(@Param("preferredShopCode") String preferredShopCode);
     int insertBatch(Map<String, Object> data);
@@ -44,4 +48,10 @@ public interface RpaOutreachMapper
     Map<String, Object> selectShopConfigById(@Param("shopConfigId") Long shopConfigId);
     int deleteRoomBindings(@Param("shopConfigId") Long shopConfigId);
     int upsertRoomBindings(@Param("shopConfigId") Long shopConfigId, @Param("roomKeys") List<String> roomKeys);
+
+    Map<String, Object> selectTrackingConfig();
+    int updateTrackingConfig(Map<String, Object> data);
+    int deleteViewerTrackingRules(@Param("viewerIds") List<Long> viewerIds);
+    int insertViewerTrackingRules(Map<String, Object> data);
+    int deletePendingTasksByViewerIds(@Param("viewerIds") List<Long> viewerIds);
 }
