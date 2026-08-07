@@ -13,3 +13,7 @@ spring:
       port: 6379
       database: 0
       password: 替换为本地Redis密码
+
+live:
+  rpa:
+    api-key: 替换为随机且足够长的影刀接口密钥

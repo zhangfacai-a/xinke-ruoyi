@@ -10,6 +10,25 @@ public interface DyViewerLeadMapper
 {
     int createPluginClientTable();
 
+    int createLiveSessionTable();
+
+    int createAudienceObservationTable();
+
+    int createViewerStayTable();
+
+    int upsertLiveSession(Map<String, Object> data);
+
+    int insertAudienceObservation(Map<String, Object> data);
+
+    Map<String, Object> selectLatestViewerStay(@Param("liveSessionKey") String liveSessionKey,
+                                                @Param("secUid") String secUid);
+
+    int insertViewerStay(Map<String, Object> data);
+
+    int updateViewerStay(Map<String, Object> data);
+
+    int deleteExpiredAudienceObservations(@Param("retentionDays") int retentionDays);
+
     int insertCaptureBatch(Map<String, Object> data);
 
     int upsertLiveRoom(Map<String, Object> data);
@@ -82,6 +101,8 @@ public interface DyViewerLeadMapper
     Map<String, Object> selectLeadById(@Param("leadId") Long leadId);
 
     List<Map<String, Object>> selectVisitsByLeadId(@Param("leadId") Long leadId);
+
+    List<Map<String, Object>> selectViewerStaysByLeadId(@Param("leadId") Long leadId);
 
     List<Map<String, Object>> selectCommentsByLeadId(@Param("leadId") Long leadId);
 

@@ -45,6 +45,8 @@ public class DyViewerLeadController extends BaseController
     private static final String CONFIG_ENABLED = "live.plugin.enabled";
     private static final String CONFIG_MIN_VERSION = "live.plugin.minVersion";
     private static final String CONFIG_LATEST_VERSION = "live.plugin.latestVersion";
+    private static volatile boolean pluginConfigReady;
+    private static volatile boolean pluginClientTableReady;
 
     @Autowired
     private IDyViewerLeadService dyViewerLeadService;
@@ -88,7 +90,7 @@ public class DyViewerLeadController extends BaseController
         Map<String, Object> data = new HashMap<>();
         data.put("enabled", pluginEnabled());
         data.put("minVersion", configValue(CONFIG_MIN_VERSION, "4.0.8"));
-        data.put("latestVersion", configValue(CONFIG_LATEST_VERSION, "4.0.8"));
+        data.put("latestVersion", configValue(CONFIG_LATEST_VERSION, "4.0.11"));
         data.put("disabledCode", PLUGIN_DISABLED_CODE);
         data.put("versionBlockedCode", PLUGIN_VERSION_BLOCKED_CODE);
         data.put("clientDisabledCode", PLUGIN_CLIENT_DISABLED_CODE);
@@ -112,7 +114,7 @@ public class DyViewerLeadController extends BaseController
         }
         if (form != null && form.containsKey("latestVersion"))
         {
-            upsertConfig(CONFIG_LATEST_VERSION, "Live plugin latest version", str(form.get("latestVersion"), "4.0.8"),
+            upsertConfig(CONFIG_LATEST_VERSION, "Live plugin latest version", str(form.get("latestVersion"), "4.0.11"),
                     "Recommended plugin version.");
         }
         configService.resetConfigCache();
@@ -265,7 +267,7 @@ public class DyViewerLeadController extends BaseController
         ensurePluginConfig();
         Map<String, Object> client = upsertAndGetPluginClient(report);
         String minVersion = configValue(CONFIG_MIN_VERSION, "4.0.8");
-        String latestVersion = configValue(CONFIG_LATEST_VERSION, "4.0.8");
+        String latestVersion = configValue(CONFIG_LATEST_VERSION, "4.0.11");
         String clientVersion = report == null ? "" : str(report.getPluginVersion(), "");
         String clientId = report == null ? "" : str(report.getClientId(), "");
         Map<String, Object> data = new HashMap<>();
@@ -371,7 +373,18 @@ public class DyViewerLeadController extends BaseController
 
     private void ensurePluginClientTable()
     {
-        dyViewerLeadMapper.createPluginClientTable();
+        if (pluginClientTableReady)
+        {
+            return;
+        }
+        synchronized (DyViewerLeadController.class)
+        {
+            if (!pluginClientTableReady)
+            {
+                dyViewerLeadMapper.createPluginClientTable();
+                pluginClientTableReady = true;
+            }
+        }
     }
 
     private boolean pluginEnabled()
@@ -381,9 +394,21 @@ public class DyViewerLeadController extends BaseController
 
     private void ensurePluginConfig()
     {
-        ensureConfig(CONFIG_ENABLED, "Live plugin enabled", "true", "When disabled, reports receive a stop response.");
-        ensureConfig(CONFIG_MIN_VERSION, "Live plugin minimum version", "4.0.8", "Reports from lower plugin versions are blocked.");
-        ensureConfig(CONFIG_LATEST_VERSION, "Live plugin latest version", "4.0.8", "Recommended plugin version.");
+        if (pluginConfigReady)
+        {
+            return;
+        }
+        synchronized (DyViewerLeadController.class)
+        {
+            if (pluginConfigReady)
+            {
+                return;
+            }
+            ensureConfig(CONFIG_ENABLED, "Live plugin enabled", "true", "When disabled, reports receive a stop response.");
+            ensureConfig(CONFIG_MIN_VERSION, "Live plugin minimum version", "4.0.8", "Reports from lower plugin versions are blocked.");
+            ensureConfig(CONFIG_LATEST_VERSION, "Live plugin latest version", "4.0.11", "Recommended plugin version.");
+            pluginConfigReady = true;
+        }
     }
 
     private void ensureConfig(String key, String name, String value, String remark)

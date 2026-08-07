@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.RpaOutreachMapper">
+
+    <update id="createShopConfigTable">
+        create table if not exists dy_rpa_shop_config (
+            shop_config_id bigint not null auto_increment,
+            shop_code varchar(64) not null,
+            shop_name varchar(100) not null,
+            douyin_account_code varchar(128) not null,
+            douyin_shop_name varchar(128) not null,
+            message_template varchar(1000) default null,
+            daily_limit int not null default 200,
+            status char(1) not null default '0',
+            remark varchar(500) default null,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (shop_config_id),
+            unique key uk_dy_rpa_shop_code (shop_code),
+            key idx_dy_rpa_shop_status (status)
+        ) engine=InnoDB default charset=utf8mb4 comment='RPA shop and Douyin account configuration'
+    </update>
+
+    <update id="createRoomShopTable">
+        create table if not exists dy_rpa_room_shop (
+            room_key varchar(128) not null,
+            shop_config_id bigint not null,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (room_key),
+            key idx_dy_rpa_room_shop (shop_config_id)
+        ) engine=InnoDB default charset=utf8mb4 comment='Live room to RPA shop mapping'
+    </update>
+
+    <update id="createTaskTable">
+        create table if not exists dy_rpa_outreach_task (
+            task_id bigint not null auto_increment,
+            task_no varchar(64) not null,
+            viewer_id bigint not null,
+            lead_id bigint not null,
+            shop_config_id bigint not null,
+            sec_uid varchar(256) not null,
+            profile_url varchar(500) not null,
+            status varchar(32) not null default 'pending',
+            priority int not null default 0,
+            attempt_count int not null default 0,
+            max_attempts int not null default 5,
+            batch_no varchar(64) default null,
+            lease_token varchar(64) default null,
+            worker_id varchar(128) default null,
+            lease_expire_time datetime default null,
+            result_request_id varchar(64) default null,
+            outcome varchar(32) default null,
+            douyin_no varchar(128) default null,
+            order_no varchar(128) default null,
+            followed tinyint not null default 0,
+            messaged tinyint not null default 0,
+            message_content varchar(1000) default null,
+            result_code varchar(64) default null,
+            error_message varchar(1000) default null,
+            first_claim_time datetime default null,
+            completed_time datetime default null,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (task_id),
+            unique key uk_dy_rpa_task_no (task_no),
+            unique key uk_dy_rpa_shop_viewer (shop_config_id, viewer_id),
+            unique key uk_dy_rpa_result_request (result_request_id),
+            key idx_dy_rpa_task_claim (status, shop_config_id, priority, task_id),
+            key idx_dy_rpa_task_batch (batch_no),
+            key idx_dy_rpa_task_lease (lease_expire_time)
+        ) engine=InnoDB default charset=utf8mb4 comment='RPA outreach task queue'
+    </update>
+
+    <update id="createBatchTable">
+        create table if not exists dy_rpa_outreach_batch (
+            batch_id bigint not null auto_increment,
+            batch_no varchar(64) not null,
+            shop_config_id bigint not null,
+            active_shop_key varchar(64) default null,
+            worker_id varchar(128) not null,
+            lease_token varchar(64) not null,
+            status varchar(32) not null default 'leased',
+            task_count int not null default 0,
+            completed_count int not null default 0,
+            lease_expire_time datetime not null,
+            create_time datetime default null,
+            update_time datetime default null,
+            completed_time datetime default null,
+            primary key (batch_id),
+            unique key uk_dy_rpa_batch_no (batch_no),
+            unique key uk_dy_rpa_active_shop (active_shop_key),
+            key idx_dy_rpa_batch_worker (worker_id, status),
+            key idx_dy_rpa_batch_lease (lease_expire_time)
+        ) engine=InnoDB default charset=utf8mb4 comment='RPA outreach leased batches'
+    </update>
+
+    <update id="upgradeRoomShopKeyLength">
+        alter table dy_rpa_room_shop modify column room_key varchar(128) not null
+    </update>
+
+    <update id="upgradeTaskSecUidLength">
+        alter table dy_rpa_outreach_task modify column sec_uid varchar(256) not null
+    </update>
+
+    <update id="releaseExpiredTasks">
+        update dy_rpa_outreach_task
+        set status = if(attempt_count &gt;= max_attempts, 'failed', 'pending'),
+            lease_token = null,
+            worker_id = null,
+            lease_expire_time = null,
+            result_code = if(attempt_count &gt;= max_attempts, 'LEASE_EXHAUSTED', result_code),
+            error_message = if(attempt_count &gt;= max_attempts, '任务租约多次过期', error_message),
+            completed_time = if(attempt_count &gt;= max_attempts, sysdate(), null),
+            update_time = sysdate()
+        where status = 'leased'
+          and lease_expire_time &lt; sysdate()
+    </update>
+
+    <update id="expireBatches">
+        update dy_rpa_outreach_batch
+        set status = 'expired',
+            active_shop_key = null,
+            completed_time = sysdate(),
+            update_time = sysdate()
+        where status = 'leased'
+          and lease_expire_time &lt; sysdate()
+    </update>
+
+    <insert id="prepareTasks">
+        insert ignore into dy_rpa_outreach_task(
+            task_no, viewer_id, lead_id, shop_config_id, sec_uid, profile_url,
+            status, priority, attempt_count, max_attempts, create_time, update_time
+        )
+        select replace(uuid(), '-', ''), ranked.viewer_id, ranked.lead_id, ranked.shop_config_id,
+               ranked.sec_uid, concat('https://www.douyin.com/user/', ranked.sec_uid),
+               'pending', ranked.priority, 0, 5, sysdate(), sysdate()
+        from (
+            select l.viewer_id, l.lead_id, rs.shop_config_id, v.sec_uid,
+                   (ifnull(v.has_comment, 0) * 1000 + least(ifnull(v.comment_count, 0), 100) * 10
+                    + least(datediff(curdate(), ifnull(v.first_seen_date, curdate())), 365)) as priority,
+                   row_number() over (
+                       partition by l.viewer_id, rs.shop_config_id
+                       order by l.lead_date desc, l.lead_id desc
+                   ) as rn
+            from dy_viewer_daily_lead l
+            inner join dy_viewer v on v.viewer_id = l.viewer_id
+            inner join dy_rpa_room_shop rs on rs.room_key = l.room_key
+            inner join dy_rpa_shop_config sc on sc.shop_config_id = rs.shop_config_id and sc.status = '0'
+            where v.sec_uid is not null
+              and trim(v.sec_uid) != ''
+              and ifnull(v.status, 'new') = 'new'
+              and (v.last_seen_date is null or v.last_seen_date &gt;= date_sub(curdate(), interval 30 day))
+        ) ranked
+        where ranked.rn = 1
+        order by ranked.priority desc, ranked.lead_id asc
+        limit 1000
+    </insert>
+
+    <select id="selectClaimableShop" resultType="java.util.HashMap">
+        select sc.shop_config_id as shopConfigId,
+               sc.shop_code as shopCode,
+               sc.shop_name as shopName,
+               sc.douyin_account_code as douyinAccountCode,
+               sc.douyin_shop_name as douyinShopName,
+               sc.message_template as messageTemplate,
+               sc.daily_limit as dailyLimit,
+               (
+                   select count(1)
+                   from dy_rpa_outreach_task done
+                   where done.shop_config_id = sc.shop_config_id
+                     and done.completed_time &gt;= curdate()
+                     and done.status in ('ordered', 'contacted')
+               ) as dailyCompleted,
+               sc.daily_limit - (
+                   select count(1)
+                   from dy_rpa_outreach_task done
+                   where done.shop_config_id = sc.shop_config_id
+                     and done.completed_time &gt;= curdate()
+                     and done.status in ('ordered', 'contacted')
+               ) as dailyRemaining
+        from dy_rpa_outreach_task t
+        inner join dy_rpa_shop_config sc on sc.shop_config_id = t.shop_config_id and sc.status = '0'
+        where t.status = 'pending'
+          and t.attempt_count &lt; t.max_attempts
+          <if test="preferredShopCode != null and preferredShopCode != ''">
+            and sc.shop_code = #{preferredShopCode}
+          </if>
+          and not exists (
+              select 1 from dy_rpa_outreach_batch b
+              where b.shop_config_id = sc.shop_config_id and b.status = 'leased'
+          )
+          and (
+              select count(1)
+              from dy_rpa_outreach_task done
+              where done.shop_config_id = sc.shop_config_id
+                and done.completed_time &gt;= curdate()
+                and done.status in ('ordered', 'contacted')
+          ) &lt; sc.daily_limit
+        order by t.priority desc, t.task_id asc
+        limit 1
+    </select>
+
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="batchId">
+        insert ignore into dy_rpa_outreach_batch(
+            batch_no, shop_config_id, active_shop_key, worker_id, lease_token,
+            status, task_count, completed_count, lease_expire_time, create_time, update_time
+        ) values(
+            #{batchNo}, #{shopConfigId}, cast(#{shopConfigId} as char), #{workerId}, #{leaseToken},
+            'leased', 0, 0, date_add(sysdate(), interval #{leaseMinutes} minute), sysdate(), sysdate()
+        )
+    </insert>
+
+    <select id="selectPendingTaskIds" resultType="java.lang.Long">
+        select task_id
+        from dy_rpa_outreach_task
+        where shop_config_id = #{shopConfigId}
+          and status = 'pending'
+          and attempt_count &lt; max_attempts
+        order by priority desc, task_id asc
+        limit #{limit}
+        for update skip locked
+    </select>
+
+    <update id="leaseTasks">
+        update dy_rpa_outreach_task
+        set status = 'leased',
+            batch_no = #{batchNo},
+            lease_token = #{leaseToken},
+            worker_id = #{workerId},
+            lease_expire_time = date_add(sysdate(), interval #{leaseMinutes} minute),
+            attempt_count = attempt_count + 1,
+            first_claim_time = ifnull(first_claim_time, sysdate()),
+            update_time = sysdate()
+        where task_id in
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+            #{taskId}
+        </foreach>
+          and status = 'pending'
+    </update>
+
+    <update id="updateBatchTaskCount">
+        update dy_rpa_outreach_batch
+        set task_count = #{taskCount}, update_time = sysdate()
+        where batch_no = #{batchNo}
+    </update>
+
+    <select id="selectBatch" resultType="java.util.HashMap">
+        select b.batch_id as batchId, b.batch_no as batchNo, b.shop_config_id as shopConfigId,
+               b.worker_id as workerId, b.lease_token as leaseToken, b.status,
+               b.task_count as taskCount, b.completed_count as completedCount,
+               b.lease_expire_time as leaseExpiresAt, b.create_time as createTime,
+               sc.shop_code as shopCode, sc.shop_name as shopName,
+               sc.douyin_account_code as douyinAccountCode,
+               sc.douyin_shop_name as douyinShopName,
+               sc.message_template as messageTemplate, sc.daily_limit as dailyLimit
+        from dy_rpa_outreach_batch b
+        inner join dy_rpa_shop_config sc on sc.shop_config_id = b.shop_config_id
+        where b.batch_no = #{batchNo}
+        limit 1
+    </select>
+
+    <select id="selectBatchTasks" resultType="java.util.HashMap">
+        select t.task_id as taskId, t.task_no as taskNo, t.lead_id as leadId, t.viewer_id as viewerId,
+               t.sec_uid as secUid, t.profile_url as profileUrl, t.status, t.priority,
+               t.attempt_count as attemptCount, v.nickname,
+               ifnull(v.has_comment, 0) as hasComment, ifnull(v.comment_count, 0) as commentCount,
+               v.last_comment_content as lastCommentContent,
+               (
+                   select ifnull(sum(s.estimated_stay_seconds), 0)
+                   from dy_live_viewer_stay s
+                   where s.viewer_id = t.viewer_id
+                     and s.room_key = l.room_key
+                     and s.last_seen_at &gt;= l.lead_date
+                     and s.first_seen_at &lt; date_add(l.lead_date, interval 1 day)
+               ) as estimatedStaySeconds,
+               l.lead_date as leadDate,
+               coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as liveRoomName
+        from dy_rpa_outreach_task t
+        inner join dy_viewer v on v.viewer_id = t.viewer_id
+        inner join dy_viewer_daily_lead l on l.lead_id = t.lead_id
+        left join dy_live_room r on r.room_key = l.room_key
+        where t.batch_no = #{batchNo} and t.status = 'leased'
+        order by t.priority desc, t.task_id asc
+    </select>
+
+    <update id="heartbeatBatch">
+        update dy_rpa_outreach_batch
+        set lease_expire_time = date_add(sysdate(), interval #{leaseMinutes} minute),
+            update_time = sysdate()
+        where batch_no = #{batchNo}
+          and lease_token = #{leaseToken}
+          and worker_id = #{workerId}
+          and status = 'leased'
+          and lease_expire_time &gt; sysdate()
+    </update>
+
+    <update id="heartbeatTasks">
+        update dy_rpa_outreach_task
+        set lease_expire_time = date_add(sysdate(), interval #{leaseMinutes} minute),
+            update_time = sysdate()
+        where batch_no = #{batchNo}
+          and lease_token = #{leaseToken}
+          and worker_id = #{workerId}
+          and status = 'leased'
+    </update>
+
+    <select id="selectTaskForUpdate" resultType="java.util.HashMap">
+        select task_id as taskId, task_no as taskNo, viewer_id as viewerId, lead_id as leadId,
+               shop_config_id as shopConfigId, status, attempt_count as attemptCount,
+               max_attempts as maxAttempts, batch_no as batchNo, lease_token as leaseToken,
+               worker_id as workerId, lease_expire_time as leaseExpiresAt,
+               result_request_id as resultRequestId, outcome
+        from dy_rpa_outreach_task
+        where task_no = #{taskNo}
+        limit 1
+        for update
+    </select>
+
+    <select id="selectTaskByRequestId" resultType="java.util.HashMap">
+        select task_no as taskNo, status, outcome, order_no as orderNo,
+               completed_time as completedTime, result_request_id as requestId
+        from dy_rpa_outreach_task
+        where result_request_id = #{requestId}
+        limit 1
+    </select>
+
+    <update id="updateTaskResult">
+        update dy_rpa_outreach_task
+        set status = #{status},
+            result_request_id = #{requestId},
+            outcome = #{outcome},
+            douyin_no = nullif(#{douyinNo}, ''),
+            order_no = nullif(#{orderNo}, ''),
+            followed = #{followed},
+            messaged = #{messaged},
+            message_content = nullif(#{messageContent}, ''),
+            result_code = nullif(#{resultCode}, ''),
+            error_message = nullif(#{errorMessage}, ''),
+            lease_token = null,
+            worker_id = null,
+            lease_expire_time = null,
+            completed_time = <choose><when test="status == 'pending'">null</when><otherwise>sysdate()</otherwise></choose>,
+            update_time = sysdate()
+        where task_id = #{taskId} and status = 'leased'
+    </update>
+
+    <update id="refreshBatchProgress">
+        update dy_rpa_outreach_batch b
+        set completed_count = (
+                select count(1) from dy_rpa_outreach_task t
+                where t.batch_no = b.batch_no and t.status != 'leased'
+            ),
+            status = if(
+                exists(select 1 from dy_rpa_outreach_task t where t.batch_no = b.batch_no and t.status = 'leased'),
+                'leased', 'completed'
+            ),
+            active_shop_key = if(
+                exists(select 1 from dy_rpa_outreach_task t where t.batch_no = b.batch_no and t.status = 'leased'),
+                b.active_shop_key, null
+            ),
+            completed_time = if(
+                exists(select 1 from dy_rpa_outreach_task t where t.batch_no = b.batch_no and t.status = 'leased'),
+                null, sysdate()
+            ),
+            update_time = sysdate()
+        where b.batch_no = #{batchNo} and b.status = 'leased'
+    </update>
+
+    <update id="markViewerOrdered">
+        update dy_viewer v
+        inner join dy_viewer_daily_lead l on l.viewer_id = v.viewer_id and l.lead_id = #{leadId}
+        set v.status = 'pre_ordered',
+            v.order_no = #{orderNo},
+            v.remark = concat_ws('；', nullif(v.remark, ''), #{remark}),
+            v.manual_update_time = sysdate(),
+            v.update_time = sysdate(),
+            l.status = 'pre_ordered',
+            l.order_no = #{orderNo},
+            l.remark = concat_ws('；', nullif(l.remark, ''), #{remark}),
+            l.manual_update_time = sysdate(),
+            l.update_time = sysdate()
+    </update>
+
+    <update id="markViewerContacted">
+        update dy_viewer v
+        inner join dy_viewer_daily_lead l on l.viewer_id = v.viewer_id and l.lead_id = #{leadId}
+        set v.status = 'following',
+            v.last_follow_time = sysdate(),
+            v.manual_update_time = sysdate(),
+            v.update_time = sysdate(),
+            l.status = 'following',
+            l.last_follow_time = sysdate(),
+            l.manual_update_time = sysdate(),
+            l.update_time = sysdate()
+    </update>
+
+    <insert id="insertOutreachFollowRecord">
+        insert into dy_viewer_follow_record(
+            lead_id, viewer_id, follow_content, follow_result, next_follow_time,
+            operator_id, operator_name, create_time
+        ) values(
+            #{leadId}, #{viewerId}, #{followContent}, #{followResult}, null,
+            null, #{workerId}, sysdate()
+        )
+    </insert>
+
+    <update id="releaseBatchTasks">
+        update dy_rpa_outreach_task
+        set status = if(attempt_count &gt;= max_attempts, 'failed', 'pending'),
+            lease_token = null,
+            worker_id = null,
+            lease_expire_time = null,
+            result_code = if(attempt_count &gt;= max_attempts, 'RELEASE_EXHAUSTED', result_code),
+            error_message = if(attempt_count &gt;= max_attempts, '任务释放次数过多', error_message),
+            completed_time = if(attempt_count &gt;= max_attempts, sysdate(), null),
+            update_time = sysdate()
+        where batch_no = #{batchNo}
+          and lease_token = #{leaseToken}
+          and worker_id = #{workerId}
+          and status = 'leased'
+    </update>
+
+    <update id="markBatchReleased">
+        update dy_rpa_outreach_batch
+        set status = 'released', active_shop_key = null, completed_time = sysdate(), update_time = sysdate()
+        where batch_no = #{batchNo}
+          and lease_token = #{leaseToken}
+          and worker_id = #{workerId}
+          and status = 'leased'
+    </update>
+
+    <select id="selectShopConfigList" resultType="java.util.HashMap">
+        select sc.shop_config_id as shopConfigId, sc.shop_code as shopCode, sc.shop_name as shopName,
+               sc.douyin_account_code as douyinAccountCode, sc.douyin_shop_name as douyinShopName,
+               sc.message_template as messageTemplate, sc.daily_limit as dailyLimit, sc.status,
+               sc.remark, sc.create_time as createTime, sc.update_time as updateTime,
+               group_concat(rs.room_key order by rs.room_key separator '、') as roomKeys,
+               count(rs.room_key) as roomCount
+        from dy_rpa_shop_config sc
+        left join dy_rpa_room_shop rs on rs.shop_config_id = sc.shop_config_id
+        group by sc.shop_config_id
+        order by sc.status asc, sc.shop_config_id asc
+    </select>
+
+    <select id="selectUnmappedRooms" resultType="java.util.HashMap">
+        select r.room_key as roomKey, r.room_name as roomName, r.last_report_time as lastReportTime
+        from dy_live_room r
+        left join dy_rpa_room_shop rs on rs.room_key = r.room_key
+        where rs.room_key is null
+        order by r.last_report_time desc, r.room_id desc
+    </select>
+
+    <insert id="insertShopConfig" useGeneratedKeys="true" keyProperty="shopConfigId">
+        insert into dy_rpa_shop_config(
+            shop_code, shop_name, douyin_account_code, douyin_shop_name,
+            message_template, daily_limit, status, remark, create_time, update_time
+        ) values(
+            #{shopCode}, #{shopName}, #{douyinAccountCode}, #{douyinShopName},
+            #{messageTemplate}, #{dailyLimit}, #{status}, #{remark}, sysdate(), sysdate()
+        )
+    </insert>
+
+    <update id="updateShopConfig">
+        update dy_rpa_shop_config
+        set shop_code = #{shopCode}, shop_name = #{shopName},
+            douyin_account_code = #{douyinAccountCode}, douyin_shop_name = #{douyinShopName},
+            message_template = #{messageTemplate}, daily_limit = #{dailyLimit},
+            status = #{status}, remark = #{remark}, update_time = sysdate()
+        where shop_config_id = #{shopConfigId}
+    </update>
+
+    <select id="selectShopConfigById" resultType="java.util.HashMap">
+        select shop_config_id as shopConfigId, shop_code as shopCode, shop_name as shopName,
+               douyin_account_code as douyinAccountCode, douyin_shop_name as douyinShopName,
+               message_template as messageTemplate, daily_limit as dailyLimit, status, remark
+        from dy_rpa_shop_config
+        where shop_config_id = #{shopConfigId}
+        limit 1
+    </select>
+
+    <delete id="deleteRoomBindings">
+        delete from dy_rpa_room_shop where shop_config_id = #{shopConfigId}
+    </delete>
+
+    <insert id="upsertRoomBindings">
+        insert into dy_rpa_room_shop(room_key, shop_config_id, create_time, update_time)
+        values
+        <foreach collection="roomKeys" item="roomKey" separator=",">
+            (#{roomKey}, #{shopConfigId}, sysdate(), sysdate())
+        </foreach>
+        on duplicate key update shop_config_id = values(shop_config_id), update_time = sysdate()
+    </insert>
+</mapper>

@@ -84,6 +84,9 @@
         <el-table-column label="直播间" prop="live_room_name" min-width="170" show-overflow-tooltip>
           <template #default="scope">{{ roomName(scope.row) }}</template>
         </el-table-column>
+        <el-table-column label="停留" width="112" align="center">
+          <template #default="scope">{{ formatDuration(scope.row.estimated_stay_seconds) }}</template>
+        </el-table-column>
         <el-table-column label="评论" min-width="220" show-overflow-tooltip>
           <template #default="scope">
             <div class="comment-cell">
@@ -147,11 +150,23 @@
           <el-descriptions-item label="意向">{{ intentLabel(detail.lead.intent) }}</el-descriptions-item>
           <el-descriptions-item label="负责人">{{ detail.lead.owner_name || '-' }}</el-descriptions-item>
           <el-descriptions-item label="订单号">{{ detail.lead.order_no || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="累计停留">{{ formatDuration(detailStaySeconds) }}</el-descriptions-item>
+          <el-descriptions-item label="在线片段">{{ detail.stays?.length || 0 }} 次</el-descriptions-item>
           <el-descriptions-item label="主页" :span="2">
             <el-button link type="primary" icon="CopyDocument" @click="copyProfile(detail.lead)">复制抖音主页链接</el-button>
           </el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detail.lead.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
+
+        <h4>在线记录</h4>
+        <el-empty v-if="!detail.stays || detail.stays.length === 0" description="暂无在线记录" />
+        <el-timeline v-else>
+          <el-timeline-item v-for="item in detail.stays" :key="item.stay_id"
+            :timestamp="`${formatDateTime(item.first_seen_at)} 至 ${formatDateTime(item.last_seen_at)}`">
+            <strong>{{ formatDuration(item.estimated_stay_seconds) }}</strong>
+            <span class="visit-meta">采样 {{ item.observation_count || 1 }} 次</span>
+          </el-timeline-item>
+        </el-timeline>
 
         <h4>评论记录</h4>
         <el-empty v-if="!detail.comments || detail.comments.length === 0" description="暂无评论" />
@@ -256,7 +271,7 @@ const followOpen = ref(false)
 const orderedOpen = ref(false)
 const currentLead = ref(null)
 const orderedLead = ref(null)
-const detail = ref({ lead: null, comments: [], visits: [], followRecords: [] })
+const detail = ref({ lead: null, comments: [], visits: [], stays: [], followRecords: [] })
 
 const queryParams = reactive({
   pageNum: 1,
@@ -311,6 +326,12 @@ const detailRoomName = computed(() => {
   return lead.display_room_name || lead.live_room_name || '-'
 })
 
+const detailStaySeconds = computed(() => {
+  return (detail.value.stays || []).reduce((total, item) => {
+    return total + Number(item.estimated_stay_seconds || 0)
+  }, 0)
+})
+
 const ownerInputDisabled = computed(() => {
   if (!currentLead.value) return false
   return hasOrderNo(currentLead.value) || hasOwner(currentLead.value)
@@ -347,6 +368,16 @@ function formatLocalDate(date) {
 function formatDateTime(value) {
   if (value === undefined || value === null || value === '') return '-'
   return String(value).replace('T', ' ').replace(/\.\d+$/, '').slice(0, 19)
+}
+
+function formatDuration(value) {
+  const seconds = Math.max(0, Number(value || 0))
+  if (!seconds) return '-'
+  const minutes = Math.max(1, Math.round(seconds / 60))
+  const hours = Math.floor(minutes / 60)
+  const restMinutes = minutes % 60
+  if (!hours) return `约 ${minutes} 分钟`
+  return restMinutes ? `约 ${hours} 小时 ${restMinutes} 分钟` : `约 ${hours} 小时`
 }
 
 function toSnake(key) {
@@ -523,7 +554,7 @@ function handleExport() {
 
 function openDetail(row) {
   getViewerLead(row.lead_id).then((res) => {
-    detail.value = res.data || { lead: row, comments: [], visits: [], followRecords: [] }
+    detail.value = res.data || { lead: row, comments: [], visits: [], stays: [], followRecords: [] }
     detailOpen.value = true
   })
 }

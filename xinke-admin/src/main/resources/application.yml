@@ -69,13 +69,13 @@ spring:
     # redis 配置
     redis:
       # 地址
-      host: ${REDIS_HOST:47.116.62.234}
+      host: 47.116.62.234
       # 端口，默认为6379
-      port: ${REDIS_PORT:6379}
+      port: 6379
       # 数据库索引
-      database: ${REDIS_DATABASE:0}
+      database: 0
       # 密码
-      password: ${REDIS_PASSWORD:Xinke123.}
+      password: Xinke123.
       # 连接超时时间
       timeout: 10s
       lettuce:
@@ -150,7 +150,7 @@ springdoc:
 
 # 跨域配置。生产环境只允许明确配置的来源；Chrome 插件依赖 host_permissions 发起请求。
 cors:
-  allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,http://47.116.62.234}
+  allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,http://47.116.62.234,chrome-extension://*}
 
 # 外部 iframe 白名单，多个来源用空格分隔。
 security:
@@ -160,6 +160,10 @@ security:
 live:
   plugin:
     report-key: ${LIVE_PLUGIN_REPORT_KEY:}
+  rpa:
+    # 生产环境通过环境变量配置；本地密钥放在 config/application-local.yml。
+    api-key: ${LIVE_RPA_API_KEY:}
+    lease-minutes: ${LIVE_RPA_LEASE_MINUTES:30}
 
 # 防盗链配置
 referer:

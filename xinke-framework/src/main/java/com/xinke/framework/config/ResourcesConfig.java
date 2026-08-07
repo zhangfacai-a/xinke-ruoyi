@@ -29,7 +29,7 @@ public class ResourcesConfig implements WebMvcConfigurer
     @Autowired
     private RepeatSubmitInterceptor repeatSubmitInterceptor;
 
-    @Value("${cors.allowed-origin-patterns:http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*}")
+    @Value("${cors.allowed-origin-patterns:http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,chrome-extension://*}")
     private String allowedOriginPatterns;
 
     @Override
@@ -66,7 +66,7 @@ public class ResourcesConfig implements WebMvcConfigurer
                 .filter(value -> !value.isEmpty())
                 .toList();
         config.setAllowedOriginPatterns(origins);
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Plugin-Key"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Plugin-Key", "X-RPA-Key"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(false);

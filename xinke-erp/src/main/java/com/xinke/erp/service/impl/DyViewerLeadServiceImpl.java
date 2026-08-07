@@ -28,6 +28,15 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
     private static final ZoneId ZONE = ZoneId.systemDefault();
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DATE_TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final int DEFAULT_SAMPLE_INTERVAL_SECONDS = 60;
+    private static final int MIN_SAMPLE_INTERVAL_SECONDS = 30;
+    private static final int MAX_SAMPLE_INTERVAL_SECONDS = 300;
+    private static final int PRESENCE_GAP_MULTIPLIER = 3;
+    private static final int OBSERVATION_RETENTION_DAYS = 7;
+    private static final long OBSERVATION_CLEANUP_INTERVAL_MS = 6L * 60 * 60 * 1000;
+
+    private static volatile boolean presenceTablesReady;
+    private static volatile long lastObservationCleanupAt;
 
     @Autowired
     private DyViewerLeadMapper dyViewerLeadMapper;
@@ -43,8 +52,14 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
 
         int inserted = 0;
         int leadTouched = 0;
+        int observationsInserted = 0;
+        int staySessionsTouched = 0;
         if ("audiences".equals(payloadType) || "online_audiences".equals(payloadType))
         {
+            if ("online_audiences".equals(payloadType))
+            {
+                ensurePresenceTables();
+            }
             List<DyViewerPayload> audiences = report.getAudiences();
             if (audiences != null)
             {
@@ -54,10 +69,20 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
                     {
                         continue;
                     }
-                    upsertViewerLead(report, audience);
+                    Long viewerId = upsertViewerLead(report, audience);
+                    if ("online_audiences".equals(payloadType)
+                            && recordAudiencePresence(report, audience, viewerId))
+                    {
+                        observationsInserted++;
+                        staySessionsTouched++;
+                    }
                     inserted++;
                     leadTouched++;
                 }
+            }
+            if ("online_audiences".equals(payloadType))
+            {
+                cleanupExpiredAudienceObservations();
             }
         }
         else if ("comments".equals(payloadType))
@@ -77,6 +102,8 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
             }
         }
 
+        upsertLiveRoom(canonicalRoomKey(report), report.getLiveRoomName(), report.getSource());
+
         Map<String, Object> data = new HashMap<>();
         data.put("batchId", batchId);
         data.put("payloadType", payloadType);
@@ -84,6 +111,8 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         data.put("inserted", inserted);
         data.put("duplicated", Math.max(itemCount - inserted, 0));
         data.put("leadTouched", leadTouched);
+        data.put("observationsInserted", observationsInserted);
+        data.put("staySessionsTouched", staySessionsTouched);
         return data;
     }
 
@@ -147,6 +176,7 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
     @Override
     public List<Map<String, Object>> listLeads(Map<String, Object> query)
     {
+        ensurePresenceTables();
         refreshLeadRules();
         return dyViewerLeadMapper.selectLeadList(query);
     }
@@ -154,6 +184,7 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
     @Override
     public List<DyViewerLeadExport> exportLeads(Map<String, Object> query)
     {
+        ensurePresenceTables();
         refreshLeadRules();
         List<Map<String, Object>> leads = dyViewerLeadMapper.selectLeadList(query);
         List<DyViewerLeadExport> rows = new ArrayList<>();
@@ -167,6 +198,7 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
             row.setProfileUrl(profileUrl(lead.get("sec_uid")));
             row.setCommentCount(asInteger(lead.get("comment_count")));
             row.setComments(joinComments(leadId));
+            row.setEstimatedStayMinutes(toEstimatedMinutes(lead.get("estimated_stay_seconds")));
             row.setIntent(intentLabel(str(lead.get("intent"))));
             row.setStatus(statusLabel(str(lead.get("status"))));
             row.setOwnerName(str(lead.get("owner_name")));
@@ -193,11 +225,13 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
     @Override
     public Map<String, Object> getLeadDetail(Long leadId)
     {
+        ensurePresenceTables();
         refreshLeadRules();
         Map<String, Object> data = new HashMap<>();
         data.put("lead", dyViewerLeadMapper.selectLeadById(leadId));
         data.put("comments", dyViewerLeadMapper.selectCommentsByLeadId(leadId));
         data.put("visits", dyViewerLeadMapper.selectVisitsByLeadId(leadId));
+        data.put("stays", dyViewerLeadMapper.selectViewerStaysByLeadId(leadId));
         data.put("followRecords", dyViewerLeadMapper.selectFollowRecordsByLeadId(leadId));
         return data;
     }
@@ -343,7 +377,6 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
     private Long insertBatch(DyCaptureReport report, String payloadType, int itemCount)
     {
         String roomKey = canonicalRoomKey(report);
-        upsertLiveRoom(roomKey, report.getLiveRoomName(), report.getSource());
         Map<String, Object> data = new HashMap<>();
         data.put("batchNo", hasText(report.getBatchNo()) ? report.getBatchNo() : nextBatchNo(roomKey, payloadType));
         data.put("roomKey", roomKey);
@@ -357,12 +390,11 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         return asLong(data.get("batchId"));
     }
 
-    private void upsertViewerLead(DyCaptureReport report, DyViewerPayload audience)
+    private Long upsertViewerLead(DyCaptureReport report, DyViewerPayload audience)
     {
         String leadDate = dateOf(audience.getCapturedAt());
         String roomKey = captureRoomKey(report, audience);
         String roomName = trim(report.getLiveRoomName(), 100);
-        upsertLiveRoom(roomKey, roomName, report.getSource());
 
         Map<String, Object> viewer = new HashMap<>();
         viewer.put("secUid", audience.getSecUid());
@@ -370,7 +402,11 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         viewer.put("gender", audience.getGender() == null ? 0 : audience.getGender());
         viewer.put("leadDate", leadDate);
         dyViewerLeadMapper.insertViewer(viewer);
-        Long viewerId = dyViewerLeadMapper.selectViewerIdBySecUid(audience.getSecUid());
+        Long viewerId = asLong(viewer.get("viewerId"));
+        if (viewerId == null)
+        {
+            viewerId = dyViewerLeadMapper.selectViewerIdBySecUid(audience.getSecUid());
+        }
 
         Map<String, Object> lead = new HashMap<>();
         lead.put("leadDate", leadDate);
@@ -382,13 +418,21 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
         lead.put("nickname", trim(audience.getNickname(), 100));
         dyViewerLeadMapper.insertDailyLead(lead);
 
-        Long leadId = dyViewerLeadMapper.selectLeadId(leadDate, roomKey, audience.getSecUid());
+        Long leadId = asLong(lead.get("leadId"));
+        if (leadId == null)
+        {
+            leadId = dyViewerLeadMapper.selectLeadId(leadDate, roomKey, audience.getSecUid());
+        }
         if (leadId != null && hasText(audience.getNickname()))
         {
-            dyViewerLeadMapper.bindUnmatchedComments(leadId, viewerId, leadDate, roomKey, audience.getNickname());
-            dyViewerLeadMapper.refreshLeadCommentStats(leadId);
-            dyViewerLeadMapper.updateViewerCommentStats(viewerId);
+            int bound = dyViewerLeadMapper.bindUnmatchedComments(leadId, viewerId, leadDate, roomKey, audience.getNickname());
+            if (bound > 0)
+            {
+                dyViewerLeadMapper.refreshLeadCommentStats(leadId);
+                dyViewerLeadMapper.updateViewerCommentStats(viewerId);
+            }
         }
+        return viewerId;
     }
 
     private int insertComment(DyCaptureReport report, DyViewerCommentPayload comment)
@@ -450,6 +494,146 @@ public class DyViewerLeadServiceImpl implements IDyViewerLeadService
             }
         }
         return inserted;
+    }
+
+    private boolean recordAudiencePresence(DyCaptureReport report, DyViewerPayload audience, Long viewerId)
+    {
+        long observedAt = observedAt(report, audience);
+        int sampleIntervalSeconds = sampleIntervalSeconds(report);
+        String roomKey = captureRoomKey(report, audience);
+        String roomId = trim(audience.getRoomId(), 128);
+        String liveSessionKey = liveSessionKey(report, roomKey, roomId, observedAt);
+        long observationBucket = observedAt / (sampleIntervalSeconds * 1000L);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("liveSessionKey", liveSessionKey);
+        data.put("roomKey", roomKey);
+        data.put("roomId", roomId);
+        data.put("douyinUserId", trim(report.getUserId(), 128));
+        data.put("liveRoomName", trim(report.getLiveRoomName(), 100));
+        data.put("viewerId", viewerId);
+        data.put("secUid", trim(audience.getSecUid(), 256));
+        data.put("nickname", trim(audience.getNickname(), 128));
+        data.put("observedAt", observedAt);
+        data.put("observationBucket", observationBucket);
+        data.put("sampleIntervalSeconds", sampleIntervalSeconds);
+        data.put("clientId", trim(report.getClientId(), 128));
+        data.put("source", trim(audience.getSource(), 64));
+
+        if (dyViewerLeadMapper.insertAudienceObservation(data) <= 0)
+        {
+            return false;
+        }
+
+        dyViewerLeadMapper.upsertLiveSession(data);
+        Map<String, Object> latest = dyViewerLeadMapper.selectLatestViewerStay(liveSessionKey, data.get("secUid").toString());
+        Long lastSeenAt = latest == null ? null : asLong(latest.get("lastSeenAt"));
+        Long firstSeenAt = latest == null ? null : asLong(latest.get("firstSeenAt"));
+        long maxContinuousGap = sampleIntervalSeconds * PRESENCE_GAP_MULTIPLIER * 1000L;
+
+        if (latest != null && lastSeenAt != null && observedAt < lastSeenAt)
+        {
+            return true;
+        }
+
+        if (latest != null && lastSeenAt != null && firstSeenAt != null
+                && observedAt >= lastSeenAt && observedAt - lastSeenAt <= maxContinuousGap)
+        {
+            int observationCount = asInteger(latest.get("observationCount")) + 1;
+            int estimatedStaySeconds = estimatedStaySeconds(firstSeenAt, observedAt, sampleIntervalSeconds);
+            data.put("stayId", asLong(latest.get("stayId")));
+            data.put("observationCount", observationCount);
+            data.put("estimatedStaySeconds", estimatedStaySeconds);
+            dyViewerLeadMapper.updateViewerStay(data);
+            return true;
+        }
+
+        data.put("estimatedStaySeconds", sampleIntervalSeconds);
+        dyViewerLeadMapper.insertViewerStay(data);
+        return true;
+    }
+
+    private void ensurePresenceTables()
+    {
+        if (presenceTablesReady)
+        {
+            return;
+        }
+        synchronized (DyViewerLeadServiceImpl.class)
+        {
+            if (presenceTablesReady)
+            {
+                return;
+            }
+            dyViewerLeadMapper.createLiveSessionTable();
+            dyViewerLeadMapper.createAudienceObservationTable();
+            dyViewerLeadMapper.createViewerStayTable();
+            presenceTablesReady = true;
+        }
+    }
+
+    private void cleanupExpiredAudienceObservations()
+    {
+        long now = System.currentTimeMillis();
+        if (now - lastObservationCleanupAt < OBSERVATION_CLEANUP_INTERVAL_MS)
+        {
+            return;
+        }
+        synchronized (DyViewerLeadServiceImpl.class)
+        {
+            if (now - lastObservationCleanupAt < OBSERVATION_CLEANUP_INTERVAL_MS)
+            {
+                return;
+            }
+            dyViewerLeadMapper.deleteExpiredAudienceObservations(OBSERVATION_RETENTION_DAYS);
+            lastObservationCleanupAt = now;
+        }
+    }
+
+    private long observedAt(DyCaptureReport report, DyViewerPayload audience)
+    {
+        if (audience != null && audience.getCapturedAt() != null && audience.getCapturedAt() > 0)
+        {
+            return audience.getCapturedAt();
+        }
+        if (report != null && report.getSnapshotAt() != null && report.getSnapshotAt() > 0)
+        {
+            return report.getSnapshotAt();
+        }
+        return System.currentTimeMillis();
+    }
+
+    private int sampleIntervalSeconds(DyCaptureReport report)
+    {
+        int value = report == null || report.getSampleIntervalSeconds() == null
+                ? DEFAULT_SAMPLE_INTERVAL_SECONDS : report.getSampleIntervalSeconds();
+        return Math.max(MIN_SAMPLE_INTERVAL_SECONDS, Math.min(MAX_SAMPLE_INTERVAL_SECONDS, value));
+    }
+
+    private String liveSessionKey(DyCaptureReport report, String roomKey, String roomId, long observedAt)
+    {
+        String configured = report == null ? "" : trim(report.getLiveSessionKey(), 128);
+        if (hasText(configured))
+        {
+            return configured;
+        }
+        if (hasText(roomId))
+        {
+            return roomId;
+        }
+        return trim(roomKey + "-" + dateOf(observedAt), 128);
+    }
+
+    private int estimatedStaySeconds(long firstSeenAt, long lastSeenAt, int sampleIntervalSeconds)
+    {
+        long seconds = Math.max(0, (lastSeenAt - firstSeenAt) / 1000L) + sampleIntervalSeconds;
+        return seconds > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) seconds;
+    }
+
+    private int toEstimatedMinutes(Object secondsValue)
+    {
+        int seconds = Math.max(0, asInteger(secondsValue));
+        return seconds == 0 ? 0 : Math.max(1, (seconds + 59) / 60);
     }
 
     private void upsertLiveRoom(String roomKey, String roomName, String source)

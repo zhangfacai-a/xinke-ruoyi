@@ -24,6 +24,9 @@ public class DyViewerLeadExport
     @Excel(name = "评论明细", width = 60, wrapText = true)
     private String comments;
 
+    @Excel(name = "估算停留（分钟）", width = 18)
+    private Integer estimatedStayMinutes;
+
     @Excel(name = "意向", width = 12)
     private String intent;
 
@@ -54,6 +57,8 @@ public class DyViewerLeadExport
     public void setCommentCount(Integer commentCount) { this.commentCount = commentCount; }
     public String getComments() { return comments; }
     public void setComments(String comments) { this.comments = comments; }
+    public Integer getEstimatedStayMinutes() { return estimatedStayMinutes; }
+    public void setEstimatedStayMinutes(Integer estimatedStayMinutes) { this.estimatedStayMinutes = estimatedStayMinutes; }
     public String getIntent() { return intent; }
     public void setIntent(String intent) { this.intent = intent; }
     public String getStatus() { return status; }

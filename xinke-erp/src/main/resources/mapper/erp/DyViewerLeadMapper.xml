@@ -114,6 +114,155 @@
         where client_id = #{clientId}
     </update>
 
+    <update id="createLiveSessionTable">
+        create table if not exists dy_live_session (
+            session_id bigint not null auto_increment,
+            live_session_key varchar(128) not null,
+            room_key varchar(128) not null,
+            room_id varchar(128) default null,
+            douyin_user_id varchar(128) default null,
+            live_room_name varchar(128) default null,
+            first_seen_at datetime not null,
+            last_seen_at datetime not null,
+            observation_count bigint not null default 0,
+            sample_interval_seconds int not null default 60,
+            source varchar(64) default null,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (session_id),
+            unique key uk_dy_live_session_key (live_session_key),
+            key idx_dy_live_session_room_time (room_key, last_seen_at)
+        ) engine=InnoDB default charset=utf8mb4 comment='Douyin live capture sessions'
+    </update>
+
+    <update id="createAudienceObservationTable">
+        create table if not exists dy_live_audience_observation (
+            observation_id bigint not null auto_increment,
+            live_session_key varchar(128) not null,
+            room_key varchar(128) not null,
+            room_id varchar(128) default null,
+            viewer_id bigint default null,
+            sec_uid varchar(256) not null,
+            nickname varchar(128) default null,
+            observed_at datetime not null,
+            observation_bucket bigint not null,
+            client_id varchar(128) default null,
+            source varchar(64) default null,
+            create_time datetime default null,
+            primary key (observation_id),
+            unique key uk_dy_audience_observation (live_session_key, sec_uid, observation_bucket),
+            key idx_dy_audience_observation_time (observed_at),
+            key idx_dy_audience_observation_viewer (viewer_id, observed_at)
+        ) engine=InnoDB default charset=utf8mb4 comment='Short-retention observed online audiences'
+    </update>
+
+    <update id="createViewerStayTable">
+        create table if not exists dy_live_viewer_stay (
+            stay_id bigint not null auto_increment,
+            live_session_key varchar(128) not null,
+            room_key varchar(128) not null,
+            room_id varchar(128) default null,
+            viewer_id bigint default null,
+            sec_uid varchar(256) not null,
+            nickname varchar(128) default null,
+            first_seen_at datetime not null,
+            last_seen_at datetime not null,
+            observation_count int not null default 1,
+            estimated_stay_seconds int not null default 0,
+            sample_interval_seconds int not null default 60,
+            client_id varchar(128) default null,
+            source varchar(64) default null,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (stay_id),
+            key idx_dy_viewer_stay_session_viewer (live_session_key, sec_uid, last_seen_at),
+            key idx_dy_viewer_stay_viewer_time (viewer_id, last_seen_at)
+        ) engine=InnoDB default charset=utf8mb4 comment='Estimated viewer stay sessions'
+    </update>
+
+    <insert id="upsertLiveSession">
+        insert into dy_live_session(
+            live_session_key, room_key, room_id, douyin_user_id, live_room_name,
+            first_seen_at, last_seen_at, observation_count, sample_interval_seconds,
+            source, create_time, update_time
+        )
+        values(
+            #{liveSessionKey}, #{roomKey}, #{roomId}, #{douyinUserId}, #{liveRoomName},
+            from_unixtime(#{observedAt} / 1000), from_unixtime(#{observedAt} / 1000), 1, #{sampleIntervalSeconds},
+            #{source}, sysdate(), sysdate()
+        )
+        on duplicate key update
+            room_key = values(room_key),
+            room_id = if(values(room_id) is null or values(room_id) = '', room_id, values(room_id)),
+            douyin_user_id = if(values(douyin_user_id) is null or values(douyin_user_id) = '', douyin_user_id, values(douyin_user_id)),
+            live_room_name = if(values(live_room_name) is null or values(live_room_name) = '', live_room_name, values(live_room_name)),
+            first_seen_at = least(first_seen_at, values(first_seen_at)),
+            last_seen_at = greatest(last_seen_at, values(last_seen_at)),
+            observation_count = ifnull(observation_count, 0) + 1,
+            sample_interval_seconds = values(sample_interval_seconds),
+            source = ifnull(values(source), source),
+            update_time = sysdate()
+    </insert>
+
+    <insert id="insertAudienceObservation">
+        insert ignore into dy_live_audience_observation(
+            live_session_key, room_key, room_id, viewer_id, sec_uid, nickname,
+            observed_at, observation_bucket, client_id, source, create_time
+        )
+        values(
+            #{liveSessionKey}, #{roomKey}, #{roomId}, #{viewerId}, #{secUid}, #{nickname},
+            from_unixtime(#{observedAt} / 1000), #{observationBucket}, #{clientId}, #{source}, sysdate()
+        )
+    </insert>
+
+    <select id="selectLatestViewerStay" resultType="java.util.HashMap">
+        select stay_id as stayId,
+               unix_timestamp(first_seen_at) * 1000 as firstSeenAt,
+               unix_timestamp(last_seen_at) * 1000 as lastSeenAt,
+               observation_count as observationCount,
+               estimated_stay_seconds as estimatedStaySeconds,
+               sample_interval_seconds as sampleIntervalSeconds
+        from dy_live_viewer_stay
+        where live_session_key = #{liveSessionKey}
+          and sec_uid = #{secUid}
+        order by last_seen_at desc, stay_id desc
+        limit 1
+    </select>
+
+    <insert id="insertViewerStay" useGeneratedKeys="true" keyProperty="stayId">
+        insert into dy_live_viewer_stay(
+            live_session_key, room_key, room_id, viewer_id, sec_uid, nickname,
+            first_seen_at, last_seen_at, observation_count, estimated_stay_seconds,
+            sample_interval_seconds, client_id, source, create_time, update_time
+        )
+        values(
+            #{liveSessionKey}, #{roomKey}, #{roomId}, #{viewerId}, #{secUid}, #{nickname},
+            from_unixtime(#{observedAt} / 1000), from_unixtime(#{observedAt} / 1000), 1, #{estimatedStaySeconds},
+            #{sampleIntervalSeconds}, #{clientId}, #{source}, sysdate(), sysdate()
+        )
+    </insert>
+
+    <update id="updateViewerStay">
+        update dy_live_viewer_stay
+        set room_key = #{roomKey},
+            room_id = if(#{roomId} is null or #{roomId} = '', room_id, #{roomId}),
+            viewer_id = ifnull(#{viewerId}, viewer_id),
+            nickname = if(#{nickname} is null or #{nickname} = '', nickname, #{nickname}),
+            last_seen_at = from_unixtime(#{observedAt} / 1000),
+            observation_count = #{observationCount},
+            estimated_stay_seconds = #{estimatedStaySeconds},
+            sample_interval_seconds = #{sampleIntervalSeconds},
+            client_id = ifnull(#{clientId}, client_id),
+            source = ifnull(#{source}, source),
+            update_time = sysdate()
+        where stay_id = #{stayId}
+    </update>
+
+    <delete id="deleteExpiredAudienceObservations">
+        delete from dy_live_audience_observation
+        where observed_at &lt; date_sub(sysdate(), interval #{retentionDays} day)
+    </delete>
+
     <insert id="insertCaptureBatch" useGeneratedKeys="true" keyProperty="batchId">
         insert ignore into dy_capture_batch(
             batch_no, room_key, douyin_user_id, payload_type, source, live_room_name,
@@ -199,6 +348,7 @@
             #{secUid}, #{nickname}, #{gender}, #{leadDate}, #{leadDate}, sysdate(), sysdate()
         )
         on duplicate key update
+            viewer_id = last_insert_id(viewer_id),
             nickname = values(nickname),
             gender = values(gender),
             last_seen_date = values(last_seen_date),
@@ -233,6 +383,7 @@
             #{nickname}, sysdate(), sysdate()
         )
         on duplicate key update
+            lead_id = last_insert_id(lead_id),
             douyin_user_id = values(douyin_user_id),
             live_room_name = values(live_room_name),
             viewer_id = values(viewer_id),
@@ -518,6 +669,9 @@
             v.last_follow_time, null as next_follow_time, v.manual_update_time,
             v.first_seen_date, v.last_seen_date,
             visit.visit_count, visit.first_visit_date, visit.last_visit_date,
+            ifnull(presence.estimated_stay_seconds, 0) as estimated_stay_seconds,
+            ifnull(presence.stay_session_count, 0) as stay_session_count,
+            presence.last_presence_time,
             latest.create_time, greatest(ifnull(v.update_time, latest.update_time), latest.update_time) as update_time
         from (
             select l.*
@@ -574,6 +728,33 @@
             </where>
             group by l.viewer_id
         ) visit on visit.viewer_id = latest.viewer_id
+        left join (
+            select s.viewer_id,
+                   sum(s.estimated_stay_seconds) as estimated_stay_seconds,
+                   count(1) as stay_session_count,
+                   max(s.last_seen_at) as last_presence_time
+            from dy_live_viewer_stay s
+            left join dy_live_room sr on sr.room_key = s.room_key
+            <where>
+                <if test="leadDate != null and leadDate != ''">
+                    and s.last_seen_at &gt;= concat(#{leadDate}, ' 00:00:00')
+                    and s.first_seen_at &lt; date_add(#{leadDate}, interval 1 day)
+                </if>
+                <if test="beginLeadDate != null and beginLeadDate != ''">
+                    and s.last_seen_at &gt;= concat(#{beginLeadDate}, ' 00:00:00')
+                </if>
+                <if test="endLeadDate != null and endLeadDate != ''">
+                    and s.first_seen_at &lt; date_add(#{endLeadDate}, interval 1 day)
+                </if>
+                <if test="roomKey != null and roomKey != ''">
+                    and s.room_key = #{roomKey}
+                </if>
+                <if test="roomName != null and roomName != ''">
+                    and coalesce(sr.room_name, s.room_key) like concat('%', #{roomName}, '%')
+                </if>
+            </where>
+            group by s.viewer_id
+        ) presence on presence.viewer_id = latest.viewer_id
         <where>
             <if test="nickname != null and nickname != ''">
                 and coalesce(v.nickname, latest.nickname) like concat('%', #{nickname}, '%')
@@ -685,6 +866,29 @@
         where l.viewer_id = (select viewer_id from dy_viewer_daily_lead where lead_id = #{leadId})
         group by l.viewer_id, l.lead_date
         order by l.lead_date desc, max(l.update_time) desc
+    </select>
+
+    <select id="selectViewerStaysByLeadId" resultType="java.util.HashMap">
+        select s.stay_id,
+               s.live_session_key,
+               s.room_key,
+               s.room_id,
+               coalesce(nullif(r.room_name, ''), s.room_key) as live_room_name,
+               s.first_seen_at,
+               s.last_seen_at,
+               s.observation_count,
+               s.estimated_stay_seconds,
+               s.sample_interval_seconds
+        from dy_live_viewer_stay s
+        left join dy_live_room r on r.room_key = s.room_key
+        where s.viewer_id = (select viewer_id from dy_viewer_daily_lead where lead_id = #{leadId})
+          and s.room_key = (select room_key from dy_viewer_daily_lead where lead_id = #{leadId})
+          and s.last_seen_at &gt;= (select lead_date from dy_viewer_daily_lead where lead_id = #{leadId})
+          and s.first_seen_at &lt; date_add(
+              (select lead_date from dy_viewer_daily_lead where lead_id = #{leadId}), interval 1 day
+          )
+        order by s.last_seen_at desc, s.stay_id desc
+        limit 100
     </select>
 
     <select id="selectFollowRecordsByLeadId" resultType="java.util.HashMap">

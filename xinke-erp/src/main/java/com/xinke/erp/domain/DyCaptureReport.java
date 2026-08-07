@@ -11,6 +11,8 @@ public class DyCaptureReport
     private String batchNo;
     @Size(max = 128, message = "roomKey长度不能超过128")
     private String roomKey;
+    @Size(max = 128, message = "liveSessionKey exceeds 128 characters")
+    private String liveSessionKey;
     @Size(max = 128, message = "userId长度不能超过128")
     private String userId;
     @Size(max = 64, message = "source长度不能超过64")
@@ -34,6 +36,10 @@ public class DyCaptureReport
     private String clientName;
     private Integer queueSize;
     private Long clientTime;
+    private Long snapshotAt;
+    private Integer sampleIntervalSeconds;
+    @Size(max = 128, message = "snapshotId exceeds 128 characters")
+    private String snapshotId;
     @Valid
     @Size(max = 500, message = "单次评论上报不能超过500条")
     private List<DyViewerCommentPayload> comments;
@@ -45,6 +51,8 @@ public class DyCaptureReport
     public void setBatchNo(String batchNo) { this.batchNo = batchNo; }
     public String getRoomKey() { return roomKey; }
     public void setRoomKey(String roomKey) { this.roomKey = roomKey; }
+    public String getLiveSessionKey() { return liveSessionKey; }
+    public void setLiveSessionKey(String liveSessionKey) { this.liveSessionKey = liveSessionKey; }
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
     public String getSource() { return source; }
@@ -67,6 +75,12 @@ public class DyCaptureReport
     public void setQueueSize(Integer queueSize) { this.queueSize = queueSize; }
     public Long getClientTime() { return clientTime; }
     public void setClientTime(Long clientTime) { this.clientTime = clientTime; }
+    public Long getSnapshotAt() { return snapshotAt; }
+    public void setSnapshotAt(Long snapshotAt) { this.snapshotAt = snapshotAt; }
+    public Integer getSampleIntervalSeconds() { return sampleIntervalSeconds; }
+    public void setSampleIntervalSeconds(Integer sampleIntervalSeconds) { this.sampleIntervalSeconds = sampleIntervalSeconds; }
+    public String getSnapshotId() { return snapshotId; }
+    public void setSnapshotId(String snapshotId) { this.snapshotId = snapshotId; }
     public List<DyViewerCommentPayload> getComments() { return comments; }
     public void setComments(List<DyViewerCommentPayload> comments) { this.comments = comments; }
     public List<DyViewerPayload> getAudiences() { return audiences; }
