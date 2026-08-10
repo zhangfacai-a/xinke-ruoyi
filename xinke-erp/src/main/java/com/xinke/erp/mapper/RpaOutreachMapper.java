@@ -14,7 +14,9 @@ public interface RpaOutreachMapper
     int createBatchTable();
     int createTrackingConfigTable();
     int createViewerTrackingRuleTable();
+    int createViewerBlacklistTable();
     int initializeTrackingConfig();
+    int upgradeDefaultTrackingLookback();
     int upgradeRoomShopKeyLength();
     int upgradeTaskSecUidLength();
 
@@ -54,4 +56,15 @@ public interface RpaOutreachMapper
     int deleteViewerTrackingRules(@Param("viewerIds") List<Long> viewerIds);
     int insertViewerTrackingRules(Map<String, Object> data);
     int deletePendingTasksByViewerIds(@Param("viewerIds") List<Long> viewerIds);
+    int prepareTasksForViewerIds(@Param("viewerIds") List<Long> viewerIds);
+    int resetCancelledTasksForViewerIds(@Param("viewerIds") List<Long> viewerIds);
+    List<Map<String, Object>> selectWorkbenchCandidates(Map<String, Object> query);
+    List<Map<String, Object>> selectWorkbenchTasks(Map<String, Object> query);
+    List<Map<String, Object>> selectWorkbenchBlacklist(Map<String, Object> query);
+    Map<String, Object> selectWorkbenchStats(Map<String, Object> query);
+    int insertViewerBlacklist(Map<String, Object> data);
+    int cancelBlacklistedTasks(Map<String, Object> data);
+    int closeBatchesWithoutActiveTasks();
+    int deleteBlacklistByIds(@Param("blacklistIds") List<Long> blacklistIds);
+    int deleteRoomBinding(@Param("roomKey") String roomKey);
 }

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.time.LocalDate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
 import com.xinke.erp.domain.RpaTrackingConfigRequest;
 import com.xinke.erp.domain.RpaViewerTrackingRequest;
+import com.xinke.erp.domain.RpaBlacklistRequest;
 import com.xinke.erp.mapper.RpaOutreachMapper;
 import com.xinke.erp.service.IRpaOutreachService;
 
@@ -56,7 +58,9 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
             rpaOutreachMapper.createBatchTable();
             rpaOutreachMapper.createTrackingConfigTable();
             rpaOutreachMapper.createViewerTrackingRuleTable();
+            rpaOutreachMapper.createViewerBlacklistTable();
             rpaOutreachMapper.initializeTrackingConfig();
+            rpaOutreachMapper.upgradeDefaultTrackingLookback();
             rpaOutreachMapper.upgradeRoomShopKeyLength();
             rpaOutreachMapper.upgradeTaskSecUidLength();
             schemaReady = true;
@@ -328,6 +332,28 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int mapRoomToShop(String roomKey, Long shopConfigId)
+    {
+        String normalizedRoomKey = trim(roomKey, 128);
+        if (!StringUtils.hasText(normalizedRoomKey)) throw new ServiceException("roomKey不能为空");
+        if (shopConfigId == null || rpaOutreachMapper.selectShopConfigById(shopConfigId) == null)
+        {
+            throw new ServiceException("店铺配置不存在");
+        }
+        return rpaOutreachMapper.upsertRoomBindings(shopConfigId, List.of(normalizedRoomKey));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int unmapRoom(String roomKey)
+    {
+        String normalizedRoomKey = trim(roomKey, 128);
+        if (!StringUtils.hasText(normalizedRoomKey)) throw new ServiceException("roomKey不能为空");
+        return rpaOutreachMapper.deleteRoomBinding(normalizedRoomKey);
+    }
+
+    @Override
     public Map<String, Object> getTrackingConfig()
     {
         Map<String, Object> config = rpaOutreachMapper.selectTrackingConfig();
@@ -335,7 +361,7 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         {
             Map<String, Object> defaults = new LinkedHashMap<>();
             defaults.put("enabled", true);
-            defaults.put("lookbackDays", 1);
+            defaults.put("lookbackDays", 2);
             return defaults;
         }
         Map<String, Object> result = new LinkedHashMap<>();
@@ -389,6 +415,100 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         }
         rpaOutreachMapper.deletePendingTasksByViewerIds(viewerIds);
         return viewerIds.size();
+    }
+
+    @Override
+    public List<Map<String, Object>> listWorkbench(Map<String, Object> query)
+    {
+        Map<String, Object> normalized = workbenchQuery(query);
+        String view = str(normalized.get("view")).toUpperCase(Locale.ROOT);
+        return switch (view)
+        {
+            case "BLACKLIST" -> rpaOutreachMapper.selectWorkbenchBlacklist(normalized);
+            case "PENDING", "LEASED", "HISTORY" -> rpaOutreachMapper.selectWorkbenchTasks(normalized);
+            default -> rpaOutreachMapper.selectWorkbenchCandidates(normalized);
+        };
+    }
+
+    @Override
+    public Map<String, Object> workbenchStats(Map<String, Object> query)
+    {
+        return rpaOutreachMapper.selectWorkbenchStats(workbenchQuery(query));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int enqueueViewers(List<Long> requestedViewerIds)
+    {
+        List<Long> viewerIds = cleanViewerIds(requestedViewerIds);
+        rpaOutreachMapper.deleteViewerTrackingRules(viewerIds);
+        Map<String, Object> rule = new HashMap<>();
+        rule.put("viewerIds", viewerIds);
+        rule.put("mode", "INCLUDE");
+        rule.put("remark", "从影刀任务池手工加入");
+        rpaOutreachMapper.insertViewerTrackingRules(rule);
+        int restored = rpaOutreachMapper.resetCancelledTasksForViewerIds(viewerIds);
+        return restored + rpaOutreachMapper.prepareTasksForViewerIds(viewerIds);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int blacklistViewers(RpaBlacklistRequest request, Long userId, String username)
+    {
+        List<Long> viewerIds = cleanViewerIds(request.getViewerIds());
+        String scope = trim(request.getScope(), 16).toUpperCase(Locale.ROOT);
+        if (!List.of("GLOBAL", "SHOP").contains(scope))
+        {
+            throw new ServiceException("不支持的黑名单范围：" + scope);
+        }
+        if ("SHOP".equals(scope) && request.getShopConfigId() == null)
+        {
+            throw new ServiceException("店铺黑名单必须选择店铺");
+        }
+        String scopeKey = "GLOBAL".equals(scope) ? "GLOBAL" : "SHOP:" + request.getShopConfigId();
+        Map<String, Object> data = new HashMap<>();
+        data.put("viewerIds", viewerIds);
+        data.put("scopeKey", scopeKey);
+        data.put("shopConfigId", request.getShopConfigId());
+        data.put("reason", trim(request.getReason(), 64));
+        data.put("remark", trim(request.getRemark(), 500));
+        data.put("operatorId", userId);
+        data.put("operatorName", trim(username, 64));
+        rpaOutreachMapper.insertViewerBlacklist(data);
+        rpaOutreachMapper.cancelBlacklistedTasks(data);
+        rpaOutreachMapper.closeBatchesWithoutActiveTasks();
+        return viewerIds.size();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int restoreBlacklist(List<Long> blacklistIds)
+    {
+        List<Long> ids = blacklistIds == null ? List.of() : blacklistIds.stream()
+                .filter(value -> value != null && value > 0)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) throw new ServiceException("blacklistIds不能为空");
+        return rpaOutreachMapper.deleteBlacklistByIds(ids);
+    }
+
+    private Map<String, Object> workbenchQuery(Map<String, Object> source)
+    {
+        Map<String, Object> query = new HashMap<>(source == null ? Map.of() : source);
+        query.put("view", trim(str(query.getOrDefault("view", "CANDIDATE")), 16).toUpperCase(Locale.ROOT));
+        if (!StringUtils.hasText(str(query.get("beginDate")))) query.put("beginDate", LocalDate.now().minusDays(1).toString());
+        if (!StringUtils.hasText(str(query.get("endDate")))) query.put("endDate", LocalDate.now().toString());
+        return query;
+    }
+
+    private List<Long> cleanViewerIds(List<Long> requestedViewerIds)
+    {
+        List<Long> viewerIds = requestedViewerIds == null ? List.of() : requestedViewerIds.stream()
+                .filter(value -> value != null && value > 0)
+                .distinct()
+                .toList();
+        if (viewerIds.isEmpty()) throw new ServiceException("viewerIds不能为空");
+        return viewerIds;
     }
 
     private void cleanupExpiredLeases()

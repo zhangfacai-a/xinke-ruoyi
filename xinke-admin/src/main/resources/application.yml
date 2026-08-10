@@ -93,8 +93,8 @@ spring:
 token:
   # 令牌自定义标识
   header: Authorization
-  # 令牌密钥：生产环境必须配置 JWT_SECRET；本地未配置时使用本次进程的随机密钥
-  secret: ${JWT_SECRET:${random.uuid}-${random.uuid}}
+  # 固定令牌密钥。修改后现有登录令牌会全部失效。
+  secret: xinke-jwt-2026-8f4c1a96-5e2d-4b79-a03c-9d7f6e18b4c2
   # 令牌有效期（默认30分钟）
   expireTime: 43200
 
@@ -115,10 +115,10 @@ pagehelper:
 
 # 动态数据集配置
 datahub:
-  # 为空时使用当前数据库；生产环境建议配置为独立 MySQL Schema
-  schema: ${DATAHUB_SCHEMA:}
+  # DataHub 数据表所在 Schema
+  schema: xinkeerp
   # 必须是私有目录，代码会拒绝 xinke.profile 及其子目录
-  storage-path: ${DATAHUB_STORAGE_PATH:}
+  storage-path: D:/xinke/datahub-storage
   table-prefix: dh_data_
   max-file-size: 30MB
   max-rows: 50000
@@ -136,10 +136,10 @@ datahub:
 # Springdoc配置
 springdoc:
   api-docs:
-    enabled: ${SWAGGER_ENABLED:false}
+    enabled: false
     path: /v3/api-docs
   swagger-ui:
-    enabled: ${SWAGGER_ENABLED:false}
+    enabled: false
     path: /swagger-ui.html
     tags-sorter: alpha
   group-configs:
@@ -150,20 +150,20 @@ springdoc:
 
 # 跨域配置。生产环境只允许明确配置的来源；Chrome 插件依赖 host_permissions 发起请求。
 cors:
-  allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,http://47.116.62.234,chrome-extension://*}
+  allowed-origin-patterns: http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,http://47.116.62.234,chrome-extension://*
 
 # 外部 iframe 白名单，多个来源用空格分隔。
 security:
-  frame-ancestors: ${FRAME_ANCESTORS:http://39.96.157.230}
+  frame-ancestors: http://39.96.157.230
 
 # 插件上报密钥。配置后，插件必须通过 X-Plugin-Key 请求头携带相同值。
 live:
   plugin:
-    report-key: ${LIVE_PLUGIN_REPORT_KEY:}
+    report-key: test-plugin-report-key-2026
   rpa:
-    # 生产环境通过环境变量配置；本地密钥放在 config/application-local.yml。
-    api-key: ${LIVE_RPA_API_KEY:}
-    lease-minutes: ${LIVE_RPA_LEASE_MINUTES:30}
+    # 影刀领取和回传任务使用的固定接口密钥。
+    api-key: test-rpa-key-2026
+    lease-minutes: 30
 
 # 防盗链配置
 referer:

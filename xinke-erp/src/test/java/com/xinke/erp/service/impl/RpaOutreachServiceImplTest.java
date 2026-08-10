@@ -24,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import com.xinke.common.exception.ServiceException;
+import com.xinke.erp.domain.RpaBlacklistRequest;
 import com.xinke.erp.domain.RpaRoomBindingRequest;
 import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
@@ -235,6 +236,103 @@ class RpaOutreachServiceImplTest
         verify(rpaOutreachMapper).deleteViewerTrackingRules(List.of(2L, 3L));
         verify(rpaOutreachMapper).insertViewerTrackingRules(any());
         verify(rpaOutreachMapper).deletePendingTasksByViewerIds(List.of(2L, 3L));
+    }
+
+    @Test
+    void enqueueViewersIncludesDistinctUsersAndRestoresCancelledTasks()
+    {
+        when(rpaOutreachMapper.resetCancelledTasksForViewerIds(List.of(2L, 3L))).thenReturn(1);
+        when(rpaOutreachMapper.prepareTasksForViewerIds(List.of(2L, 3L))).thenReturn(2);
+
+        int count = service.enqueueViewers(List.of(2L, 3L, 2L));
+
+        assertEquals(3, count);
+        verify(rpaOutreachMapper).deleteViewerTrackingRules(List.of(2L, 3L));
+        ArgumentCaptor<Map<String, Object>> rule = ArgumentCaptor.forClass(Map.class);
+        verify(rpaOutreachMapper).insertViewerTrackingRules(rule.capture());
+        assertEquals("INCLUDE", rule.getValue().get("mode"));
+        assertEquals(List.of(2L, 3L), rule.getValue().get("viewerIds"));
+    }
+
+    @Test
+    void globalBlacklistCancelsTasksAndClosesEmptyBatches()
+    {
+        RpaBlacklistRequest request = new RpaBlacklistRequest();
+        request.setViewerIds(List.of(2L, 3L, 2L));
+        request.setScope("GLOBAL");
+        request.setReason("manual");
+
+        int count = service.blacklistViewers(request, 9L, "admin");
+
+        assertEquals(2, count);
+        ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
+        verify(rpaOutreachMapper).insertViewerBlacklist(data.capture());
+        assertEquals("GLOBAL", data.getValue().get("scopeKey"));
+        assertEquals(List.of(2L, 3L), data.getValue().get("viewerIds"));
+        assertEquals(9L, data.getValue().get("operatorId"));
+        verify(rpaOutreachMapper).cancelBlacklistedTasks(data.getValue());
+        verify(rpaOutreachMapper).closeBatchesWithoutActiveTasks();
+    }
+
+    @Test
+    void shopBlacklistRequiresShopAndUsesShopScopeKey()
+    {
+        RpaBlacklistRequest invalid = new RpaBlacklistRequest();
+        invalid.setViewerIds(List.of(2L));
+        invalid.setScope("SHOP");
+        assertThrows(ServiceException.class, () -> service.blacklistViewers(invalid, 9L, "admin"));
+
+        RpaBlacklistRequest request = new RpaBlacklistRequest();
+        request.setViewerIds(List.of(2L));
+        request.setScope("SHOP");
+        request.setShopConfigId(7L);
+        service.blacklistViewers(request, 9L, "admin");
+
+        ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
+        verify(rpaOutreachMapper).insertViewerBlacklist(data.capture());
+        assertEquals("SHOP:7", data.getValue().get("scopeKey"));
+        assertEquals(7L, data.getValue().get("shopConfigId"));
+    }
+
+    @Test
+    void restoreBlacklistDeletesDistinctPositiveIds()
+    {
+        when(rpaOutreachMapper.deleteBlacklistByIds(List.of(4L, 5L))).thenReturn(2);
+
+        assertEquals(2, service.restoreBlacklist(java.util.Arrays.asList(4L, 5L, 4L, null, -1L)));
+        verify(rpaOutreachMapper).deleteBlacklistByIds(List.of(4L, 5L));
+    }
+
+    @Test
+    void workbenchDefaultsToYesterdayThroughToday()
+    {
+        service.listWorkbench(new HashMap<>());
+
+        ArgumentCaptor<Map<String, Object>> query = ArgumentCaptor.forClass(Map.class);
+        verify(rpaOutreachMapper).selectWorkbenchCandidates(query.capture());
+        assertEquals(java.time.LocalDate.now().minusDays(1).toString(), query.getValue().get("beginDate"));
+        assertEquals(java.time.LocalDate.now().toString(), query.getValue().get("endDate"));
+        assertEquals("CANDIDATE", query.getValue().get("view"));
+    }
+
+    @Test
+    void mapSingleRoomDoesNotClearOtherShopBindings()
+    {
+        when(rpaOutreachMapper.selectShopConfigById(7L)).thenReturn(Map.of("shopConfigId", 7L));
+        when(rpaOutreachMapper.upsertRoomBindings(7L, List.of("room-1"))).thenReturn(1);
+
+        assertEquals(1, service.mapRoomToShop("room-1", 7L));
+        verify(rpaOutreachMapper).upsertRoomBindings(7L, List.of("room-1"));
+        verify(rpaOutreachMapper, never()).deleteRoomBindings(anyLong());
+    }
+
+    @Test
+    void unmapRoomDeletesOnlyRequestedRoom()
+    {
+        when(rpaOutreachMapper.deleteRoomBinding("room-1")).thenReturn(1);
+
+        assertEquals(1, service.unmapRoom("room-1"));
+        verify(rpaOutreachMapper).deleteRoomBinding("room-1");
     }
 
     private Map<String, Object> leasedTask()

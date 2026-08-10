@@ -54,6 +54,23 @@ export const constantRoutes = [
     meta: { title: '直播追单BI' }
   },
   {
+    path: '/live-ops/live-bi',
+    component: () => import('@/views/live/bi/index'),
+    hidden: true,
+    meta: { title: '直播追单BI', public: true }
+  },
+  {
+    path: '/live/rpa-workbench',
+    component: Layout,
+    hidden: true,
+    children: [{
+      path: '',
+      component: () => import('@/views/live/rpaWorkbench/index.vue'),
+      name: 'RpaWorkbench',
+      meta: { title: '影刀任务池', activeMenu: '/live/viewer' }
+    }]
+  },
+  {
     path: "/:pathMatch(.*)*",
     component: () => import('@/views/error/404'),
     hidden: true

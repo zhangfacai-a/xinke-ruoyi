@@ -160,6 +160,7 @@ public class DyViewerLeadController extends BaseController
     @GetMapping("/live/room/list")
     public TableDataInfo roomList(@RequestParam Map<String, Object> query)
     {
+        rpaOutreachService.ensureSchema();
         startPage();
         List<Map<String, Object>> list = dyViewerLeadService.listRooms(query);
         return getDataTable(list);
@@ -217,14 +218,14 @@ public class DyViewerLeadController extends BaseController
         util.exportExcel(response, list, "live_viewer_leads");
     }
 
-    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @Anonymous
     @GetMapping("/live/viewer/room/suggestions")
     public AjaxResult roomSuggestions(@RequestParam(value = "keyword", required = false) String keyword)
     {
         return success(dyViewerLeadService.listRoomSuggestions(keyword));
     }
 
-    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @Anonymous
     @GetMapping("/live/viewer/owner/suggestions")
     public AjaxResult ownerSuggestions(@RequestParam(value = "keyword", required = false) String keyword)
     {
@@ -261,7 +262,7 @@ public class DyViewerLeadController extends BaseController
         return success(dyViewerLeadService.summary(query));
     }
 
-    @PreAuthorize("@ss.hasPermi('live:viewer:list')")
+    @Anonymous
     @GetMapping("/live/viewer/bi")
     public AjaxResult bi(@RequestParam Map<String, Object> query)
     {

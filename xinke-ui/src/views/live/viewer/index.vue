@@ -9,6 +9,7 @@
       <div class="hero-status">
         <span>最近同步</span>
         <strong>{{ formatDateTime(summary.lastUpdateTime || summary.last_update_time) }}</strong>
+        <el-button type="primary" icon="Promotion" @click="openRpaWorkbench">影刀任务池</el-button>
       </div>
     </section>
 
@@ -349,8 +350,8 @@ const currentLead = ref(null)
 const orderedLead = ref(null)
 const detail = ref({ lead: null, comments: [], visits: [], stays: [], followRecords: [] })
 const selectedViewerIds = ref([])
-const trackingConfig = reactive({ enabled: true, lookbackDays: 1 })
-const trackingConfigForm = reactive({ enabled: true, lookbackDays: 1 })
+const trackingConfig = reactive({ enabled: true, lookbackDays: 2 })
+const trackingConfigForm = reactive({ enabled: true, lookbackDays: 2 })
 
 const queryParams = reactive({
   pageNum: 1,
@@ -448,6 +449,10 @@ function formatLocalDate(date) {
 function formatDateTime(value) {
   if (value === undefined || value === null || value === '') return '-'
   return String(value).replace('T', ' ').replace(/\.\d+$/, '').slice(0, 19)
+}
+
+function openRpaWorkbench() {
+  proxy.$router.push('/live/rpa-workbench')
 }
 
 function formatDuration(value) {
@@ -587,6 +592,7 @@ function trackingEligible(row) {
 }
 
 function trackingLabel(row) {
+  if (Number(row?.rpa_blacklisted || 0) === 1) return '黑名单'
   const mode = trackingMode(row)
   if (mode === 'EXCLUDE') return '永不追踪'
   if (mode === 'INCLUDE') return '强制追踪'
@@ -594,6 +600,7 @@ function trackingLabel(row) {
 }
 
 function trackingTag(row) {
+  if (Number(row?.rpa_blacklisted || 0) === 1) return 'danger'
   const mode = trackingMode(row)
   if (mode === 'EXCLUDE') return 'danger'
   if (mode === 'INCLUDE') return trackingEligible(row) ? 'warning' : 'info'

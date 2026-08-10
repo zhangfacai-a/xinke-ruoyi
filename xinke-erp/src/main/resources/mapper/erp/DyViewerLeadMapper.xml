@@ -289,20 +289,28 @@
     </insert>
 
     <select id="selectLiveRoomList" parameterType="java.util.Map" resultType="java.util.HashMap">
-        select room_id, room_key, room_name, source, status, remark, last_report_time, create_time, update_time
-        from dy_live_room
+        select r.room_id, r.room_key, r.room_name, r.source, r.status, r.remark,
+               r.last_report_time, r.create_time, r.update_time,
+               sc.shop_config_id, sc.shop_code, sc.shop_name,
+               sc.douyin_account_code, sc.douyin_shop_name
+        from dy_live_room r
+        left join dy_rpa_room_shop rs on rs.room_key = r.room_key
+        left join dy_rpa_shop_config sc on sc.shop_config_id = rs.shop_config_id
         <where>
             <if test="roomKey != null and roomKey != ''">
-                and room_key like concat('%', #{roomKey}, '%')
+                and r.room_key like concat('%', #{roomKey}, '%')
             </if>
             <if test="roomName != null and roomName != ''">
-                and room_name like concat('%', #{roomName}, '%')
+                and r.room_name like concat('%', #{roomName}, '%')
             </if>
             <if test="status != null and status != ''">
-                and status = #{status}
+                and r.status = #{status}
             </if>
+            <if test="mappingStatus == 'MAPPED'">and rs.room_key is not null</if>
+            <if test="mappingStatus == 'UNMAPPED'">and rs.room_key is null</if>
+            <if test="shopConfigId != null and shopConfigId != ''">and sc.shop_config_id = #{shopConfigId}</if>
         </where>
-        order by update_time desc, room_id desc
+        order by (rs.room_key is null) desc, r.update_time desc, r.room_id desc
     </select>
 
     <select id="selectLiveRoomByKey" resultType="java.util.HashMap">
@@ -666,10 +674,22 @@
             ifnull(v.status, 'new') as status,
             ifnull(v.intent, 'unknown') as intent,
             ifnull(vr.tracking_mode, 'AUTO') as rpa_tracking_mode,
+            case when exists(
+                select 1 from dy_rpa_viewer_blacklist bl
+                left join dy_rpa_room_shop brs on brs.room_key = latest.room_key
+                where bl.viewer_id = v.viewer_id
+                  and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = brs.shop_config_id)
+            ) then 1 else 0 end as rpa_blacklisted,
             case
                 when cfg.enabled = 0 then 0
                 when ifnull(v.status, 'new') != 'new' then 0
                 when vr.tracking_mode = 'EXCLUDE' then 0
+                when exists(
+                    select 1 from dy_rpa_viewer_blacklist bl
+                    left join dy_rpa_room_shop brs on brs.room_key = latest.room_key
+                    where bl.viewer_id = v.viewer_id
+                      and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = brs.shop_config_id)
+                ) then 0
                 when vr.tracking_mode = 'INCLUDE' then 1
                 when datediff(curdate(), ifnull(v.last_seen_date, latest.lead_date)) &lt; cfg.lookback_days then 1
                 else 0
@@ -797,6 +817,12 @@
                         and cfg.enabled = 1
                         and ifnull(v.status, 'new') = 'new'
                         and ifnull(vr.tracking_mode, 'AUTO') != 'EXCLUDE'
+                        and not exists(
+                            select 1 from dy_rpa_viewer_blacklist bl
+                            left join dy_rpa_room_shop brs on brs.room_key = latest.room_key
+                            where bl.viewer_id = v.viewer_id
+                              and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = brs.shop_config_id)
+                        )
                         and (
                             vr.tracking_mode = 'INCLUDE'
                             or datediff(curdate(), ifnull(v.last_seen_date, latest.lead_date)) &lt; cfg.lookback_days
@@ -807,6 +833,12 @@
                             cfg.enabled = 0
                             or ifnull(v.status, 'new') != 'new'
                             or vr.tracking_mode = 'EXCLUDE'
+                            or exists(
+                                select 1 from dy_rpa_viewer_blacklist bl
+                                left join dy_rpa_room_shop brs on brs.room_key = latest.room_key
+                                where bl.viewer_id = v.viewer_id
+                                  and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = brs.shop_config_id)
+                            )
                             or (
                                 ifnull(vr.tracking_mode, 'AUTO') != 'INCLUDE'
                                 and datediff(curdate(), ifnull(v.last_seen_date, latest.lead_date)) &gt;= cfg.lookback_days

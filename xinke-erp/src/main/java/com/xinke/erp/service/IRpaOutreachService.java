@@ -9,6 +9,7 @@ import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
 import com.xinke.erp.domain.RpaTrackingConfigRequest;
 import com.xinke.erp.domain.RpaViewerTrackingRequest;
+import com.xinke.erp.domain.RpaBlacklistRequest;
 
 public interface IRpaOutreachService
 {
@@ -37,4 +38,18 @@ public interface IRpaOutreachService
     Map<String, Object> updateTrackingConfig(RpaTrackingConfigRequest request);
 
     int updateViewerTracking(RpaViewerTrackingRequest request);
+
+    List<Map<String, Object>> listWorkbench(Map<String, Object> query);
+
+    Map<String, Object> workbenchStats(Map<String, Object> query);
+
+    int enqueueViewers(List<Long> viewerIds);
+
+    int blacklistViewers(RpaBlacklistRequest request, Long userId, String username);
+
+    int restoreBlacklist(List<Long> blacklistIds);
+
+    int mapRoomToShop(String roomKey, Long shopConfigId);
+
+    int unmapRoom(String roomKey);
 }

@@ -45,13 +45,13 @@ spring:
             webStatFilter: 
                 enabled: true
             statViewServlet:
-                enabled: ${DRUID_STAT_ENABLED:false}
+                enabled: false
                 # 仅在显式开启时允许本机访问
                 allow: 127.0.0.1
                 url-pattern: /druid/*
                 # 控制台管理用户名和密码
                 login-username: xinke
-                login-password: ${DRUID_LOGIN_PASSWORD:}
+                login-password: druid-console-2026
             filter:
                 stat:
                     enabled: true

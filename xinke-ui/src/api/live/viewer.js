@@ -101,6 +101,20 @@ export function deleteLiveRoom(roomKey) {
   })
 }
 
+export function mapLiveRoomShop(roomKey, shopConfigId) {
+  return request({
+    url: `/live/rpa/room/${encodeURIComponent(roomKey)}/shop/${shopConfigId}`,
+    method: 'put'
+  })
+}
+
+export function unmapLiveRoomShop(roomKey) {
+  return request({
+    url: `/live/rpa/room/${encodeURIComponent(roomKey)}/shop`,
+    method: 'delete'
+  })
+}
+
 export function getRpaTrackingConfig() {
   return request({
     url: '/live/rpa/tracking/config',
@@ -121,5 +135,74 @@ export function updateRpaViewerTracking(data) {
     url: '/live/rpa/tracking/viewers',
     method: 'put',
     data
+  })
+}
+
+export function listRpaWorkbench(query) {
+  return request({
+    url: '/live/rpa/workbench/list',
+    method: 'get',
+    params: query
+  })
+}
+
+export function getRpaWorkbenchStats(query) {
+  return request({
+    url: '/live/rpa/workbench/stats',
+    method: 'get',
+    params: query
+  })
+}
+
+export function listRpaWorkbenchShops() {
+  return request({
+    url: '/live/rpa/workbench/shops',
+    method: 'get'
+  })
+}
+
+export function listRpaUnmappedRooms() {
+  return request({
+    url: '/live/rpa/room/unmapped',
+    method: 'get'
+  })
+}
+
+export function addRpaShop(data) {
+  return request({
+    url: '/live/rpa/shop',
+    method: 'post',
+    data
+  })
+}
+
+export function bindRpaShopRooms(shopConfigId, roomKeys) {
+  return request({
+    url: `/live/rpa/shop/${shopConfigId}/rooms`,
+    method: 'put',
+    data: { roomKeys }
+  })
+}
+
+export function enqueueRpaViewers(data) {
+  return request({
+    url: '/live/rpa/workbench/enqueue',
+    method: 'post',
+    data
+  })
+}
+
+export function blacklistRpaViewers(data) {
+  return request({
+    url: '/live/rpa/workbench/blacklist',
+    method: 'post',
+    data
+  })
+}
+
+export function restoreRpaBlacklist(ids) {
+  return request({
+    url: `/live/rpa/workbench/blacklist/${ids}`,
+    method: 'delete'
   })
 }

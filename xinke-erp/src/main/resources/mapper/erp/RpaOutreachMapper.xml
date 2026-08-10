@@ -118,10 +118,35 @@
         ) engine=InnoDB default charset=utf8mb4 comment='RPA per-viewer tracking override'
     </update>
 
+    <update id="createViewerBlacklistTable">
+        create table if not exists dy_rpa_viewer_blacklist (
+            blacklist_id bigint not null auto_increment,
+            viewer_id bigint not null,
+            scope_key varchar(80) not null default 'GLOBAL',
+            shop_config_id bigint default null,
+            reason varchar(64) not null,
+            remark varchar(500) default null,
+            operator_id bigint default null,
+            operator_name varchar(64) default null,
+            create_time datetime default null,
+            update_time datetime default null,
+            primary key (blacklist_id),
+            unique key uk_dy_rpa_blacklist_scope (viewer_id, scope_key),
+            key idx_dy_rpa_blacklist_shop (shop_config_id),
+            key idx_dy_rpa_blacklist_time (create_time)
+        ) engine=InnoDB default charset=utf8mb4 comment='RPA viewer blacklist'
+    </update>
+
     <insert id="initializeTrackingConfig">
         insert ignore into dy_rpa_tracking_config(config_id, enabled, lookback_days, create_time, update_time)
-        values(1, 1, 1, sysdate(), sysdate())
+        values(1, 1, 2, sysdate(), sysdate())
     </insert>
+
+    <update id="upgradeDefaultTrackingLookback">
+        update dy_rpa_tracking_config
+        set lookback_days = 2, update_time = sysdate()
+        where config_id = 1 and lookback_days = 1 and create_time = update_time
+    </update>
 
     <update id="upgradeRoomShopKeyLength">
         alter table dy_rpa_room_shop modify column room_key varchar(128) not null
@@ -168,6 +193,11 @@
               or sc.status != '0'
               or ifnull(v.status, 'new') != 'new'
               or vr.tracking_mode = 'EXCLUDE'
+              or exists (
+                  select 1 from dy_rpa_viewer_blacklist bl
+                  where bl.viewer_id = t.viewer_id
+                    and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = t.shop_config_id)
+              )
               or (
                   ifnull(vr.tracking_mode, 'AUTO') != 'INCLUDE'
                   and datediff(curdate(), ifnull(v.last_seen_date, curdate())) &gt;= cfg.lookback_days
@@ -201,6 +231,11 @@
               and trim(v.sec_uid) != ''
               and ifnull(v.status, 'new') = 'new'
               and ifnull(vr.tracking_mode, 'AUTO') != 'EXCLUDE'
+              and not exists (
+                  select 1 from dy_rpa_viewer_blacklist bl
+                  where bl.viewer_id = l.viewer_id
+                    and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = rs.shop_config_id)
+              )
               and (
                   vr.tracking_mode = 'INCLUDE'
                   or datediff(curdate(), ifnull(v.last_seen_date, l.lead_date)) &lt; cfg.lookback_days
@@ -210,6 +245,50 @@
         order by ranked.priority desc, ranked.lead_id asc
         limit 1000
     </insert>
+
+    <insert id="prepareTasksForViewerIds">
+        insert ignore into dy_rpa_outreach_task(
+            task_no, viewer_id, lead_id, shop_config_id, sec_uid, profile_url,
+            status, priority, attempt_count, max_attempts, create_time, update_time
+        )
+        select replace(uuid(), '-', ''), ranked.viewer_id, ranked.lead_id, ranked.shop_config_id,
+               ranked.sec_uid, concat('https://www.douyin.com/user/', ranked.sec_uid),
+               'pending', ranked.priority, 0, 5, sysdate(), sysdate()
+        from (
+            select l.viewer_id, l.lead_id, rs.shop_config_id, v.sec_uid,
+                   (ifnull(v.has_comment, 0) * 1000 + least(ifnull(v.comment_count, 0), 100) * 10) as priority,
+                   row_number() over (partition by l.viewer_id, rs.shop_config_id order by l.lead_date desc, l.lead_id desc) as rn
+            from dy_viewer_daily_lead l
+            inner join dy_viewer v on v.viewer_id = l.viewer_id
+            inner join dy_rpa_room_shop rs on rs.room_key = l.room_key
+            inner join dy_rpa_shop_config sc on sc.shop_config_id = rs.shop_config_id and sc.status = '0'
+            where l.viewer_id in
+            <foreach collection="viewerIds" item="viewerId" open="(" separator="," close=")">#{viewerId}</foreach>
+              and v.sec_uid is not null and trim(v.sec_uid) != ''
+              and ifnull(v.status, 'new') = 'new'
+              and not exists (
+                  select 1 from dy_rpa_viewer_blacklist bl
+                  where bl.viewer_id = l.viewer_id
+                    and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = rs.shop_config_id)
+              )
+        ) ranked
+        where ranked.rn = 1
+    </insert>
+
+    <update id="resetCancelledTasksForViewerIds">
+        update dy_rpa_outreach_task t
+        set t.status = 'pending', t.batch_no = null, t.lease_token = null, t.worker_id = null,
+            t.lease_expire_time = null, t.result_code = null, t.error_message = null,
+            t.completed_time = null, t.update_time = sysdate()
+        where t.status = 'cancelled'
+          and t.viewer_id in
+          <foreach collection="viewerIds" item="viewerId" open="(" separator="," close=")">#{viewerId}</foreach>
+          and not exists (
+              select 1 from dy_rpa_viewer_blacklist bl
+              where bl.viewer_id = t.viewer_id
+                and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = t.shop_config_id)
+          )
+    </update>
 
     <select id="selectClaimableShop" resultType="java.util.HashMap">
         select sc.shop_config_id as shopConfigId,
@@ -498,11 +577,22 @@
     </select>
 
     <select id="selectUnmappedRooms" resultType="java.util.HashMap">
-        select r.room_key as roomKey, r.room_name as roomName, r.last_report_time as lastReportTime
-        from dy_live_room r
-        left join dy_rpa_room_shop rs on rs.room_key = r.room_key
+        select source.room_key as roomKey,
+               max(source.room_name) as roomName,
+               max(source.last_report_time) as lastReportTime
+        from (
+            select r.room_key, r.room_name, r.last_report_time
+            from dy_live_room r
+            union all
+            select l.room_key, max(coalesce(nullif(l.live_room_name, ''), l.room_key)),
+                   max(cast(l.lead_date as datetime))
+            from dy_viewer_daily_lead l
+            group by l.room_key
+        ) source
+        left join dy_rpa_room_shop rs on rs.room_key = source.room_key
         where rs.room_key is null
-        order by r.last_report_time desc, r.room_id desc
+        group by source.room_key
+        order by lastReportTime desc, roomKey
     </select>
 
     <insert id="insertShopConfig" useGeneratedKeys="true" keyProperty="shopConfigId">
@@ -546,6 +636,10 @@
         on duplicate key update shop_config_id = values(shop_config_id), update_time = sysdate()
     </insert>
 
+    <delete id="deleteRoomBinding">
+        delete from dy_rpa_room_shop where room_key = #{roomKey}
+    </delete>
+
     <select id="selectTrackingConfig" resultType="java.util.HashMap">
         select enabled, lookback_days as lookbackDays, create_time as createTime, update_time as updateTime
         from dy_rpa_tracking_config
@@ -582,5 +676,190 @@
         <foreach collection="viewerIds" item="viewerId" open="(" separator="," close=")">
             #{viewerId}
         </foreach>
+    </delete>
+
+    <select id="selectWorkbenchCandidates" parameterType="map" resultType="java.util.HashMap">
+        select candidate.*
+        from (
+            select v.viewer_id as viewerId, l.lead_id as leadId, l.lead_date as leadDate,
+                   v.sec_uid as secUid, concat('https://www.douyin.com/user/', v.sec_uid) as profileUrl,
+                   coalesce(nullif(v.nickname, ''), l.nickname, '未知观众') as nickname,
+                   ifnull(v.has_comment, 0) as hasComment, ifnull(v.comment_count, 0) as commentCount,
+                   v.last_comment_content as lastCommentContent, v.first_seen_date as firstSeenDate,
+                   v.last_seen_date as lastSeenDate, ifnull(v.status, 'new') as viewerStatus,
+                   l.room_key as roomKey, rs.shop_config_id as shopConfigId,
+                   sc.shop_code as shopCode, sc.shop_name as shopName,
+                   coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as liveRoomName,
+                   ifnull(vr.tracking_mode, 'AUTO') as trackingMode,
+                   t.task_id as taskId, t.task_no as taskNo, t.status as taskStatus,
+                   case when exists(
+                       select 1 from dy_rpa_viewer_blacklist bl
+                       where bl.viewer_id = v.viewer_id
+                         and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = rs.shop_config_id)
+                   ) then 1 else 0 end as blacklisted,
+                   case
+                       when rs.shop_config_id is null or sc.shop_config_id is null then 0
+                       when cfg.enabled = 0 or ifnull(v.status, 'new') != 'new' then 0
+                       when vr.tracking_mode = 'EXCLUDE' then 0
+                       when exists(
+                           select 1 from dy_rpa_viewer_blacklist bl
+                           where bl.viewer_id = v.viewer_id
+                             and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = rs.shop_config_id)
+                       ) then 0
+                       when t.task_id is not null then 0
+                       when vr.tracking_mode = 'INCLUDE' then 1
+                       when datediff(curdate(), ifnull(v.last_seen_date, l.lead_date)) &lt; cfg.lookback_days then 1
+                       else 0
+                   end as eligible,
+                   row_number() over (
+                       partition by v.viewer_id, coalesce(cast(rs.shop_config_id as char), concat('ROOM:', l.room_key))
+                       order by l.lead_date desc, l.lead_id desc
+                   ) as rowNumber
+            from dy_viewer_daily_lead l
+            inner join dy_viewer v on v.viewer_id = l.viewer_id
+            left join dy_rpa_room_shop rs on rs.room_key = l.room_key
+            left join dy_rpa_shop_config sc on sc.shop_config_id = rs.shop_config_id and sc.status = '0'
+            inner join dy_rpa_tracking_config cfg on cfg.config_id = 1
+            left join dy_rpa_viewer_rule vr on vr.viewer_id = v.viewer_id
+            left join dy_rpa_outreach_task t on t.viewer_id = v.viewer_id and t.shop_config_id = rs.shop_config_id
+            left join dy_live_room r on r.room_key = l.room_key
+            where l.lead_date &gt;= #{beginDate} and l.lead_date &lt;= #{endDate}
+            <if test="shopConfigId != null and shopConfigId != ''">and rs.shop_config_id = #{shopConfigId}</if>
+            <if test="keyword != null and keyword != ''">
+                and (v.nickname like concat('%', #{keyword}, '%') or v.sec_uid like concat('%', #{keyword}, '%'))
+            </if>
+            <if test="hasComment != null and hasComment != ''">and ifnull(v.has_comment, 0) = #{hasComment}</if>
+        ) candidate
+        where candidate.rowNumber = 1
+        <if test="sendControl != null and sendControl != ''">
+            <choose>
+                <when test="sendControl == 'ELIGIBLE'">and candidate.eligible = 1</when>
+                <when test="sendControl == 'AUTO'">and candidate.trackingMode = 'AUTO'</when>
+                <when test="sendControl == 'INCLUDE'">and candidate.trackingMode = 'INCLUDE'</when>
+                <when test="sendControl == 'EXCLUDE'">and candidate.trackingMode = 'EXCLUDE'</when>
+            </choose>
+        </if>
+        order by candidate.eligible desc, candidate.hasComment desc, candidate.commentCount desc, candidate.leadId desc
+    </select>
+
+    <select id="selectWorkbenchTasks" parameterType="map" resultType="java.util.HashMap">
+        select t.task_id as taskId, t.task_no as taskNo, t.viewer_id as viewerId, t.lead_id as leadId,
+               t.profile_url as profileUrl, t.status as taskStatus, t.priority, t.attempt_count as attemptCount,
+               t.max_attempts as maxAttempts, t.batch_no as batchNo, t.worker_id as workerId,
+               t.lease_expire_time as leaseExpireTime, t.outcome, t.douyin_no as douyinNo,
+               t.order_no as orderNo, t.followed, t.messaged, t.result_code as resultCode,
+               t.error_message as errorMessage, t.first_claim_time as firstClaimTime,
+               t.completed_time as completedTime, t.create_time as createTime, t.update_time as updateTime,
+               coalesce(nullif(v.nickname, ''), l.nickname, '未知观众') as nickname,
+               ifnull(v.has_comment, 0) as hasComment, ifnull(v.comment_count, 0) as commentCount,
+               v.last_comment_content as lastCommentContent, l.lead_date as leadDate,
+               sc.shop_config_id as shopConfigId, sc.shop_code as shopCode, sc.shop_name as shopName,
+               coalesce(nullif(r.room_name, ''), nullif(l.live_room_name, ''), l.room_key) as liveRoomName
+        from dy_rpa_outreach_task t
+        inner join dy_viewer v on v.viewer_id = t.viewer_id
+        inner join dy_viewer_daily_lead l on l.lead_id = t.lead_id
+        inner join dy_rpa_shop_config sc on sc.shop_config_id = t.shop_config_id
+        left join dy_live_room r on r.room_key = l.room_key
+        where 1 = 1
+        <choose>
+            <when test="view == 'PENDING'">and t.status = 'pending'</when>
+            <when test="view == 'LEASED'">and t.status = 'leased'</when>
+            <otherwise>and t.status not in ('pending', 'leased')</otherwise>
+        </choose>
+        <if test="shopConfigId != null and shopConfigId != ''">and t.shop_config_id = #{shopConfigId}</if>
+        <if test="keyword != null and keyword != ''">
+            and (v.nickname like concat('%', #{keyword}, '%') or t.douyin_no like concat('%', #{keyword}, '%')
+                 or t.task_no like concat('%', #{keyword}, '%') or t.order_no like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="taskStatus != null and taskStatus != ''">and t.status = #{taskStatus}</if>
+        <if test="view == 'HISTORY'">and date(ifnull(t.completed_time, t.update_time)) between #{beginDate} and #{endDate}</if>
+        order by t.task_id desc
+    </select>
+
+    <select id="selectWorkbenchBlacklist" parameterType="map" resultType="java.util.HashMap">
+        select bl.blacklist_id as blacklistId, bl.viewer_id as viewerId, bl.scope_key as scopeKey,
+               bl.shop_config_id as shopConfigId, bl.reason, bl.remark,
+               bl.operator_id as operatorId, bl.operator_name as operatorName,
+               bl.create_time as createTime, bl.update_time as updateTime,
+               v.nickname, v.sec_uid as secUid,
+               case when bl.scope_key = 'GLOBAL' then '所有店铺' else sc.shop_name end as scopeName,
+               sc.shop_code as shopCode, sc.shop_name as shopName
+        from dy_rpa_viewer_blacklist bl
+        inner join dy_viewer v on v.viewer_id = bl.viewer_id
+        left join dy_rpa_shop_config sc on sc.shop_config_id = bl.shop_config_id
+        where 1 = 1
+        <if test="shopConfigId != null and shopConfigId != ''">and bl.shop_config_id = #{shopConfigId}</if>
+        <if test="keyword != null and keyword != ''">
+            and (v.nickname like concat('%', #{keyword}, '%') or v.sec_uid like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="reason != null and reason != ''">and bl.reason = #{reason}</if>
+        order by bl.blacklist_id desc
+    </select>
+
+    <select id="selectWorkbenchStats" parameterType="map" resultType="java.util.HashMap">
+        select
+            (
+                select count(distinct concat(l.viewer_id, ':', coalesce(cast(rs.shop_config_id as char), concat('ROOM:', l.room_key))))
+                from dy_viewer_daily_lead l
+                inner join dy_viewer v on v.viewer_id = l.viewer_id
+                left join dy_rpa_room_shop rs on rs.room_key = l.room_key
+                left join dy_rpa_shop_config sc on sc.shop_config_id = rs.shop_config_id and sc.status = '0'
+                left join dy_rpa_viewer_rule vr on vr.viewer_id = v.viewer_id
+                left join dy_rpa_outreach_task t on t.viewer_id = v.viewer_id and t.shop_config_id = rs.shop_config_id
+                where l.lead_date between #{beginDate} and #{endDate}
+                  and ifnull(v.status, 'new') = 'new' and t.task_id is null
+                  and ifnull(vr.tracking_mode, 'AUTO') != 'EXCLUDE'
+                  and not exists(select 1 from dy_rpa_viewer_blacklist bl where bl.viewer_id = v.viewer_id
+                                 and (bl.scope_key = 'GLOBAL' or bl.shop_config_id = rs.shop_config_id))
+                <if test="shopConfigId != null and shopConfigId != ''">and rs.shop_config_id = #{shopConfigId}</if>
+            ) as candidateCount,
+            (select count(1) from dy_rpa_outreach_task t where t.status = 'pending'
+             <if test="shopConfigId != null and shopConfigId != ''">and t.shop_config_id = #{shopConfigId}</if>) as pendingCount,
+            (select count(1) from dy_rpa_outreach_task t where t.status = 'leased'
+             <if test="shopConfigId != null and shopConfigId != ''">and t.shop_config_id = #{shopConfigId}</if>) as leasedCount,
+            (select count(1) from dy_rpa_outreach_task t where t.status = 'pending' and t.attempt_count &gt; 0
+             <if test="shopConfigId != null and shopConfigId != ''">and t.shop_config_id = #{shopConfigId}</if>) as retryCount,
+            (select count(1) from dy_rpa_outreach_task t where t.status = 'failed'
+             <if test="shopConfigId != null and shopConfigId != ''">and t.shop_config_id = #{shopConfigId}</if>) as failedCount,
+            (select count(1) from dy_rpa_outreach_task t where t.completed_time &gt;= curdate()
+             and t.status in ('ordered', 'contacted', 'skipped')) as todayCompletedCount,
+            (select count(1) from dy_rpa_viewer_blacklist) as blacklistCount
+    </select>
+
+    <insert id="insertViewerBlacklist">
+        insert into dy_rpa_viewer_blacklist(
+            viewer_id, scope_key, shop_config_id, reason, remark,
+            operator_id, operator_name, create_time, update_time
+        ) values
+        <foreach collection="viewerIds" item="viewerId" separator=",">
+            (#{viewerId}, #{scopeKey}, #{shopConfigId}, #{reason}, nullif(#{remark}, ''),
+             #{operatorId}, #{operatorName}, sysdate(), sysdate())
+        </foreach>
+        on duplicate key update reason = values(reason), remark = values(remark),
+            operator_id = values(operator_id), operator_name = values(operator_name), update_time = sysdate()
+    </insert>
+
+    <update id="cancelBlacklistedTasks">
+        update dy_rpa_outreach_task
+        set status = 'cancelled', result_code = 'BLACKLISTED', error_message = '用户已加入黑名单',
+            lease_token = null, worker_id = null, lease_expire_time = null,
+            completed_time = sysdate(), update_time = sysdate()
+        where viewer_id in
+        <foreach collection="viewerIds" item="viewerId" open="(" separator="," close=")">#{viewerId}</foreach>
+          and status in ('pending', 'leased')
+        <if test="scopeKey != 'GLOBAL'">and shop_config_id = #{shopConfigId}</if>
+    </update>
+
+    <update id="closeBatchesWithoutActiveTasks">
+        update dy_rpa_outreach_batch b
+        set b.status = 'cancelled', b.active_shop_key = null, b.completed_time = sysdate(), b.update_time = sysdate()
+        where b.status = 'leased'
+          and not exists(select 1 from dy_rpa_outreach_task t where t.batch_no = b.batch_no and t.status = 'leased')
+    </update>
+
+    <delete id="deleteBlacklistByIds">
+        delete from dy_rpa_viewer_blacklist
+        where blacklist_id in
+        <foreach collection="blacklistIds" item="blacklistId" open="(" separator="," close=")">#{blacklistId}</foreach>
     </delete>
 </mapper>
