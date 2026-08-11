@@ -3,16 +3,18 @@ package com.xinke.erp.service.impl;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +40,8 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
 {
     private static final int DEFAULT_BATCH_SIZE = 10;
     private static final int MAX_BATCH_SIZE = 10;
+    private static final Set<String> MESSAGE_SCENES = Set.of("NO_PURCHASE", "REFUND");
+    private static final Set<String> MESSAGE_VARIABLES = Set.of("{{nickname}}", "{{shopName}}", "{{liveRoomName}}");
     private static volatile boolean schemaReady;
 
     @Autowired
@@ -96,12 +100,30 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
     public Map<String, Object> claim(RpaTaskClaimRequest request)
     {
         cleanupExpiredLeases();
+        String workerId = trim(request.getWorkerId(), 128);
+        String preferredShopCode = trim(request.getPreferredShopCode(), 64);
+        String activeBatchNo = rpaOutreachMapper.selectActiveBatchNo(workerId, preferredShopCode);
+        if (StringUtils.hasText(activeBatchNo))
+        {
+            Map<String, Object> activeBatch = hydrateShopConfig(rpaOutreachMapper.selectBatch(activeBatchNo));
+            Map<String, Object> heartbeat = new HashMap<>();
+            heartbeat.put("batchNo", activeBatchNo);
+            heartbeat.put("leaseToken", activeBatch.get("leaseToken"));
+            heartbeat.put("workerId", workerId);
+            heartbeat.put("leaseMinutes", safeLeaseMinutes());
+            if (rpaOutreachMapper.heartbeatBatch(heartbeat) > 0)
+            {
+                rpaOutreachMapper.heartbeatTasks(heartbeat);
+                return claimedWork(activeBatch, true);
+            }
+            cleanupExpiredLeases();
+        }
         rpaOutreachMapper.removeIneligiblePendingTasks();
         rpaOutreachMapper.prepareTasks();
 
         int requestedLimit = request.getLimit() == null ? DEFAULT_BATCH_SIZE : request.getLimit();
         requestedLimit = Math.max(1, Math.min(MAX_BATCH_SIZE, requestedLimit));
-        Map<String, Object> shop = rpaOutreachMapper.selectClaimableShop(trim(request.getPreferredShopCode(), 64));
+        Map<String, Object> shop = rpaOutreachMapper.selectClaimableShop(preferredShopCode);
         if (shop == null || shop.isEmpty())
         {
             return noWork(60, "当前没有可领取任务，请检查店铺和直播间绑定");
@@ -120,7 +142,7 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         Map<String, Object> batchData = new HashMap<>();
         batchData.put("batchNo", batchNo);
         batchData.put("shopConfigId", shop.get("shopConfigId"));
-        batchData.put("workerId", trim(request.getWorkerId(), 128));
+        batchData.put("workerId", workerId);
         batchData.put("leaseToken", leaseToken);
         batchData.put("leaseMinutes", safeLeaseMinutes);
         if (rpaOutreachMapper.insertBatch(batchData) <= 0)
@@ -141,7 +163,7 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         leaseData.put("taskIds", taskIds);
         leaseData.put("batchNo", batchNo);
         leaseData.put("leaseToken", leaseToken);
-        leaseData.put("workerId", trim(request.getWorkerId(), 128));
+        leaseData.put("workerId", workerId);
         leaseData.put("leaseMinutes", safeLeaseMinutes);
         int leased = rpaOutreachMapper.leaseTasks(leaseData);
         if (leased != taskIds.size())
@@ -150,14 +172,8 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         }
         rpaOutreachMapper.updateBatchTaskCount(batchNo, leased);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("available", true);
         Map<String, Object> batch = hydrateShopConfig(rpaOutreachMapper.selectBatch(batchNo));
-        result.put("batch", batch);
-        result.put("tasks", enrichTasks(rpaOutreachMapper.selectBatchTasks(batchNo), batch));
-        result.put("leaseSeconds", safeLeaseMinutes * 60);
-        result.put("heartbeatAfterSeconds", Math.max(60, safeLeaseMinutes * 30));
-        return result;
+        return claimedWork(batch, false);
     }
 
     @Override
@@ -622,6 +638,18 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         return result;
     }
 
+    private Map<String, Object> claimedWork(Map<String, Object> batch, boolean resumed)
+    {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("available", true);
+        result.put("resumed", resumed);
+        result.put("batch", claimBatchView(batch));
+        result.put("tasks", enrichTasks(rpaOutreachMapper.selectBatchTasks(str(batch.get("batchNo"))), batch));
+        result.put("leaseSeconds", safeLeaseMinutes() * 60);
+        result.put("heartbeatAfterSeconds", Math.max(60, safeLeaseMinutes() * 30));
+        return result;
+    }
+
     private Map<String, Object> idempotentResult(Map<String, Object> task)
     {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -688,20 +716,50 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         String json = str(result.remove("messageTemplatesJson"));
         try
         {
-            result.put("messageTemplates", StringUtils.hasText(json)
-                    ? objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {}) : defaultTemplates());
+            List<Map<String, Object>> templates = StringUtils.hasText(json)
+                    ? objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {}) : defaultTemplates();
+            List<Map<String, Object>> resolvedTemplates = hasRequiredBusinessScenes(templates)
+                    && !isPreviousTwoSceneRecommendedTemplates(templates) ? templates : defaultTemplates();
+            result.put("messageTemplates", resolvedTemplates);
+            result.put("messageTemplate", resolvedTemplates.stream()
+                    .filter(item -> Boolean.TRUE.equals(item.get("defaultTemplate")))
+                    .map(item -> str(item.get("content"))).findFirst()
+                    .orElse(resolvedTemplates.isEmpty() ? "" : str(resolvedTemplates.get(0).get("content"))));
         }
-        catch (Exception ex) { result.put("messageTemplates", defaultTemplates()); }
+        catch (Exception ex)
+        {
+            List<Map<String, Object>> templates = defaultTemplates();
+            result.put("messageTemplates", templates);
+            result.put("messageTemplate", str(templates.get(0).get("content")));
+        }
+        return result;
+    }
+
+    private Map<String, Object> claimBatchView(Map<String, Object> batch)
+    {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("batchNo", batch.get("batchNo"));
+        result.put("leaseToken", batch.get("leaseToken"));
+        result.put("workerId", batch.get("workerId"));
+        result.put("shopName", batch.get("shopName"));
+        result.put("douyinAccountCode", batch.get("douyinAccountCode"));
+        result.put("taskCount", batch.get("taskCount"));
+        result.put("burstSize", batch.get("burstSize"));
+        result.put("restMinutes", batch.get("restMinutes"));
+        result.put("pauseOnCaptcha", batch.get("pauseOnCaptcha"));
+        result.put("maxConsecutiveFailures", batch.get("maxConsecutiveFailures"));
         return result;
     }
 
     private List<Map<String, Object>> normalizeTemplates(List<RpaMessageTemplateRequest> requested)
     {
         if (requested == null || requested.isEmpty()) return defaultTemplates();
+        if (requested.size() > 100) throw new ServiceException("每个店铺最多保存100条私信文案");
         List<Map<String, Object>> result = new ArrayList<>();
         int index = 0;
         for (RpaMessageTemplateRequest item : requested)
         {
+            List<String> keywords = normalizeKeywords(item.getKeywords(), item.getTemplateName());
             Map<String, Object> template = new LinkedHashMap<>();
             template.put("templateKey", StringUtils.hasText(item.getTemplateKey()) ? trim(item.getTemplateKey(), 64) : "TPL_" + (++index));
             template.put("templateName", trim(item.getTemplateName(), 100));
@@ -710,24 +768,176 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
             template.put("enabled", !Boolean.FALSE.equals(item.getEnabled()));
             template.put("defaultTemplate", Boolean.TRUE.equals(item.getDefaultTemplate()));
             template.put("priority", item.getPriority() == null ? index * 10 : item.getPriority());
-            template.put("keywords", item.getKeywords() == null ? List.of() : item.getKeywords().stream()
-                    .map(value -> trim(value, 30)).filter(StringUtils::hasText).distinct().limit(30).toList());
+            template.put("keywords", keywords);
             result.add(template);
         }
-        if (result.stream().noneMatch(item -> Boolean.TRUE.equals(item.get("defaultTemplate")))) result.get(0).put("defaultTemplate", true);
+        if (isLegacyRecommendedTemplates(result)) return defaultTemplates();
+        validateTemplateLibrary(result);
+        result.forEach(item -> item.put("defaultTemplate", false));
+        result.stream().filter(item -> "NO_PURCHASE".equals(item.get("scene")) && Boolean.TRUE.equals(item.get("enabled")))
+                .findFirst().ifPresent(item -> item.put("defaultTemplate", true));
+        if (!hasRequiredBusinessScenes(result))
+        {
+            throw new ServiceException("普通跟进和退款关怀都必须至少保留一条启用文案");
+        }
         return result;
+    }
+
+    private List<String> normalizeKeywords(List<String> requested, String templateName)
+    {
+        if (requested == null || requested.isEmpty()) return List.of();
+        List<String> keywords = requested.stream().map(value -> str(value).trim())
+                .filter(StringUtils::hasText).distinct().toList();
+        if (keywords.size() > 20) throw new ServiceException("“" + str(templateName) + "”最多设置20个关键词");
+        for (String keyword : keywords)
+        {
+            if (keyword.length() < 2 || keyword.length() > 20)
+            {
+                throw new ServiceException("关键词“" + keyword + "”应为2至20个字符");
+            }
+        }
+        return keywords;
+    }
+
+    private void validateTemplateLibrary(List<Map<String, Object>> templates)
+    {
+        Set<String> keys = new HashSet<>();
+        Set<String> sceneContents = new HashSet<>();
+        Map<String, String> sceneKeywordOwners = new HashMap<>();
+        Map<String, Integer> sceneCounts = new HashMap<>();
+        for (Map<String, Object> template : templates)
+        {
+            String key = str(template.get("templateKey"));
+            String name = str(template.get("templateName")).trim();
+            String scene = str(template.get("scene")).toUpperCase(Locale.ROOT);
+            String content = str(template.get("content")).trim();
+            if (!keys.add(key)) throw new ServiceException("私信模板编号重复：" + key);
+            if (!MESSAGE_SCENES.contains(scene)) throw new ServiceException("私信模板“" + name + "”使用了不支持的场景");
+            if (!StringUtils.hasText(name) || !StringUtils.hasText(content)) throw new ServiceException("私信模板名称和内容不能为空");
+            if (!sceneContents.add(scene + "\n" + content)) throw new ServiceException("“" + name + "”与同场景的其他文案重复");
+            if (template.get("keywords") instanceof List<?> keywords)
+            {
+                for (Object value : keywords)
+                {
+                    String keyword = str(value).toLowerCase(Locale.ROOT);
+                    String owner = sceneKeywordOwners.putIfAbsent(scene + "\n" + keyword, name);
+                    if (owner != null) throw new ServiceException("关键词“" + value + "”已被“" + owner + "”使用");
+                }
+            }
+            String textWithoutVariables = content;
+            for (String variable : MESSAGE_VARIABLES) textWithoutVariables = textWithoutVariables.replace(variable, "");
+            if (textWithoutVariables.contains("{{") || textWithoutVariables.contains("}}"))
+            {
+                throw new ServiceException("“" + name + "”包含无法识别的变量");
+            }
+            int count = sceneCounts.merge(scene, 1, Integer::sum);
+            if (count > 50) throw new ServiceException("每个私信场景最多保存50条文案");
+        }
     }
 
     private List<Map<String, Object>> defaultTemplates()
     {
         List<Map<String, Object>> result = new ArrayList<>();
-        result.add(template("GENERAL", "通用问候", "GENERAL", "你好，看到你刚刚来过{{liveRoomName}}，想了解哪款产品呢？有问题可以直接告诉我。", true, List.of(), 60));
-        result.add(template("COMMENT", "评论用户", "COMMENT", "你好，看到你在直播间咨询了“{{comment}}”，这边可以继续帮你详细解答。", false, List.of(), 50));
-        result.add(template("PRODUCT", "产品咨询", "KEYWORD", "你好，看到你在直播间关注了我们的产品，需要了解型号、价格或活动都可以直接问我。", false, List.of("型号", "区别", "功能", "适合"), 10));
-        result.add(template("PROMOTION", "优惠咨询", "KEYWORD", "你好，看到你在直播间咨询优惠活动，目前具体活动可以在这里继续了解，有需要我可以帮你确认。", false, List.of("优惠", "价格", "赠品", "活动", "便宜"), 20));
-        result.add(template("AFTER_SALES", "售后咨询", "KEYWORD", "你好，看到你在直播间咨询安装或售后问题，可以把具体情况发给我，这边帮你确认。", false, List.of("安装", "发货", "维修", "退换", "售后"), 30));
-        result.add(template("FALLBACK", "兜底模板", "FALLBACK", "你好，感谢关注{{shopName}}，有任何产品问题都可以直接告诉我。", false, List.of(), 99));
+        addTemplateSet(result, "NO_PURCHASE", "未购买用户", "NO_PURCHASE", List.of(
+                "你好，看到你刚刚来过{{liveRoomName}}，想了解哪款产品呢？有问题可以直接告诉我。",
+                "你好，感谢关注{{shopName}}，产品功能、价格或活动方面有疑问都可以问我。",
+                "你好，刚才在直播间看到你啦，有哪款产品想进一步了解吗？",
+                "你好，感谢来到{{liveRoomName}}，如果还有没来得及问的问题，我可以继续帮你。",
+                "你好，直播间里的产品如果还没选好，我可以根据你的需求帮你看看。",
+                "你好，感谢你的关注，有产品方面的问题可以直接发给我。",
+                "你好，直播间里的内容如果有没听清的地方，我可以再帮你说明。",
+                "你好，看到你关注了我们的直播，需要我帮你找合适的产品吗？",
+                "你好，感谢来过{{liveRoomName}}，选购方面有疑问可以随时问我。",
+                "你好，这里是{{shopName}}，如果你还在比较产品，我可以帮你梳理一下。"), List.of(), 10, true);
+        result.add(template("NO_PURCHASE_KEYWORD_PRICE", "价格与优惠咨询", "NO_PURCHASE",
+                "你好，看到你比较关注价格和活动，需要我帮你确认当前到手价或可用优惠吗？",
+                false, List.of("多少钱", "价格", "优惠", "国补", "补贴", "太贵", "便宜", "活动"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_GIFT", "赠品咨询", "NO_PURCHASE",
+                "你好，看到你在问赠品，需要我帮你确认当前套餐包含的赠品和领取条件吗？",
+                false, List.of("有什么赠品", "送什么", "送啥", "赠品", "礼品"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_COMPARE", "型号对比", "NO_PURCHASE",
+                "你好，看到你在比较不同款式，需要我根据你的使用需求帮你说明区别吗？",
+                false, List.of("有什么区别", "什么区别", "区别", "对比", "哪个好", "哪款好", "怎么选"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_SPEC", "参数尺寸咨询", "NO_PURCHASE",
+                "你好，看到你比较关注产品参数，需要我帮你确认具体尺寸、配置或容量吗？",
+                false, List.of("屏幕多大", "多大屏幕", "内存多大", "屏幕", "内存", "尺寸", "配置", "参数", "容量", "公斤"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_SHIPPING", "发货时效咨询", "NO_PURCHASE",
+                "你好，看到你在关注发货时间，需要我帮你确认当前库存和预计发出时间吗？",
+                false, List.of("什么时候发货", "延迟发货", "几天到", "多久到", "发货"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_INSTALL", "安装服务咨询", "NO_PURCHASE",
+                "你好，看到你在咨询安装服务，需要我帮你确认是否包安装、服务范围和预约方式吗？",
+                false, List.of("包安装吗", "包安装", "上门安装", "安装", "上门"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_WARRANTY", "售后保障咨询", "NO_PURCHASE",
+                "你好，看到你比较关注售后保障，需要我帮你确认质保、退换或服务规则吗？",
+                false, List.of("质保多久", "运费险", "可以试用吗", "质保", "保修", "试用", "售后"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_LINK", "购买链接咨询", "NO_PURCHASE",
+                "你好，看到你在找对应商品，需要我帮你确认应该看哪个链接或哪款商品吗？",
+                false, List.of("几号链接", "链接在哪", "哪个链接", "拍哪个", "哪个款"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_AGE", "年龄与使用场景", "NO_PURCHASE",
+                "你好，看到你在确认适用阶段，可以告诉我使用者的年龄或主要需求，我帮你看看是否合适。",
+                false, List.of("几岁", "幼儿园", "小班", "中班", "大班", "一年级", "二年级", "三年级"), 10));
+        result.add(template("NO_PURCHASE_KEYWORD_FUNCTION", "具体功能咨询", "NO_PURCHASE",
+                "你好，看到你比较关注具体功能，需要我结合你的使用需求帮你确认这款是否合适吗？",
+                false, List.of("不要烘干", "带烘干", "洗烘一体", "单洗", "洗烘", "烘干", "英语", "动画片", "功能"), 10));
+        addTemplateSet(result, "REFUND", "退款关怀", "REFUND", List.of(
+                "你好，看到你的订单正在申请退款，想确认一下是否遇到了什么问题？需要的话我可以帮你跟进。",
+                "你好，留意到你的订单有退款申请，如果是产品或服务方面的问题，可以告诉我，我来帮你处理。",
+                "你好，看到你提交了退款申请，给你带来不便很抱歉。方便说一下遇到的情况吗？",
+                "你好，你的订单退款情况我们已经关注到了，如需查询进度或协助处理，可以直接告诉我。",
+                "你好，看到订单进入了退款流程，如果还有未解决的问题，我可以继续帮你核实。",
+                "你好，关于这次退款，如果是使用、发货或商品方面的问题，可以告诉我具体情况。",
+                "你好，留意到你的售后申请了，需要协助确认退款进度或处理方案吗？",
+                "你好，很抱歉这次购物没有达到预期。退款过程中如果需要帮助，可以直接联系我。",
+                "你好，看到你的订单有售后记录，我来确认一下是否还需要我们协助处理。",
+                "你好，你的退款申请我们已经留意到了，有任何疑问都可以在这里告诉我，我会帮你跟进。"), List.of(), 20, false);
         return result;
+    }
+
+    private void addTemplateSet(List<Map<String, Object>> target, String prefix, String name, String scene,
+            List<String> contents, List<String> keywords, int priority, boolean defaultGroup)
+    {
+        for (int index = 0; index < contents.size(); index++)
+        {
+            String number = String.format(Locale.ROOT, "%02d", index + 1);
+            target.add(template(prefix + "_" + number, name + " " + (index + 1), scene,
+                    contents.get(index), defaultGroup && index == 0, keywords, priority));
+        }
+    }
+
+    private boolean isLegacyRecommendedTemplates(List<Map<String, Object>> templates)
+    {
+        if (templates == null || templates.isEmpty() || templates.size() > 60) return false;
+        Set<String> oldGroups = Set.of("GENERAL", "COMMENT", "PRODUCT", "PROMOTION", "AFTER_SALES", "FALLBACK");
+        return templates.stream().allMatch(item -> {
+            String key = str(item.get("templateKey"));
+            if (oldGroups.contains(key)) return true;
+            int separator = key.lastIndexOf('_');
+            return separator > 0 && oldGroups.contains(key.substring(0, separator))
+                    && key.substring(separator + 1).matches("\\d{2}");
+        });
+    }
+
+    private boolean isPreviousTwoSceneRecommendedTemplates(List<Map<String, Object>> templates)
+    {
+        if (templates == null || templates.size() != 20) return false;
+        return templates.stream().allMatch(item -> {
+            String key = str(item.get("templateKey"));
+            boolean recommendedKey = key.matches("NO_PURCHASE_\\d{2}") || key.matches("REFUND_\\d{2}");
+            return recommendedKey && !hasKeywords(item);
+        });
+    }
+
+    private boolean hasRequiredBusinessScenes(List<Map<String, Object>> templates)
+    {
+        if (templates == null || templates.isEmpty()) return false;
+        boolean hasGeneralNoPurchase = templates.stream()
+                .anyMatch(item -> !Boolean.FALSE.equals(item.get("enabled"))
+                        && "NO_PURCHASE".equals(str(item.get("scene")).toUpperCase(Locale.ROOT))
+                        && !hasKeywords(item));
+        boolean hasRefund = templates.stream()
+                .anyMatch(item -> !Boolean.FALSE.equals(item.get("enabled"))
+                        && "REFUND".equals(str(item.get("scene")).toUpperCase(Locale.ROOT)));
+        return hasGeneralNoPurchase && hasRefund;
     }
 
     private Map<String, Object> template(String key, String name, String scene, String content,
@@ -754,35 +964,90 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> source : tasks)
         {
-            Map<String, Object> task = new LinkedHashMap<>(source);
-            Map<String, Object> selected = selectTemplate(templates, str(task.get("lastCommentContent")));
-            task.put("messageTemplateKey", selected.get("templateKey"));
-            task.put("messageTemplateName", selected.get("templateName"));
-            task.put("messageContent", renderTemplate(str(selected.get("content")), task, shop));
+            String commentText = StringUtils.hasText(str(source.get("recentCommentContent")))
+                    ? str(source.get("recentCommentContent")) : str(source.get("lastCommentContent"));
+            Map<String, Object> noPurchase = messageOption(selectTemplate(templates, "NO_PURCHASE", commentText), source, shop);
+            Map<String, Object> refund = messageOption(selectTemplate(templates, "REFUND", commentText), source, shop);
+            Map<String, Object> options = new LinkedHashMap<>();
+            options.put("NO_PURCHASE", noPurchase);
+            options.put("REFUND", refund);
+
+            Map<String, Object> task = new LinkedHashMap<>();
+            task.put("taskNo", source.get("taskNo"));
+            task.put("nickname", source.get("nickname"));
+            task.put("secUid", source.get("secUid"));
+            task.put("profileUrl", source.get("profileUrl"));
+            task.put("messageOptions", options);
             result.add(task);
         }
         return result;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> selectTemplate(List<Map<String, Object>> templates, String comment)
+    private Map<String, Object> messageOption(Map<String, Object> template, Map<String, Object> task,
+            Map<String, Object> shop)
     {
-        List<Map<String, Object>> enabled = templates.stream().filter(item -> !Boolean.FALSE.equals(item.get("enabled")))
-                .sorted(Comparator.comparingInt(item -> asInt(item.get("priority")))).toList();
-        if (StringUtils.hasText(comment))
+        Map<String, Object> option = new LinkedHashMap<>();
+        option.put("templateKey", template.get("templateKey"));
+        option.put("templateName", template.get("templateName"));
+        option.put("content", renderTemplate(str(template.get("content")), task, shop));
+        return option;
+    }
+
+    private Map<String, Object> selectTemplate(List<Map<String, Object>> templates, String scene, String comment)
+    {
+        List<Map<String, Object>> enabled = templates.stream()
+                .filter(item -> !Boolean.FALSE.equals(item.get("enabled"))).toList();
+        List<Map<String, Object>> sceneTemplates = enabled.stream()
+                .filter(item -> scene.equals(str(item.get("scene")).toUpperCase(Locale.ROOT))).toList();
+        if (!StringUtils.hasText(comment)) return randomTemplateWithoutKeywords(sceneTemplates, scene);
+        List<Map<String, Object>> matches = new ArrayList<>();
+        int longestKeywordLength = 0;
+        for (Map<String, Object> item : sceneTemplates)
         {
-            for (Map<String, Object> item : enabled)
+            String matchedKeyword = longestMatchedKeyword(item, comment);
+            if (matchedKeyword == null) continue;
+            Map<String, Object> matched = new LinkedHashMap<>(item);
+            matched.put("matchedKeyword", matchedKeyword);
+            int length = matchedKeyword.length();
+            if (length > longestKeywordLength)
             {
-                if (!"KEYWORD".equals(str(item.get("scene")).toUpperCase(Locale.ROOT))) continue;
-                List<String> keywords = item.get("keywords") instanceof List<?> values ? (List<String>) values : List.of();
-                if (keywords.stream().anyMatch(comment::contains)) return item;
+                matches.clear();
+                longestKeywordLength = length;
             }
-            Map<String, Object> commentTemplate = enabled.stream()
-                    .filter(item -> "COMMENT".equals(str(item.get("scene")).toUpperCase(Locale.ROOT))).findFirst().orElse(null);
-            if (commentTemplate != null) return commentTemplate;
+            if (length == longestKeywordLength) matches.add(matched);
         }
-        return enabled.stream().filter(item -> Boolean.TRUE.equals(item.get("defaultTemplate"))).findFirst()
-                .orElseGet(() -> enabled.stream().findFirst().orElse(defaultTemplates().get(0)));
+        if (!matches.isEmpty()) return randomTemplate(matches);
+        return randomTemplateWithoutKeywords(sceneTemplates, scene);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String longestMatchedKeyword(Map<String, Object> template, String comment)
+    {
+        if (!(template.get("keywords") instanceof List<?> values)) return null;
+        String normalizedComment = comment.toLowerCase(Locale.ROOT);
+        return values.stream().map(String::valueOf).map(String::trim).filter(StringUtils::hasText)
+                .filter(keyword -> normalizedComment.contains(keyword.toLowerCase(Locale.ROOT)))
+                .max(java.util.Comparator.comparingInt(String::length)).orElse(null);
+    }
+
+    private Map<String, Object> randomTemplateWithoutKeywords(List<Map<String, Object>> templates, String scene)
+    {
+        List<Map<String, Object>> general = templates.stream().filter(item -> !hasKeywords(item)).toList();
+        if (!general.isEmpty()) return randomTemplate(general);
+        if (!templates.isEmpty()) return randomTemplate(templates);
+        List<Map<String, Object>> defaults = defaultTemplates().stream()
+                .filter(item -> scene.equals(item.get("scene")) && !hasKeywords(item)).toList();
+        return defaults.isEmpty() ? defaultTemplates().get(0) : randomTemplate(defaults);
+    }
+
+    private boolean hasKeywords(Map<String, Object> template)
+    {
+        return template.get("keywords") instanceof List<?> values && values.stream().anyMatch(value -> StringUtils.hasText(str(value)));
+    }
+
+    private Map<String, Object> randomTemplate(List<Map<String, Object>> templates)
+    {
+        return templates.get(ThreadLocalRandom.current().nextInt(templates.size()));
     }
 
     private String renderTemplate(String content, Map<String, Object> task, Map<String, Object> shop)

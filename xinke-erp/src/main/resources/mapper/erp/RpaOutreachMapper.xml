@@ -333,6 +333,20 @@
           )
     </update>
 
+    <select id="selectActiveBatchNo" resultType="java.lang.String">
+        select b.batch_no
+        from dy_rpa_outreach_batch b
+        inner join dy_rpa_shop_config sc on sc.shop_config_id = b.shop_config_id
+        where b.worker_id = #{workerId}
+          and b.status = 'leased'
+          and b.lease_expire_time &gt; sysdate()
+          <if test="preferredShopCode != null and preferredShopCode != ''">
+            and sc.shop_code = #{preferredShopCode}
+          </if>
+        order by b.batch_id desc
+        limit 1
+    </select>
+
     <select id="selectClaimableShop" resultType="java.util.HashMap">
         select sc.shop_config_id as shopConfigId,
                sc.shop_code as shopCode,
@@ -459,6 +473,12 @@
                t.attempt_count as attemptCount, v.nickname,
                ifnull(v.has_comment, 0) as hasComment, ifnull(v.comment_count, 0) as commentCount,
                v.last_comment_content as lastCommentContent,
+               (
+                   select left(group_concat(c.content order by c.captured_at desc separator ' | '), 1000)
+                   from dy_viewer_comment c
+                   where c.lead_id = t.lead_id
+                     and c.content is not null and trim(c.content) != ''
+               ) as recentCommentContent,
                (
                    select ifnull(sum(s.estimated_stay_seconds), 0)
                    from dy_live_viewer_stay s

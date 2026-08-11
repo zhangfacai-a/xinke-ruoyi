@@ -28,6 +28,7 @@ public interface RpaOutreachMapper
     int expireBatches();
     int removeIneligiblePendingTasks();
     int prepareTasks();
+    String selectActiveBatchNo(@Param("workerId") String workerId, @Param("preferredShopCode") String preferredShopCode);
     Map<String, Object> selectClaimableShop(@Param("preferredShopCode") String preferredShopCode);
     int insertBatch(Map<String, Object> data);
     List<Long> selectPendingTaskIds(@Param("shopConfigId") Long shopConfigId, @Param("limit") int limit);

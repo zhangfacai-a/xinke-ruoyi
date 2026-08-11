@@ -1,4 +1,4 @@
-﻿# 项目相关配置
+# 项目相关配置
 xinke:
   # 名称
   name: XinKe
@@ -150,7 +150,8 @@ springdoc:
 
 # 跨域配置。生产环境只允许明确配置的来源；Chrome 插件依赖 host_permissions 发起请求。
 cors:
-  allowed-origin-patterns: http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,http://47.116.62.234,chrome-extension://*
+  # 前端页面允许访问后端的来源。端口通配用于本地开发和服务器反向代理端口变化。
+  allowed-origin-patterns: http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,chrome-extension://*
 
 # 外部 iframe 白名单，多个来源用空格分隔。
 security:

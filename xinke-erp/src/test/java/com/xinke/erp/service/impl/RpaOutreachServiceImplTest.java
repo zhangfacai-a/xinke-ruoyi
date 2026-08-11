@@ -15,6 +15,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +28,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xinke.common.exception.ServiceException;
 import com.xinke.erp.domain.RpaBlacklistRequest;
+import com.xinke.erp.domain.RpaMessageTemplateRequest;
 import com.xinke.erp.domain.RpaRoomBindingRequest;
 import com.xinke.erp.domain.RpaTaskClaimRequest;
 import com.xinke.erp.domain.RpaTaskResultRequest;
@@ -50,6 +53,7 @@ class RpaOutreachServiceImplTest
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void claimReturnsOneShopBatchWithRequestedTasks()
     {
         when(rpaOutreachMapper.selectClaimableShop("")).thenReturn(Map.of(
@@ -58,9 +62,21 @@ class RpaOutreachServiceImplTest
         when(rpaOutreachMapper.insertBatch(any())).thenReturn(1);
         when(rpaOutreachMapper.selectPendingTaskIds(3L, 10)).thenReturn(List.of(11L, 12L));
         when(rpaOutreachMapper.leaseTasks(any())).thenReturn(2);
-        when(rpaOutreachMapper.selectBatch(anyString())).thenReturn(Map.of("shopConfigId", 3L));
+        when(rpaOutreachMapper.selectBatch(anyString())).thenReturn(Map.ofEntries(
+                Map.entry("batchNo", "BATCH-1"),
+                Map.entry("shopConfigId", 3L),
+                Map.entry("workerId", "worker-1"),
+                Map.entry("leaseToken", "LEASE-1"),
+                Map.entry("shopName", "测试店铺"),
+                Map.entry("douyinAccountCode", "测试账号"),
+                Map.entry("taskCount", 2),
+                Map.entry("burstSize", 10),
+                Map.entry("restMinutes", 5),
+                Map.entry("pauseOnCaptcha", 1),
+                Map.entry("maxConsecutiveFailures", 5)));
         when(rpaOutreachMapper.selectBatchTasks(anyString())).thenReturn(List.of(
-                Map.of("taskNo", "TASK-11"),
+                Map.of("taskNo", "TASK-11", "nickname", "用户A", "profileUrl", "https://example.com/a",
+                        "recentCommentContent", "什么时候发货", "commentCount", 3),
                 Map.of("taskNo", "TASK-12")));
 
         RpaTaskClaimRequest request = new RpaTaskClaimRequest();
@@ -70,7 +86,22 @@ class RpaOutreachServiceImplTest
         Map<String, Object> result = service.claim(request);
 
         assertTrue((Boolean) result.get("available"));
+        assertFalse((Boolean) result.get("resumed"));
         assertEquals(2, ((List<?>) result.get("tasks")).size());
+        Map<String, Object> firstTask = (Map<String, Object>) ((List<?>) result.get("tasks")).get(0);
+        assertEquals(Set.of("taskNo", "nickname", "secUid", "profileUrl", "messageOptions"), firstTask.keySet());
+        assertFalse(firstTask.containsKey("recentCommentContent"));
+        assertFalse(firstTask.containsKey("commentCount"));
+        Map<String, Object> messageOptions = (Map<String, Object>) firstTask.get("messageOptions");
+        assertEquals(Set.of("NO_PURCHASE", "REFUND"), messageOptions.keySet());
+        assertEquals(Set.of("templateKey", "templateName", "content"),
+                ((Map<String, Object>) messageOptions.get("NO_PURCHASE")).keySet());
+        assertTrue(String.valueOf(((Map<String, Object>) messageOptions.get("REFUND")).get("templateKey"))
+                .startsWith("REFUND_"));
+        Map<String, Object> batch = (Map<String, Object>) result.get("batch");
+        assertEquals(Set.of("batchNo", "leaseToken", "workerId", "shopName", "douyinAccountCode", "taskCount",
+                "burstSize", "restMinutes", "pauseOnCaptcha", "maxConsecutiveFailures"), batch.keySet());
+        assertFalse(batch.containsKey("messageTemplates"));
         assertEquals(1800, result.get("leaseSeconds"));
         assertEquals(900, result.get("heartbeatAfterSeconds"));
 
@@ -78,6 +109,34 @@ class RpaOutreachServiceImplTest
         verify(rpaOutreachMapper).leaseTasks(lease.capture());
         assertEquals("worker-1", lease.getValue().get("workerId"));
         assertEquals(List.of(11L, 12L), lease.getValue().get("taskIds"));
+    }
+
+    @Test
+    void claimReturnsAndRenewsWorkersActiveBatch()
+    {
+        when(rpaOutreachMapper.selectActiveBatchNo("worker-1", "")).thenReturn("BATCH-ACTIVE");
+        when(rpaOutreachMapper.selectBatch("BATCH-ACTIVE")).thenReturn(Map.ofEntries(
+                Map.entry("batchNo", "BATCH-ACTIVE"),
+                Map.entry("leaseToken", "LEASE-ACTIVE"),
+                Map.entry("workerId", "worker-1"),
+                Map.entry("shopName", "测试店铺"),
+                Map.entry("douyinAccountCode", "测试账号")));
+        when(rpaOutreachMapper.heartbeatBatch(any())).thenReturn(1);
+        when(rpaOutreachMapper.heartbeatTasks(any())).thenReturn(2);
+        when(rpaOutreachMapper.selectBatchTasks("BATCH-ACTIVE")).thenReturn(List.of(
+                Map.of("taskNo", "TASK-1"), Map.of("taskNo", "TASK-2")));
+
+        RpaTaskClaimRequest request = new RpaTaskClaimRequest();
+        request.setWorkerId("worker-1");
+        request.setLimit(10);
+
+        Map<String, Object> result = service.claim(request);
+
+        assertTrue((Boolean) result.get("available"));
+        assertTrue((Boolean) result.get("resumed"));
+        assertEquals(2, ((List<?>) result.get("tasks")).size());
+        verify(rpaOutreachMapper, never()).selectClaimableShop(anyString());
+        verify(rpaOutreachMapper, never()).insertBatch(any());
     }
 
     @Test
@@ -335,6 +394,168 @@ class RpaOutreachServiceImplTest
 
         assertEquals(1, service.unmapRoom("room-1"));
         verify(rpaOutreachMapper).deleteRoomBinding("room-1");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void recommendedTemplateLibraryContainsGeneralAndKeywordTemplatesWithoutCommentPlaceholder()
+    {
+        List<Map<String, Object>> templates = ReflectionTestUtils.invokeMethod(service, "defaultTemplates");
+
+        assertEquals(30, templates.size());
+        assertTrue(templates.stream().noneMatch(item -> String.valueOf(item.get("content")).contains("{{comment}}")));
+        Map<String, Long> groupCounts = templates.stream().collect(Collectors.groupingBy(
+                item -> String.valueOf(item.get("scene")), Collectors.counting()));
+        assertEquals(Set.of("NO_PURCHASE", "REFUND"), groupCounts.keySet());
+        assertEquals(20L, groupCounts.get("NO_PURCHASE"));
+        assertEquals(10L, groupCounts.get("REFUND"));
+        assertEquals(10, templates.stream().filter(item -> item.get("keywords") instanceof List<?> values
+                && !values.isEmpty()).count());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void legacyTemplateResponseAlsoReplacesOldBatchDefaultMessage() throws Exception
+    {
+        List<Map<String, Object>> legacyTemplates = List.of(
+                Map.of("templateKey", "GENERAL", "content", "旧通用模板", "defaultTemplate", true),
+                Map.of("templateKey", "COMMENT", "content", "看到你的评论：{{comment}}"),
+                Map.of("templateKey", "PRODUCT", "content", "旧产品模板"),
+                Map.of("templateKey", "PROMOTION", "content", "旧优惠模板"),
+                Map.of("templateKey", "AFTER_SALES", "content", "旧售后模板"),
+                Map.of("templateKey", "FALLBACK", "content", "旧兜底模板"));
+        Map<String, Object> source = new HashMap<>();
+        source.put("messageTemplate", "看到你的评论：{{comment}}");
+        source.put("messageTemplatesJson", new ObjectMapper().writeValueAsString(legacyTemplates));
+
+        Map<String, Object> hydrated = ReflectionTestUtils.invokeMethod(service, "hydrateShopConfig", source);
+
+        assertEquals(30, ((List<Map<String, Object>>) hydrated.get("messageTemplates")).size());
+        assertFalse(String.valueOf(hydrated.get("messageTemplate")).contains("{{comment}}"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void templateRandomizationNeverLeavesRequestedBusinessScene()
+    {
+        List<Map<String, Object>> templates = ReflectionTestUtils.invokeMethod(service, "defaultTemplates");
+        Set<String> selectedKeys = new java.util.HashSet<>();
+
+        for (int i = 0; i < 50; i++)
+        {
+            Map<String, Object> selected = ReflectionTestUtils.invokeMethod(service, "selectTemplate", templates,
+                    "REFUND", "");
+            String key = String.valueOf(selected.get("templateKey"));
+            assertTrue(key.startsWith("REFUND_"));
+            selectedKeys.add(key);
+        }
+        assertTrue(selectedKeys.size() > 1);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void keywordTemplateUsesLongestMatchingCommentKeywordAndGeneralFallback()
+    {
+        List<Map<String, Object>> templates = ReflectionTestUtils.invokeMethod(service, "defaultTemplates");
+
+        Map<String, Object> shipping = ReflectionTestUtils.invokeMethod(service, "selectTemplate", templates,
+                "NO_PURCHASE", "请问什么时候发货，大概几天到");
+        assertEquals("NO_PURCHASE_KEYWORD_SHIPPING", shipping.get("templateKey"));
+        assertEquals("什么时候发货", shipping.get("matchedKeyword"));
+
+        for (int i = 0; i < 30; i++)
+        {
+            Map<String, Object> general = ReflectionTestUtils.invokeMethod(service, "selectTemplate", templates,
+                    "NO_PURCHASE", "好的谢谢");
+            assertTrue(String.valueOf(general.get("templateKey")).matches("NO_PURCHASE_\\d{2}"));
+            assertFalse(general.containsKey("matchedKeyword"));
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void matchingCommentCarriesDirectedNoPurchaseAndRefundOptionsTogether()
+    {
+        List<Map<String, Object>> templates = ReflectionTestUtils.invokeMethod(service, "defaultTemplates");
+        Map<String, Object> shop = new HashMap<>();
+        shop.put("shopName", "测试店铺");
+        shop.put("messageTemplates", templates);
+        Map<String, Object> task = new HashMap<>();
+        task.put("taskNo", "TASK-KEYWORD");
+        task.put("recentCommentContent", "请问什么时候发货");
+
+        List<Map<String, Object>> enriched = ReflectionTestUtils.invokeMethod(service, "enrichTasks",
+                List.of(task), shop);
+        Map<String, Object> options = (Map<String, Object>) enriched.get(0).get("messageOptions");
+        Map<String, Object> noPurchase = (Map<String, Object>) options.get("NO_PURCHASE");
+        Map<String, Object> refund = (Map<String, Object>) options.get("REFUND");
+
+        assertEquals("NO_PURCHASE_KEYWORD_SHIPPING", noPurchase.get("templateKey"));
+        assertEquals(Set.of("templateKey", "templateName", "content"), noPurchase.keySet());
+        assertTrue(String.valueOf(refund.get("templateKey")).startsWith("REFUND_"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void customTemplateLibraryAcceptsOnlyTwoBusinessScenesAndKnownVariables()
+    {
+        List<RpaMessageTemplateRequest> valid = List.of(
+                messageTemplate("CUSTOM_NO_ORDER", "未购买", "NO_PURCHASE", "你好{{nickname}}，这里是{{shopName}}"),
+                messageTemplate("CUSTOM_REFUND", "退款关怀", "REFUND", "你好，需要协助处理退款吗？"));
+
+        List<Map<String, Object>> normalized = ReflectionTestUtils.invokeMethod(service, "normalizeTemplates", valid);
+
+        assertEquals(2, normalized.size());
+        assertTrue(Boolean.TRUE.equals(normalized.get(0).get("defaultTemplate")));
+
+        List<RpaMessageTemplateRequest> unknownVariable = List.of(
+                messageTemplate("A", "未购买", "NO_PURCHASE", "你好{{userName}}"),
+                messageTemplate("B", "退款", "REFUND", "需要协助处理退款吗？"));
+        assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "normalizeTemplates", unknownVariable));
+
+        List<RpaMessageTemplateRequest> unsupportedScene = List.of(
+                messageTemplate("A", "未购买", "NO_PURCHASE", "你好"),
+                messageTemplate("B", "优惠", "PROMOTION", "需要了解优惠吗？"));
+        assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "normalizeTemplates", unsupportedScene));
+    }
+
+    @Test
+    void duplicateKeywordInSameSceneIsRejected()
+    {
+        RpaMessageTemplateRequest first = messageTemplate("PRICE_A", "价格咨询一", "NO_PURCHASE", "我来帮你确认当前价格");
+        first.setKeywords(List.of("多少钱", "优惠"));
+        RpaMessageTemplateRequest second = messageTemplate("PRICE_B", "价格咨询二", "NO_PURCHASE", "我来帮你确认当前活动");
+        second.setKeywords(List.of("多少钱", "活动"));
+        RpaMessageTemplateRequest refund = messageTemplate("REFUND_A", "退款关怀", "REFUND", "需要协助处理退款吗？");
+
+        assertThrows(ServiceException.class, () -> ReflectionTestUtils.invokeMethod(service,
+                "normalizeTemplates", List.of(first, second, refund)));
+    }
+
+    @Test
+    void templateLibraryWithoutGeneralNoPurchaseFallbackIsRejected()
+    {
+        RpaMessageTemplateRequest directed = messageTemplate("SHIPPING", "发货咨询", "NO_PURCHASE",
+                "我来帮你确认发货时间");
+        directed.setKeywords(List.of("什么时候发货"));
+        RpaMessageTemplateRequest refund = messageTemplate("REFUND_A", "退款关怀", "REFUND",
+                "需要协助处理退款吗？");
+
+        assertThrows(ServiceException.class, () -> ReflectionTestUtils.invokeMethod(service,
+                "normalizeTemplates", List.of(directed, refund)));
+    }
+
+    private RpaMessageTemplateRequest messageTemplate(String key, String name, String scene, String content)
+    {
+        RpaMessageTemplateRequest request = new RpaMessageTemplateRequest();
+        request.setTemplateKey(key);
+        request.setTemplateName(name);
+        request.setScene(scene);
+        request.setContent(content);
+        request.setEnabled(true);
+        return request;
     }
 
     private Map<String, Object> leasedTask()

@@ -77,7 +77,7 @@
         执行前会自动排除已购买、退款、黑名单、没有抖音号或未配置店铺的用户，并显示最终人数。
       </el-alert>
 
-      <el-table v-loading="loading" :data="rows" border stripe row-key="rowKey" height="560" @selection-change="handleSelection">
+      <el-table v-loading="loading" :data="rows" border stripe :row-key="workbenchRowKey" height="560" @selection-change="handleSelection">
         <el-table-column v-if="activeView === 'CANDIDATE'" type="selection" width="48" fixed />
         <el-table-column label="用户" min-width="190" fixed>
           <template #default="scope"><div class="user-cell"><strong>{{ scope.row.nickname || '未知观众' }}</strong><small>{{ scope.row.douyinNo || scope.row.secUid || '-' }}</small></div></template>
@@ -91,7 +91,7 @@
           <template #default="scope"><el-tag :type="Number(scope.row.hasComment) ? 'success' : 'info'" size="small">{{ Number(scope.row.commentCount || 0) }} 条</el-tag><span class="comment-text">{{ scope.row.lastCommentContent || '暂无评论' }}</span></template>
         </el-table-column>
         <el-table-column v-if="activeView === 'CANDIDATE'" label="发送控制" width="125" align="center">
-          <template #default="scope"><el-tag :type="controlTag(scope.row)">{{ controlLabel(scope.row) }}</el-tag><small v-if="scope.row.ineligibleReason" class="reason-text">{{ scope.row.ineligibleReason }}</small></template>
+          <template #default="scope"><el-tag :type="controlTag(scope.row)">{{ controlLabel(scope.row) }}</el-tag><small v-if="hardStopReason(scope.row)" class="reason-text">{{ hardStopReason(scope.row) }}</small></template>
         </el-table-column>
         <el-table-column v-if="['PENDING','LEASED','HISTORY'].includes(activeView)" label="任务状态" width="110" align="center">
           <template #default="scope"><el-tag :type="taskTag(scope.row.taskStatus)">{{ taskLabel(scope.row.taskStatus) }}</el-tag></template>
@@ -115,9 +115,11 @@
         <el-table-column label="操作" fixed="right" :width="activeView === 'CANDIDATE' ? 250 : 120">
           <template #default="scope">
             <template v-if="activeView === 'CANDIDATE'">
-              <el-button link type="primary" @click="enqueueRows([scope.row])">预览执行</el-button>
-              <el-dropdown @command="mode => setControl([scope.row.viewerId], mode)"><el-button link type="primary">联系设置</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="INCLUDE">允许本次联系</el-dropdown-item><el-dropdown-item command="EXCLUDE">暂停联系</el-dropdown-item><el-dropdown-item command="AUTO" divided>恢复按规则</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
-              <el-button link type="danger" @click="openBlacklist([scope.row])">拉黑</el-button>
+              <div class="candidate-actions">
+                <el-button link type="primary" @click="enqueueRows([scope.row])">预览执行</el-button>
+                <el-dropdown @command="mode => setControl([scope.row.viewerId], mode)"><el-button link type="primary">联系设置</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="INCLUDE">允许本次联系</el-dropdown-item><el-dropdown-item command="EXCLUDE">暂停联系</el-dropdown-item><el-dropdown-item command="AUTO" divided>恢复按规则</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
+                <el-button link type="danger" @click="openBlacklist([scope.row])">拉黑</el-button>
+              </div>
             </template>
             <el-button v-else-if="activeView === 'BLACKLIST'" link type="primary" @click="restore(scope.row)">恢复</el-button>
             <el-button v-else link type="primary" @click="copyProfile(scope.row)">主页</el-button>
@@ -178,10 +180,12 @@ function changeView(view){ activeView.value=view; handleTabChange() }
 function handleTabChange(){ query.pageNum=1; selectedRows.value=[]; loadList() }
 function handleQuery(){ query.pageNum=1; refreshAll() }
 function resetQuery(){ query.pageNum=1;query.dateRange=defaultRange();query.shopConfigId=undefined;query.keyword=undefined;query.sendControl=undefined;query.taskStatus=undefined;query.reason=undefined;refreshAll() }
+function workbenchRowKey(row){return [activeView.value,row.taskId||row.blacklistId||row.leadId||'',row.viewerId||'',row.shopConfigId||row.roomKey||''].join(':')}
 function handleSelection(value){ selectedRows.value=value||[] }
-const previewEligible=computed(()=>previewRows.value.filter(row=>!row.ineligibleReason&&Number(row.eligible)!==0&&!row.blacklisted&&row.shopConfigId&&row.secUid))
+const previewEligible=computed(()=>previewRows.value.filter(row=>!Number(row.blacklisted)&&!Number(row.marketingSuppressed)&&row.shopConfigId&&row.secUid))
 const previewExcluded=computed(()=>previewRows.value.filter(row=>!previewEligible.value.includes(row)))
-function rowReason(row){if(row.ineligibleReason)return row.ineligibleReason;if(!row.shopConfigId)return'直播间未指定店铺';if(!row.secUid)return'没有抖音号';if(Number(row.blacklisted))return'已加入不再联系名单';if(Number(row.eligible)===0)return'不符合当前跟进规则';return'系统保护用户'}
+function hardStopReason(row){if(!row.shopConfigId)return'未配置店铺';if(!row.secUid)return'没有抖音号';if(Number(row.blacklisted))return'已拉黑';if(Number(row.marketingSuppressed))return'购买或售后保护';return''}
+function rowReason(row){if(!row.shopConfigId)return'直播间未指定店铺';if(!row.secUid)return'没有抖音号';if(Number(row.blacklisted))return'已加入不再联系名单';if(Number(row.marketingSuppressed))return'已购买或售后保护中';return row.ineligibleReason||'系统保护用户'}
 function enqueueRows(items){if(!items.length)return;previewRows.value=[...new Map(items.map(row=>[row.viewerId,row])).values()];previewOpen.value=true}
 function confirmEnqueue(){const ids=previewEligible.value.map(row=>Number(row.viewerId)).filter(Boolean);if(!ids.length)return;enqueueSaving.value=true;enqueueRpaViewers({viewerIds:ids}).then(res=>{proxy.$modal.msgSuccess(`已加入 ${res.data||0} 人的等待执行队列`);previewOpen.value=false;selectedRows.value=[];refreshAll()}).finally(()=>enqueueSaving.value=false)}
 function enqueueSelected(){ enqueueRows(selectedRows.value) }
@@ -190,8 +194,8 @@ function setSelectedControl(mode){ setControl(selectedViewerIds.value,mode) }
 function openBlacklist(items){ blacklistForm.viewerIds=[...new Set(items.map(row=>Number(row.viewerId)).filter(Boolean))];blacklistForm.scope='SHOP';blacklistForm.shopConfigId=items.length===1?items[0].shopConfigId:query.shopConfigId;blacklistForm.reason=undefined;blacklistForm.remark=undefined;blacklistOpen.value=true }
 function submitBlacklist(){ if(!blacklistForm.reason)return proxy.$modal.msgWarning('请选择拉黑原因');if(blacklistForm.scope==='SHOP'&&!blacklistForm.shopConfigId)return proxy.$modal.msgWarning('请选择店铺');blacklistRpaViewers({...blacklistForm}).then(()=>{proxy.$modal.msgSuccess('已加入黑名单');blacklistOpen.value=false;refreshAll()}) }
 function restore(row){ proxy.$modal.confirm(`确认将“${row.nickname||'该用户'}”移出黑名单？`).then(()=>restoreRpaBlacklist(row.blacklistId)).then(()=>{proxy.$modal.msgSuccess('已恢复');refreshAll()}) }
-function controlLabel(row){if(Number(row.blacklisted))return'不再联系';if(row.trackingMode==='INCLUDE')return'允许本次联系';if(row.trackingMode==='EXCLUDE')return'暂停联系';return Number(row.eligible)?'按规则联系':'暂不联系'}
-function controlTag(row){if(Number(row.blacklisted)||row.trackingMode==='EXCLUDE')return'danger';if(row.trackingMode==='INCLUDE')return'warning';return Number(row.eligible)?'success':'info'}
+function controlLabel(row){if(Number(row.blacklisted)||Number(row.marketingSuppressed))return'不再联系';if(row.trackingMode==='INCLUDE')return'允许本次联系';if(row.trackingMode==='EXCLUDE')return'暂停联系';return'允许联系'}
+function controlTag(row){if(Number(row.blacklisted)||Number(row.marketingSuppressed)||row.trackingMode==='EXCLUDE')return'danger';if(row.trackingMode==='INCLUDE')return'warning';return'success'}
 function taskLabel(value){return({pending:'待领取',leased:'处理中',ordered:'已下单',contacted:'已触达',skipped:'已跳过',failed:'执行失败',cancelled:'已取消'})[value]||value||'-'}
 function taskTag(value){return({pending:'warning',leased:'primary',ordered:'success',contacted:'success',skipped:'info',failed:'danger',cancelled:'info'})[value]||'info'}
 function outcomeText(row){if(row.taskStatus==='ordered')return`已下单${row.orderNo?' · '+row.orderNo:''}`;if(row.taskStatus==='contacted')return`${Number(row.followed)?'已关注':'未关注'} / ${Number(row.messaged)?'已私信':'未私信'}`;return row.errorMessage||row.resultCode||taskLabel(row.taskStatus)}
@@ -207,5 +211,5 @@ loadShops();refreshAll()
 
 <style scoped>
 .rpa-workbench{background:#f6f7f9;min-height:calc(100vh - 84px)}.page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}.page-head h2{margin:0 0 5px;font-size:22px;color:#202124}.page-head p{margin:0;color:#6b7280}.stats-strip{display:grid;grid-template-columns:repeat(7,minmax(108px,1fr));background:#fff;border:1px solid #e4e7ed;border-radius:6px;margin-bottom:14px;overflow:hidden}.stats-strip button{border:0;border-right:1px solid #ebeef5;background:#fff;padding:13px 14px;text-align:left;cursor:pointer}.stats-strip button:last-child{border-right:0}.stats-strip button.active{box-shadow:inset 0 -3px #f97316;background:#fff8f3}.stats-strip span{display:block;color:#6b7280;font-size:12px}.stats-strip strong{display:block;margin-top:4px;font-size:22px;color:#202124}.workbench-body{background:#fff;border:1px solid #e4e7ed;border-radius:6px;padding:0 16px 16px}.filter-row{padding-top:2px}.action-row{display:flex;gap:8px;align-items:center;margin-bottom:10px}.selection-tip{color:#909399;font-size:13px}.user-cell{display:flex;flex-direction:column;line-height:1.5}.user-cell small{color:#909399;overflow:hidden;text-overflow:ellipsis}.comment-text{margin-left:8px}.mb12{margin-bottom:12px}@media(max-width:1100px){.stats-strip{grid-template-columns:repeat(4,1fr)}.stats-strip button{border-bottom:1px solid #ebeef5}}@media(max-width:700px){.stats-strip{grid-template-columns:repeat(2,1fr)}.page-head{gap:10px}.page-head p{display:none}}
-.transaction-cell{display:flex;flex-direction:column;line-height:1.5}.transaction-cell small{color:#dc2626}.reason-text{display:block;color:#9a3412;font-size:11px;line-height:1.3;margin-top:3px}.preview-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}.preview-summary div{padding:12px;background:#f8fafc;border:1px solid #e5e7eb}.preview-summary span,.preview-summary strong{display:block}.preview-summary span{color:#6b7280;font-size:12px}.preview-summary strong{font-size:22px;margin-top:4px}.success-text{color:#16a34a}.warning-text{color:#d97706}
+.transaction-cell{display:flex;flex-direction:column;line-height:1.5}.transaction-cell small{color:#dc2626}.candidate-actions{display:flex;align-items:center;justify-content:flex-start;gap:3px;white-space:nowrap}.candidate-actions :deep(.el-dropdown){display:inline-flex;align-items:center}.candidate-actions :deep(.el-button){margin-left:0}.reason-text{display:block;color:#9a3412;font-size:11px;line-height:1.3;margin-top:3px}.preview-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}.preview-summary div{padding:12px;background:#f8fafc;border:1px solid #e5e7eb}.preview-summary span,.preview-summary strong{display:block}.preview-summary span{color:#6b7280;font-size:12px}.preview-summary strong{font-size:22px;margin-top:4px}.success-text{color:#16a34a}.warning-text{color:#d97706}
 </style>
