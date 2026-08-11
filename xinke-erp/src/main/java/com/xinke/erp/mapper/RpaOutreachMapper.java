@@ -15,10 +15,14 @@ public interface RpaOutreachMapper
     int createTrackingConfigTable();
     int createViewerTrackingRuleTable();
     int createViewerBlacklistTable();
+    int createMarketingSuppressionTable();
     int initializeTrackingConfig();
     int upgradeDefaultTrackingLookback();
     int upgradeRoomShopKeyLength();
     int upgradeTaskSecUidLength();
+    int selectColumnExists(@Param("tableName") String tableName, @Param("columnName") String columnName);
+    int addShopConfigColumn(@Param("definition") String definition);
+    int addTaskColumn(@Param("definition") String definition);
 
     int releaseExpiredTasks();
     int expireBatches();
@@ -67,4 +71,5 @@ public interface RpaOutreachMapper
     int closeBatchesWithoutActiveTasks();
     int deleteBlacklistByIds(@Param("blacklistIds") List<Long> blacklistIds);
     int deleteRoomBinding(@Param("roomKey") String roomKey);
+    int upsertMarketingSuppression(Map<String, Object> data);
 }

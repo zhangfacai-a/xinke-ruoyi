@@ -23,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xinke.common.exception.ServiceException;
 import com.xinke.erp.domain.RpaBlacklistRequest;
 import com.xinke.erp.domain.RpaRoomBindingRequest;
@@ -45,6 +46,7 @@ class RpaOutreachServiceImplTest
     void setUp()
     {
         ReflectionTestUtils.setField(service, "leaseMinutes", 30);
+        ReflectionTestUtils.setField(service, "objectMapper", new ObjectMapper());
     }
 
     @Test

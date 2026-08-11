@@ -176,6 +176,14 @@ export function addRpaShop(data) {
   })
 }
 
+export function updateRpaShop(shopConfigId, data) {
+  return request({
+    url: `/live/rpa/shop/${shopConfigId}`,
+    method: 'put',
+    data
+  })
+}
+
 export function bindRpaShopRooms(shopConfigId, roomKeys) {
   return request({
     url: `/live/rpa/shop/${shopConfigId}/rooms`,

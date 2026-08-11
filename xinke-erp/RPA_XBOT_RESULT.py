@@ -34,11 +34,17 @@ def _as_bool(value):
 
 def _validate(payload):
     outcome = payload["outcome"]
-    allowed = {"ORDERED", "CONTACTED", "SKIPPED", "FAILED", "RETRYABLE_ERROR"}
+    allowed = {
+        "NOT_ORDERED", "UNPAID", "PAID", "FULFILLING", "COMPLETED", "CANCELLED",
+        "REFUNDING", "PARTIAL_REFUNDED", "REFUNDED", "ORDER_QUERY_FAILED",
+        "ORDERED", "CONTACTED", "SKIPPED", "FAILED", "RETRYABLE_ERROR"
+    }
     if outcome not in allowed:
         raise ValueError("不支持的 outcome: " + outcome)
     if outcome == "ORDERED" and (not payload.get("douyinNo") or not payload.get("orderNo")):
         raise ValueError("ORDERED 必须提供 douyin_no 和 order_no")
+    if outcome in {"UNPAID", "PAID", "FULFILLING", "COMPLETED", "REFUNDING", "PARTIAL_REFUNDED", "REFUNDED"} and not payload.get("orderNo"):
+        raise ValueError(outcome + " must include order_no")
     if outcome == "CONTACTED":
         if not payload.get("douyinNo"):
             raise ValueError("CONTACTED 必须提供 douyin_no")
@@ -104,6 +110,11 @@ def main(args):
         "message_content": "messageContent",
         "result_code": "resultCode",
         "error_message": "errorMessage",
+        "order_status": "orderStatus",
+        "refund_status": "refundStatus",
+        "refund_reason": "refundReason",
+        "order_time": "orderTime",
+        "refund_time": "refundTime",
     }
     for input_name, api_name in optional_text.items():
         value = args.get(input_name)
@@ -113,6 +124,8 @@ def main(args):
         payload["followed"] = _as_bool(args.get("followed"))
     if "messaged" in args:
         payload["messaged"] = _as_bool(args.get("messaged"))
+    if args.get("refund_amount") is not None and str(args.get("refund_amount")).strip() != "":
+        payload["refundAmount"] = float(args.get("refund_amount"))
 
     _validate(payload)
     base_url = BASE_URL.rstrip("/")
@@ -121,5 +134,5 @@ def main(args):
     print("开始回传任务结果: " + task_no)
     data = _post_json(base_url + "/task/result", api_key, payload, timeout_seconds, retries)
     data["requestId"] = request_id
-    print("任务结果回传成功: " + task_no)
+    print("任务结果回传成功: {0}，状态: {1}".format(task_no, data.get("status") or "-"))
     return data

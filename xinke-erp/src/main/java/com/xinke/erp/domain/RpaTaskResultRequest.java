@@ -1,5 +1,7 @@
 package com.xinke.erp.domain;
 
+import java.math.BigDecimal;
+import java.util.Date;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -35,6 +37,13 @@ public class RpaTaskResultRequest extends RpaBatchRequest
     @Size(max = 1000, message = "errorMessage长度不能超过1000")
     private String errorMessage;
 
+    @Size(max = 32) private String orderStatus;
+    @Size(max = 32) private String refundStatus;
+    @Size(max = 255) private String refundReason;
+    private Date orderTime;
+    private Date refundTime;
+    private BigDecimal refundAmount;
+
     public String getRequestId() { return requestId; }
     public void setRequestId(String requestId) { this.requestId = requestId; }
     public String getTaskNo() { return taskNo; }
@@ -55,4 +64,16 @@ public class RpaTaskResultRequest extends RpaBatchRequest
     public void setResultCode(String resultCode) { this.resultCode = resultCode; }
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+    public String getOrderStatus() { return orderStatus; }
+    public void setOrderStatus(String value) { orderStatus = value; }
+    public String getRefundStatus() { return refundStatus; }
+    public void setRefundStatus(String value) { refundStatus = value; }
+    public String getRefundReason() { return refundReason; }
+    public void setRefundReason(String value) { refundReason = value; }
+    public Date getOrderTime() { return orderTime; }
+    public void setOrderTime(Date value) { orderTime = value; }
+    public Date getRefundTime() { return refundTime; }
+    public void setRefundTime(Date value) { refundTime = value; }
+    public BigDecimal getRefundAmount() { return refundAmount; }
+    public void setRefundAmount(BigDecimal value) { refundAmount = value; }
 }

@@ -75,7 +75,11 @@ def main(args):
     print("开始领取RPA任务")
     data = _post_json(base_url + "/task/claim", api_key, payload, timeout_seconds, retries)
     if data.get("available"):
-        print("领取成功，本批任务数: {0}".format(len(data.get("tasks") or [])))
+        batch = data.get("batch") or {}
+        tasks = data.get("tasks") or []
+        print("领取成功，批次: {0}，店铺: {1}，任务数: {2}".format(
+            batch.get("batchNo") or "-", batch.get("shopName") or "-", len(tasks)))
+        print("本批租约秒数: {0}".format(data.get("leaseSeconds") or 0))
     else:
         print("当前无任务，建议{0}秒后重试".format(data.get("retryAfterSeconds") or 60))
     return data
