@@ -154,6 +154,16 @@ class RpaOutreachServiceImplTest
     }
 
     @Test
+    void reclaimExpiredLeasesRequeuesTasksBeforeExpiringBatches()
+    {
+        service.reclaimExpiredLeases();
+
+        var ordered = org.mockito.Mockito.inOrder(rpaOutreachMapper);
+        ordered.verify(rpaOutreachMapper).releaseExpiredTasks();
+        ordered.verify(rpaOutreachMapper).expireBatches();
+    }
+
+    @Test
     void orderedResultUpdatesTaskAndLead()
     {
         when(rpaOutreachMapper.selectTaskForUpdate("TASK-1")).thenReturn(leasedTask());

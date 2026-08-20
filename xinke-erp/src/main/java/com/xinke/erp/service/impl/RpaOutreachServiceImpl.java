@@ -97,6 +97,13 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void reclaimExpiredLeases()
+    {
+        cleanupExpiredLeases();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> claim(RpaTaskClaimRequest request)
     {
         cleanupExpiredLeases();
@@ -468,6 +475,7 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
     @Override
     public List<Map<String, Object>> listWorkbench(Map<String, Object> query)
     {
+        cleanupExpiredLeases();
         Map<String, Object> normalized = workbenchQuery(query);
         String view = str(normalized.get("view")).toUpperCase(Locale.ROOT);
         return switch (view)
@@ -481,6 +489,7 @@ public class RpaOutreachServiceImpl implements IRpaOutreachService
     @Override
     public Map<String, Object> workbenchStats(Map<String, Object> query)
     {
+        cleanupExpiredLeases();
         return rpaOutreachMapper.selectWorkbenchStats(workbenchQuery(query));
     }
 

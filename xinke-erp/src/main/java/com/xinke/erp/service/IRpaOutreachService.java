@@ -17,6 +17,8 @@ public interface IRpaOutreachService
 
     Map<String, Object> health();
 
+    void reclaimExpiredLeases();
+
     Map<String, Object> claim(RpaTaskClaimRequest request);
 
     Map<String, Object> heartbeat(RpaBatchRequest request);
