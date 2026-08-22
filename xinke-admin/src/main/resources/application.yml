@@ -159,6 +159,13 @@ security:
 
 # 插件上报密钥。配置后，插件必须通过 X-Plugin-Key 请求头携带相同值。
 live:
+  dingtalk:
+    # 钉钉企业内部应用凭证，生产环境请通过环境变量注入。
+    app-key: dingsl2actbbkulcqquf
+    app-secret: tEefFZT8IfHby1YNslE8U8FJBBBywk-WIFkaJPPTE9hjkCWeNOeB4Jxhpn-Lz1AH
+    # 新同步用户的初始密码；已有用户密码不会被覆盖。每天 02:30 自动同步。
+    default-password: ${DINGTALK_DEFAULT_PASSWORD:xk123456}
+    sync-cron: ${DINGTALK_SYNC_CRON:0 30 2 * * ?}
   plugin:
     report-key: test-plugin-report-key-2026
   rpa:

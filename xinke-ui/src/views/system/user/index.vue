@@ -38,6 +38,9 @@
             <el-button type="info" plain icon="Upload" @click="handleImport" v-hasPermi="['system:user:import']">导入</el-button>
           </el-col>
           <el-col :span="1.5">
+            <el-button type="primary" plain icon="Refresh" :loading="dingSyncing" @click="handleDingTalkSync" v-hasPermi="['system:user:add']">同步钉钉</el-button>
+          </el-col>
+          <el-col :span="1.5">
             <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['system:user:export']">导出</el-button>
           </el-col>
           <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" :columns="columns" storageKey="xxxxxxxx"></right-toolbar>
@@ -189,7 +192,7 @@ import TreePanel from "@/components/TreePanel"
 import ExcelImportDialog from "@/components/ExcelImportDialog"
 import UserViewDrawer from "./view"
 import { usePasswordRule } from "@/utils/passwordRule"
-import { changeUserStatus, listUser, resetUserPwd, delUser, getUser, updateUser, addUser, deptTreeSelect } from "@/api/system/user"
+import { changeUserStatus, listUser, resetUserPwd, delUser, getUser, updateUser, addUser, deptTreeSelect, syncDingTalkUsers } from "@/api/system/user"
 
 const router = useRouter()
 const { proxy } = getCurrentInstance()
@@ -199,6 +202,7 @@ const { sys_normal_disable, sys_user_sex } = useDict("sys_normal_disable", "sys_
 const userList = ref([])
 const open = ref(false)
 const loading = ref(true)
+const dingSyncing = ref(false)
 const showSearch = ref(true)
 const ids = ref([])
 const single = ref(true)
@@ -373,6 +377,22 @@ function handleViewData(row) {
 /** 导入按钮操作 */
 function handleImport() {
   proxy.$refs["importUserRef"].open()
+}
+
+async function handleDingTalkSync() {
+  dingSyncing.value = true
+  try {
+    const response = await syncDingTalkUsers()
+    const result = response.data || {}
+    proxy.$modal.msgSuccess(`同步完成：成功 ${result.success || 0} 人，停用 ${result.disabled || 0} 人`)
+    if (result.failures?.length) {
+      proxy.$alert(result.failures.slice(0, 30).join('\n'), '未同步人员')
+    }
+    getDeptTree()
+    getList()
+  } finally {
+    dingSyncing.value = false
+  }
 }
 
 /** 重置操作表单 */

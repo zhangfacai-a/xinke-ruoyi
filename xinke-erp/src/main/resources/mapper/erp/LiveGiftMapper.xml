@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.LiveGiftMapper">
+  <select id="selectLiveUserOptions" resultType="java.util.LinkedHashMap">
+    select u.user_id userId,u.nick_name userName,u.user_name account,u.phonenumber mobile,u.avatar,u.status,
+      d.dept_name departmentName,group_concat(distinct r.role_key order by r.role_key) roleCodes
+    from sys_user u left join sys_dept d on d.dept_id=u.dept_id
+      left join sys_user_role ur on ur.user_id=u.user_id
+      left join sys_role r on r.role_id=ur.role_id and r.del_flag='0' and r.status='0'
+    where u.del_flag='0'
+    <if test="keyword!=null and keyword!=''">and (u.nick_name like concat('%',#{keyword},'%') or u.user_name like concat('%',#{keyword},'%'))</if>
+    <if test="status!=null and status!=''">and u.status=#{status}</if>
+    <if test="roleCode!=null and roleCode!=''">
+      and exists(select 1 from sys_user_role xur join sys_role xr on xr.role_id=xur.role_id
+        where xur.user_id=u.user_id and xr.status='0' and xr.del_flag='0'
+        <choose>
+          <when test="roleCode=='anchor'">and (xr.role_key='anchor' or xr.role_name='主播')</when>
+          <when test="roleCode=='controller'">and (xr.role_key='controller' or xr.role_name='场控')</when>
+          <when test="roleCode=='manager'">and (xr.role_key='manager' or xr.role_name='运营' or xr.role_name='运营主管')</when>
+          <otherwise>and xr.role_key=#{roleCode}</otherwise>
+        </choose>)
+    </if>
+    group by u.user_id order by u.status,u.nick_name
+  </select>
+  <select id="selectDingDepartmentBinding" resultType="java.util.LinkedHashMap">
+    select b.ding_dept_id dingDeptId,b.sys_dept_id sysDeptId,b.parent_ding_dept_id parentDingDeptId,
+      d.parent_id parentId,d.ancestors,d.dept_name deptName,d.status
+    from live_ding_dept_bind b join sys_dept d on d.dept_id=b.sys_dept_id
+    where b.ding_dept_id=#{dingDeptId}
+  </select>
+  <select id="selectSystemDepartment" resultType="java.util.LinkedHashMap">
+    select dept_id sysDeptId,parent_id parentId,ancestors,dept_name deptName,status
+    from sys_dept where parent_id=#{parentId} and dept_name=#{deptName} and del_flag='0' limit 1
+  </select>
+  <insert id="insertSystemDepartment" parameterType="map" useGeneratedKeys="true" keyProperty="sysDeptId">
+    insert into sys_dept(parent_id,ancestors,dept_name,order_num,status,del_flag,create_by,create_time)
+    values(#{parentId},#{ancestors},#{deptName},#{orderNum},'0','0',#{username},sysdate())
+  </insert>
+  <update id="updateSystemDepartment" parameterType="map">
+    update sys_dept set parent_id=#{parentId},ancestors=#{ancestors},dept_name=#{deptName},
+      order_num=#{orderNum},status='0',del_flag='0',update_by=#{username},update_time=sysdate()
+    where dept_id=#{sysDeptId}
+  </update>
+  <insert id="upsertDingDepartmentBinding" parameterType="map">
+    insert into live_ding_dept_bind(ding_dept_id,sys_dept_id,parent_ding_dept_id,dept_name,sync_batch,last_sync_time,create_time)
+    values(#{dingDeptId},#{sysDeptId},#{parentDingDeptId},#{deptName},#{syncBatch},sysdate(),sysdate())
+    on duplicate key update sys_dept_id=values(sys_dept_id),parent_ding_dept_id=values(parent_ding_dept_id),
+      dept_name=values(dept_name),sync_batch=values(sync_batch),last_sync_time=sysdate()
+  </insert>
+  <update id="disableMissingDingDepartments">
+    update sys_dept d join live_ding_dept_bind b on b.sys_dept_id=d.dept_id
+    set d.status='1',d.update_by=#{username},d.update_time=sysdate()
+    where b.sync_batch&lt;&gt;#{syncBatch}
+  </update>
+  <select id="selectDingUserBinding" resultType="java.util.LinkedHashMap">
+    select b.ding_user_id dingUserId,b.user_id userId,u.user_name userName,u.status
+    from live_ding_user_bind b join sys_user u on u.user_id=b.user_id
+    where b.ding_user_id=#{dingUserId}
+  </select>
+  <select id="selectSystemUserByUserName" resultType="java.util.LinkedHashMap">
+    select user_id userId,user_name userName,status from sys_user
+    where (user_name=#{userName} or phonenumber=#{userName}) and del_flag='0'
+    order by (user_name=#{userName}) desc,user_id limit 1
+  </select>
+  <insert id="insertSystemUser" parameterType="map" useGeneratedKeys="true" keyProperty="userId">
+    insert into sys_user(dept_id,user_name,nick_name,phonenumber,avatar,sex,password,status,del_flag,create_by,create_time,remark)
+    values(#{deptId},#{userName},#{nickName},#{mobile},#{avatar},#{sex},#{password},#{status},'0',#{operator},sysdate(),'钉钉通讯录自动同步')
+  </insert>
+  <update id="updateSystemUser" parameterType="map">
+    update sys_user set dept_id=#{deptId},user_name=#{userName},nick_name=#{nickName},phonenumber=#{mobile},
+      avatar=#{avatar},sex=#{sex},status=#{status},del_flag='0',update_by=#{operator},update_time=sysdate()
+    where user_id=#{userId}
+  </update>
+  <update id="touchDingUserBinding">
+    update live_ding_user_bind set sync_batch=#{syncBatch},last_sync_time=sysdate() where ding_user_id=#{dingUserId}
+  </update>
+  <insert id="upsertDingUserBinding" parameterType="map">
+    insert into live_ding_user_bind(ding_user_id,user_id,sync_batch,last_sync_time,create_time)
+    values(#{dingUserId},#{userId},#{syncBatch},sysdate(),sysdate())
+    on duplicate key update user_id=values(user_id),sync_batch=values(sync_batch),last_sync_time=sysdate()
+  </insert>
+  <delete id="deleteDingUserBinding">
+    delete from live_ding_user_bind where ding_user_id=#{dingUserId}
+  </delete>
+  <update id="disableMissingDingUsers">
+    update sys_user u set u.status='1',u.update_by=#{username},u.update_time=sysdate()
+    where u.user_id&lt;&gt;1
+      and exists(select 1 from live_ding_user_bind old_bind where old_bind.user_id=u.user_id)
+      and not exists(select 1 from live_ding_user_bind current_bind
+        where current_bind.user_id=u.user_id and current_bind.sync_batch=#{syncBatch})
+  </update>
+  <select id="selectShopOptions" resultType="java.util.LinkedHashMap">select shop_id shopId,shop_code shopCode,shop_name shopName,platform_name platformName,status from erp_shop where status='0' order by shop_name</select>
+  <select id="selectShops" resultType="java.util.LinkedHashMap">
+    select shop_id shopId,shop_code shopCode,shop_name shopName,platform_code platformCode,
+      platform_name platformName,owner_name ownerName,status,remark
+    from erp_shop
+    <where>
+      <if test="keyword!=null and keyword!=''">and (shop_code like concat('%',#{keyword},'%') or shop_name like concat('%',#{keyword},'%') or platform_name like concat('%',#{keyword},'%'))</if>
+      <if test="status!=null and status!=''">and status=#{status}</if>
+    </where>
+    order by status,shop_id desc
+  </select>
+  <select id="selectShopById" resultType="java.util.LinkedHashMap">
+    select shop_id shopId,shop_code shopCode,shop_name shopName,platform_code platformCode,
+      platform_name platformName,owner_name ownerName,status,remark from erp_shop where shop_id=#{shopId}
+  </select>
+  <insert id="insertShop" parameterType="map" useGeneratedKeys="true" keyProperty="shopId">
+    insert into erp_shop(shop_code,shop_name,platform_code,platform_name,owner_name,status,remark,create_by,create_time)
+    values(#{shopCode},#{shopName},#{platformCode},#{platformName},#{ownerName},#{status},#{remark},#{username},sysdate())
+  </insert>
+  <update id="updateShop" parameterType="map">
+    update erp_shop set shop_code=#{shopCode},shop_name=#{shopName},platform_code=#{platformCode},
+      platform_name=#{platformName},owner_name=#{ownerName},status=#{status},remark=#{remark},
+      update_by=#{username},update_time=sysdate() where shop_id=#{shopId}
+  </update>
+
+  <select id="selectRooms" resultType="java.util.LinkedHashMap">
+    select r.room_id roomId,r.room_code roomCode,r.room_name roomName,
+      r.platform_room_id platformRoomId,r.live_account liveAccount,r.owner_staff_id ownerStaffId,
+      u.nick_name ownerName,r.status,r.remark from live_room r
+      left join sys_user u on u.user_id=r.owner_staff_id
+    <where><if test="roomName!=null and roomName!=''">and r.room_name like concat('%',#{roomName},'%')</if>
+      <if test="status!=null and status!=''">and r.status=#{status}</if></where>
+    order by r.status,r.room_id desc
+  </select>
+  <select id="selectRoomById" resultType="java.util.LinkedHashMap">select room_id roomId,room_code roomCode,room_name roomName,platform_room_id platformRoomId,live_account liveAccount,owner_staff_id ownerStaffId,status,remark from live_room where room_id=#{roomId}</select>
+  <insert id="insertRoom" parameterType="map" useGeneratedKeys="true" keyProperty="roomId">insert into live_room(room_code,room_name,shop_id,platform_room_id,live_account,owner_staff_id,status,remark,create_by,create_time) values(#{roomCode},#{roomName},null,#{platformRoomId},#{liveAccount},#{ownerStaffId},#{status},#{remark},#{username},sysdate())</insert>
+  <update id="updateRoom" parameterType="map">update live_room set room_code=#{roomCode},room_name=#{roomName},shop_id=null,platform_room_id=#{platformRoomId},live_account=#{liveAccount},owner_staff_id=#{ownerStaffId},status=#{status},remark=#{remark},update_by=#{username},update_time=sysdate() where room_id=#{roomId}</update>
+
+  <select id="selectSubjectMappings" resultType="java.util.LinkedHashMap">
+    select x.subjectType,x.subjectId,x.subjectCode,x.subjectName,x.status,
+      (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='anchor') anchorIds,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='anchor') anchorNames,
+      (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='controller') controllerIds,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='controller') controllerNames
+    from (
+      select 'ROOM' subjectType,room_id subjectId,room_code subjectCode,room_name subjectName,status from live_room
+      union all
+      select 'SHOP' subjectType,shop_id subjectId,shop_code subjectCode,shop_name subjectName,status from erp_shop
+    ) x
+    <where>
+      <if test="subjectType!=null and subjectType!=''">and x.subjectType=#{subjectType}</if>
+      <if test="keyword!=null and keyword!=''">and (x.subjectCode like concat('%',#{keyword},'%') or x.subjectName like concat('%',#{keyword},'%'))</if>
+    </where>
+    order by x.subjectType,x.status,x.subjectName
+  </select>
+  <delete id="deleteSubjectMappings">delete from live_subject_user_map where subject_type=#{subjectType} and subject_id=#{subjectId}</delete>
+  <insert id="insertSubjectMapping">
+    insert into live_subject_user_map(subject_type,subject_id,user_id,role_code,create_by,create_time)
+    values(#{subjectType},#{subjectId},#{userId},#{roleCode},#{username},sysdate())
+  </insert>
+
+  <select id="selectDailyRecords" resultType="java.util.LinkedHashMap">
+    select d.daily_id dailyId,d.live_date liveDate,d.shop_id shopId,s.shop_name shopName,d.room_id roomId,r.room_name roomName,d.remark,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_daily_user ds join sys_user u on u.user_id=ds.user_id where ds.daily_id=d.daily_id and ds.role_code='anchor') anchors,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_daily_user ds join sys_user u on u.user_id=ds.user_id where ds.daily_id=d.daily_id and ds.role_code='controller') controllers,
+      (select count(*) from erp_order_gift_status ogs where ogs.daily_id=d.daily_id) handledOrders,
+      (select ifnull(sum(og.total_cost),0) from erp_order_gift_status ogs join erp_order_gift og on og.order_no=ogs.order_no and og.cost_status='included' where ogs.daily_id=d.daily_id) giftCost
+    from live_daily_record d join erp_shop s on s.shop_id=d.shop_id join live_room r on r.room_id=d.room_id
+    <where><if test="beginDate!=null and beginDate!=''">and d.live_date&gt;=#{beginDate}</if><if test="endDate!=null and endDate!=''">and d.live_date&lt;=#{endDate}</if><if test="shopId!=null">and d.shop_id=#{shopId}</if><if test="roomId!=null">and d.room_id=#{roomId}</if></where>
+    order by d.live_date desc,d.daily_id desc
+  </select>
+  <select id="selectDailyById" resultType="java.util.LinkedHashMap">select d.daily_id dailyId,d.live_date liveDate,d.shop_id shopId,d.room_id roomId,d.remark,(select group_concat(user_id) from live_daily_user where daily_id=d.daily_id and role_code='anchor') anchorIds,(select group_concat(user_id) from live_daily_user where daily_id=d.daily_id and role_code='controller') controllerIds from live_daily_record d where d.daily_id=#{dailyId}</select>
+  <insert id="insertDaily" parameterType="map" useGeneratedKeys="true" keyProperty="dailyId">insert into live_daily_record(live_date,shop_id,room_id,remark,create_by,create_time) values(#{liveDate},#{shopId},#{roomId},#{remark},#{username},sysdate())</insert>
+  <update id="updateDaily" parameterType="map">update live_daily_record set live_date=#{liveDate},shop_id=#{shopId},room_id=#{roomId},remark=#{remark},update_by=#{username},update_time=sysdate() where daily_id=#{dailyId}</update>
+  <delete id="deleteDailyStaff">delete from live_daily_user where daily_id=#{dailyId}</delete>
+  <insert id="insertDailyStaff">insert into live_daily_user(daily_id,user_id,role_code) values(#{dailyId},#{userId},#{roleCode})</insert>
+
+  <select id="selectGifts" resultType="java.util.LinkedHashMap">
+    select g.gift_id giftId,g.gift_code giftCode,g.gift_name giftName,g.short_name shortName,g.brand,g.model,g.specification,g.unit,g.category,g.image_url imageUrl,g.purchase_type purchaseType,g.status,g.sort_order sortOrder,g.remark,
+      coalesce(p.hidden,0) personalHidden,coalesce(p.pinned,0) personalPinned,coalesce(p.sort_order,0) personalSortOrder,
+      (select c.unit_cost from erp_gift_cost c where c.gift_id=g.gift_id and c.effective_date&lt;=<choose><when test="costDate!=null and costDate!=''">#{costDate}</when><otherwise>current_date</otherwise></choose> order by c.effective_date desc,c.cost_id desc limit 1) currentCost,
+      (select c.effective_date from erp_gift_cost c where c.gift_id=g.gift_id and c.effective_date&lt;=<choose><when test="costDate!=null and costDate!=''">#{costDate}</when><otherwise>current_date</otherwise></choose> order by c.effective_date desc,c.cost_id desc limit 1) costEffectiveDate,
+      (select group_concat(a.alias_name separator '、') from erp_gift_alias a where a.gift_id=g.gift_id) aliases
+    from erp_gift g left join live_user_gift_preference p on p.gift_id=g.gift_id and p.user_id=#{userId} <where><if test="keyword!=null and keyword!=''">and (g.gift_code like concat('%',#{keyword},'%') or g.gift_name like concat('%',#{keyword},'%') or g.short_name like concat('%',#{keyword},'%') or exists(select 1 from erp_gift_alias a where a.gift_id=g.gift_id and a.alias_name like concat('%',#{keyword},'%')))</if><if test="status!=null and status!=''">and g.status=#{status}</if><if test="userId!=null and (includeHidden==null or includeHidden.toString()!=&quot;1&quot;)">and coalesce(p.hidden,0)=0</if></where>
+    order by coalesce(p.pinned,0) desc,coalesce(p.sort_order,0),g.status,g.sort_order,g.gift_id desc
+  </select>
+  <select id="selectGiftById" resultType="java.util.LinkedHashMap">select gift_id giftId,gift_code giftCode,gift_name giftName,short_name shortName,brand,model,specification,unit,category,image_url imageUrl,purchase_type purchaseType,status,sort_order sortOrder,remark,(select group_concat(alias_name separator ',') from erp_gift_alias where gift_id=g.gift_id) aliases from erp_gift g where gift_id=#{giftId}</select>
+  <select id="selectGiftByCode" resultType="java.util.LinkedHashMap">select gift_id giftId,gift_code giftCode,gift_name giftName,status from erp_gift where gift_code=#{giftCode}</select>
+  <select id="selectGiftByName" resultType="java.util.LinkedHashMap">
+    select gift_id giftId,gift_code giftCode,gift_name giftName from erp_gift
+    where gift_name=#{giftName}<if test="excludeGiftId!=null">and gift_id&lt;&gt;#{excludeGiftId}</if>
+    order by gift_id limit 1
+  </select>
+  <insert id="insertGift" parameterType="map" useGeneratedKeys="true" keyProperty="giftId">insert into erp_gift(gift_code,gift_name,short_name,brand,model,specification,unit,category,image_url,purchase_type,status,sort_order,remark,create_by,create_time) values(#{giftCode},#{giftName},#{shortName},#{brand},#{model},#{specification},#{unit},#{category},#{imageUrl},#{purchaseType},#{status},#{sortOrder},#{remark},#{username},sysdate())</insert>
+  <update id="updateGift" parameterType="map">update erp_gift set gift_code=#{giftCode},gift_name=#{giftName},short_name=#{shortName},brand=#{brand},model=#{model},specification=#{specification},unit=#{unit},category=#{category},image_url=#{imageUrl},purchase_type=#{purchaseType},status=#{status},sort_order=#{sortOrder},remark=#{remark},update_by=#{username},update_time=sysdate() where gift_id=#{giftId}</update>
+  <delete id="deleteGiftAliases">delete from erp_gift_alias where gift_id=#{giftId}</delete>
+  <insert id="insertGiftAlias">insert ignore into erp_gift_alias(gift_id,alias_name) values(#{giftId},#{aliasName})</insert>
+  <insert id="insertGiftVersion">
+    insert into erp_gift_version(gift_id,action_type,gift_code,gift_name,short_name,brand,model,specification,unit,category,purchase_type,status,sort_order,aliases_snapshot,remark,create_by,create_time)
+    select g.gift_id,#{actionType},g.gift_code,g.gift_name,g.short_name,g.brand,g.model,g.specification,g.unit,g.category,g.purchase_type,g.status,g.sort_order,
+      (select group_concat(a.alias_name order by a.alias_name separator '、') from erp_gift_alias a where a.gift_id=g.gift_id),g.remark,#{username},sysdate()
+    from erp_gift g where g.gift_id=#{giftId}
+  </insert>
+  <select id="selectGiftVersions" resultType="java.util.LinkedHashMap">
+    select version_id versionId,action_type actionType,gift_code giftCode,gift_name giftName,short_name shortName,
+      specification,unit,status,sort_order sortOrder,aliases_snapshot aliases,remark,create_by createBy,create_time createTime
+    from erp_gift_version where gift_id=#{giftId} order by version_id desc
+  </select>
+  <select id="selectGiftCosts" resultType="java.util.LinkedHashMap">select cost_id costId,gift_id giftId,unit_cost unitCost,effective_date effectiveDate,change_reason changeReason,create_by createBy,create_time createTime from erp_gift_cost where gift_id=#{giftId} order by effective_date desc,cost_id desc</select>
+  <select id="selectGiftCostByDate" resultType="java.util.LinkedHashMap">select cost_id costId from erp_gift_cost where gift_id=#{giftId} and effective_date=#{effectiveDate} limit 1</select>
+  <select id="selectApplicableCost" resultType="java.util.LinkedHashMap">select cost_id costId,unit_cost unitCost,effective_date effectiveDate from erp_gift_cost where gift_id=#{giftId} and effective_date&lt;=#{costDate} order by effective_date desc,cost_id desc limit 1</select>
+  <insert id="insertGiftCost" parameterType="map">insert into erp_gift_cost(gift_id,unit_cost,effective_date,change_reason,create_by,create_time) values(#{giftId},#{unitCost},#{effectiveDate},#{changeReason},#{username},sysdate())</insert>
+  <insert id="upsertGiftPreference" parameterType="map">insert into live_user_gift_preference(user_id,gift_id,hidden,pinned,sort_order,update_by,update_time) values(#{userId},#{giftId},#{hidden},#{pinned},#{sortOrder},#{username},sysdate()) on duplicate key update hidden=values(hidden),pinned=values(pinned),sort_order=values(sort_order),update_by=values(update_by),update_time=sysdate()</insert>
+
+  <select id="selectQuickTemplates" resultType="java.util.LinkedHashMap">
+    select template_id templateId,template_name templateName,content_json contentJson,status,sort_order sortOrder,
+      create_time createTime,update_time updateTime from live_quick_template where user_id=#{userId}
+    order by status,sort_order,template_id desc
+  </select>
+  <select id="selectQuickTemplate" resultType="java.util.LinkedHashMap">
+    select template_id templateId,template_name templateName,content_json contentJson,status,sort_order sortOrder,
+      create_time createTime,update_time updateTime from live_quick_template where template_id=#{templateId} and user_id=#{userId}
+  </select>
+  <insert id="insertQuickTemplate" parameterType="map" useGeneratedKeys="true" keyProperty="templateId">
+    insert into live_quick_template(user_id,template_name,content_json,status,sort_order,create_by,create_time)
+    values(#{userId},#{templateName},cast(#{contentJson} as json),#{status},#{sortOrder},#{username},sysdate())
+  </insert>
+  <update id="updateQuickTemplate" parameterType="map">
+    update live_quick_template set template_name=#{templateName},content_json=cast(#{contentJson} as json),status=#{status},
+      sort_order=#{sortOrder},update_by=#{username},update_time=sysdate() where template_id=#{templateId} and user_id=#{userId}
+  </update>
+  <delete id="deleteQuickTemplate">delete from live_quick_template where template_id=#{templateId} and user_id=#{userId}</delete>
+
+  <select id="selectOrderByNo" resultType="java.util.LinkedHashMap">select o.sales_id salesId,o.main_order_no orderNo,o.shop_id shopId,o.shop_name shopName,o.pay_amount payAmount,o.pay_time payTime,date(o.pay_time) orderDate,o.order_status orderStatus,group_concat(i.product_name order by i.item_id separator '；') productName,sum(i.quantity) quantity from erp_sales_order o left join erp_sales_order_item i on i.sales_id=o.sales_id where o.main_order_no=#{orderNo} group by o.sales_id limit 1</select>
+  <select id="selectOrderGiftStatus" resultType="java.util.LinkedHashMap">select order_no orderNo,process_status processStatus,daily_id dailyId,operator_note operatorNote,anchor_user_id anchorUserId,anchor_name_snapshot anchorNameSnapshot,controller_user_id controllerUserId,controller_name_snapshot controllerNameSnapshot,refund_amount refundAmount,refund_reason refundReason,other_remark otherRemark,after_sale_compensation afterSaleCompensation,service_mark serviceMark,extended_warranty extendedWarranty,price_protection priceProtection,`delayed` `delayed`,follow_up followUp,urgent,template_id templateId,template_name_snapshot templateNameSnapshot,parsed_text parsedText,create_by createBy,create_time createTime,update_by updateBy,update_time updateTime from erp_order_gift_status where order_no=#{orderNo}</select>
+  <select id="selectOrderGiftItems" resultType="java.util.LinkedHashMap">select order_gift_id orderGiftId,order_no orderNo,gift_id giftId,quantity,gift_name_snapshot giftName,specification_snapshot specification,unit_snapshot unit,unit_cost_snapshot unitCost,total_cost totalCost,price_effective_date priceEffectiveDate,cost_status costStatus from erp_order_gift where order_no=#{orderNo} order by order_gift_id</select>
+  <insert id="upsertOrderGiftStatus" parameterType="map">insert into erp_order_gift_status(order_no,process_status,daily_id,operator_note,anchor_user_id,anchor_name_snapshot,controller_user_id,controller_name_snapshot,refund_amount,refund_reason,other_remark,after_sale_compensation,service_mark,extended_warranty,price_protection,`delayed`,follow_up,urgent,template_id,template_name_snapshot,parsed_text,create_by,create_time) values(#{orderNo},#{processStatus},#{dailyId},#{operatorNote},#{anchorUserId},#{anchorNameSnapshot},#{controllerUserId},#{controllerNameSnapshot},#{refundAmount},#{refundReason},#{otherRemark},#{afterSaleCompensation},#{serviceMark},#{extendedWarranty},#{priceProtection},#{delayed},#{followUp},#{urgent},#{templateId},#{templateNameSnapshot},#{parsedText},#{username},sysdate()) on duplicate key update process_status=values(process_status),daily_id=values(daily_id),operator_note=values(operator_note),anchor_user_id=values(anchor_user_id),anchor_name_snapshot=values(anchor_name_snapshot),controller_user_id=values(controller_user_id),controller_name_snapshot=values(controller_name_snapshot),refund_amount=values(refund_amount),refund_reason=values(refund_reason),other_remark=values(other_remark),after_sale_compensation=values(after_sale_compensation),service_mark=values(service_mark),extended_warranty=values(extended_warranty),price_protection=values(price_protection),`delayed`=values(`delayed`),follow_up=values(follow_up),urgent=values(urgent),template_id=values(template_id),template_name_snapshot=values(template_name_snapshot),parsed_text=values(parsed_text),update_by=#{username},update_time=sysdate()</insert>
+  <delete id="deleteOrderGiftItems">delete from erp_order_gift where order_no=#{orderNo}</delete>
+  <insert id="insertOrderGift" parameterType="map">insert into erp_order_gift(order_no,gift_id,quantity,gift_name_snapshot,specification_snapshot,unit_snapshot,unit_cost_snapshot,total_cost,price_effective_date,cost_status,create_by,create_time) values(#{orderNo},#{giftId},#{quantity},#{giftName},#{specification},#{unit},#{unitCost},#{totalCost},#{effectiveDate},'included',#{username},sysdate())</insert>
+  <insert id="insertOrderGiftLog">insert into erp_order_gift_log(order_no,action_type,detail_json,operator_name,action_time) values(#{orderNo},#{actionType},#{detailJson},#{operatorName},sysdate())</insert>
+  <select id="selectOrderGiftLedger" resultType="java.util.LinkedHashMap">select s.order_no orderNo,date(max(s.create_time)) entryDate,max(s.create_time) createTime,max(s.process_status) processStatus,max(s.anchor_name_snapshot) anchorName,max(s.controller_name_snapshot) controllerName,max(s.refund_amount) refundAmount,max(s.refund_reason) refundReason,max(s.other_remark) otherRemark,max(s.after_sale_compensation) afterSaleCompensation,max(s.service_mark) serviceMark,max(s.extended_warranty) extendedWarranty,max(s.price_protection) priceProtection,max(s.`delayed`) `delayed`,max(s.follow_up) followUp,max(s.urgent) urgent,max(s.operator_note) operatorNote,max(s.create_by) createBy,max(coalesce(s.update_by,s.create_by)) operateBy,max(coalesce(s.update_time,s.create_time)) operateTime,group_concat(concat(g.gift_name_snapshot,'×',g.quantity) order by g.order_gift_id separator '、') giftText,ifnull(sum(if(g.cost_status='included',g.total_cost,0)),0) giftCost,ifnull(sum(g.quantity),0) giftQuantity from erp_order_gift_status s left join erp_order_gift g on g.order_no=s.order_no <where><if test="orderNo!=null and orderNo!=''">and s.order_no like concat('%',#{orderNo},'%')</if><if test="beginDate!=null and beginDate!=''">and date(coalesce(s.update_time,s.create_time))&gt;=#{beginDate}</if><if test="endDate!=null and endDate!=''">and date(coalesce(s.update_time,s.create_time))&lt;=#{endDate}</if><if test="giftName!=null and giftName!=''">and exists(select 1 from erp_order_gift fg where fg.order_no=s.order_no and fg.gift_name_snapshot=#{giftName})</if><if test="processStatus!=null and processStatus!=''">and s.process_status=#{processStatus}</if></where> group by s.order_no order by operateTime desc</select>
+  <select id="selectGiftSummary" resultType="java.util.LinkedHashMap">select count(*) handledOrders,sum(if(x.process_status='selected',1,0)) giftOrders,ifnull(sum(x.gift_quantity),0) giftQuantity,ifnull(sum(x.gift_cost),0) giftCost,ifnull(sum(x.pay_amount),0) orderAmount from (select s.order_no,s.process_status,max(o.pay_amount) pay_amount,ifnull(sum(g.quantity),0) gift_quantity,ifnull(sum(if(g.cost_status='included',g.total_cost,0)),0) gift_cost from erp_order_gift_status s left join erp_sales_order o on o.main_order_no=s.order_no left join erp_order_gift g on g.order_no=s.order_no <where><if test="beginDate!=null and beginDate!=''">and date(o.pay_time)&gt;=#{beginDate}</if><if test="endDate!=null and endDate!=''">and date(o.pay_time)&lt;=#{endDate}</if><if test="shopName!=null and shopName!=''">and o.shop_name=#{shopName}</if></where> group by s.order_no,s.process_status) x</select>
+  <select id="selectGiftSummaryGroups" resultType="java.util.LinkedHashMap">select <choose><when test="groupBy=='gift'">g.gift_name_snapshot</when><when test="groupBy=='date'">date(o.pay_time)</when><otherwise>o.shop_name</otherwise></choose> groupName,count(distinct s.order_no) orderCount,ifnull(sum(g.quantity),0) giftQuantity,ifnull(sum(if(g.cost_status='included',g.total_cost,0)),0) giftCost from erp_order_gift_status s left join erp_sales_order o on o.main_order_no=s.order_no left join erp_order_gift g on g.order_no=s.order_no <where><if test="beginDate!=null and beginDate!=''">and date(o.pay_time)&gt;=#{beginDate}</if><if test="endDate!=null and endDate!=''">and date(o.pay_time)&lt;=#{endDate}</if><if test="shopName!=null and shopName!=''">and o.shop_name=#{shopName}</if></where> group by groupName order by giftCost desc</select>
+  <insert id="insertDingSyncLog" parameterType="map">insert into live_ding_sync_log(sync_status,total_count,success_count,failure_count,error_message,create_by,create_time) values(#{syncStatus},#{totalCount},#{successCount},#{failureCount},#{errorMessage},#{username},sysdate())</insert>
+</mapper>

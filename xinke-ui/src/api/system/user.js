@@ -70,6 +70,14 @@ export function changeUserStatus(userId, status) {
   })
 }
 
+// 将钉钉通讯录同步到系统用户
+export function syncDingTalkUsers() {
+  return request({
+    url: '/live/gift/staff/sync',
+    method: 'post'
+  })
+}
+
 // 查询用户个人信息
 export function getUserProfile() {
   return request({
