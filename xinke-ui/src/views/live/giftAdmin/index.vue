@@ -2,7 +2,11 @@
   <div class="app-container material-center">
     <header class="page-head"><div><h2>直播资料</h2><p>礼品、直播间、人员和常用话术都在这里维护。</p></div></header>
     <el-tabs v-if="tabs.length" v-model="activeTab" class="center-tabs" @tab-change="loadActiveTab">
-      <el-tab-pane v-if="canGift" label="礼品管理" name="gift"><GiftCatalog embedded /></el-tab-pane>
+      <el-tab-pane v-if="canGift" label="礼品与库存" name="gift">
+        <nav class="gift-workbench-nav" aria-label="礼品资料视图"><button v-for="item in giftSections" :key="item.value" type="button" :class="{active:giftSection===item.value}" @click="giftSection=item.value"><span>{{ item.label }}</span><small>{{ item.value==='catalog'?'维护名称、成本和搜索别名':'处理入库、盘点和库存流水' }}</small></button></nav>
+        <GiftCatalog v-show="giftSection==='catalog'" embedded />
+        <GiftInventory v-if="canInventory" v-show="giftSection==='inventory'" embedded />
+      </el-tab-pane>
       <el-tab-pane v-if="canSubject" label="直播间 / 店铺" name="subject">
         <div class="toolbar">
           <el-segmented v-model="subjectKind" :options="subjectKinds" @change="loadSubjects" />
@@ -57,12 +61,16 @@
 
 <script setup name="GiftAdmin">
 import GiftCatalog from '@/views/live/giftCatalog/index.vue'
+import GiftInventory from '@/views/live/giftInventory/index.vue'
+import { useRoute } from 'vue-router'
 import {checkPermi} from '@/utils/permission'
 import {assertLiveTemplateParsable,booleanValue,formatLiveTemplate,LIVE_TEMPLATE_FIELDS,parseLiveTemplate} from '@/utils/liveTemplateCodec'
 import {deleteTemplate,getRoom,getShop,getTemplate,listGifts,listMappings,listRooms,listShops,listStaff,listTemplates,saveMapping,saveRoom,saveShop,saveTemplate} from '@/api/live/gift'
 const {proxy}=getCurrentInstance()
-const canGift=checkPermi(['live:gift:catalog']),canRoom=checkPermi(['live:gift:room']),canMapping=checkPermi(['live:gift:mapping']),canTemplate=checkPermi(['live:gift:template']),canSubject=canRoom||canMapping
+const route=useRoute()
+const canGift=checkPermi(['live:gift:catalog']),canInventory=checkPermi(['live:gift:inventory']),canRoom=checkPermi(['live:gift:room']),canMapping=checkPermi(['live:gift:mapping']),canTemplate=checkPermi(['live:gift:template']),canSubject=canRoom||canMapping
 const tabs=[canGift&&'gift',canSubject&&'subject',canTemplate&&'template'].filter(Boolean),activeTab=ref(tabs[0]||''),saving=ref(false)
+const giftSection=ref('catalog'),giftSections=computed(()=>[{label:'礼品档案',value:'catalog'},...(canInventory?[{label:'库存管理',value:'inventory'}]:[])])
 const subjectKind=ref('ROOM'),subjects=ref([]),subjectLoading=ref(false),subjectVisible=ref(false),subjectFormRef=ref(),subjectForm=ref({}),subjectQuery=ref({keyword:'',status:''}),staffOptions=ref([]),mappingVisible=ref(false),mappingForm=ref({anchorIds:[],controllerIds:[]})
 const subjectKinds=[{label:'直播间',value:'ROOM'},{label:'店铺',value:'SHOP'}],statusOptions=[{label:'全部',value:''},{label:'启用',value:'0'},{label:'停用',value:'1'}],subjectRules={code:[{required:true,message:'请输入平台ID',trigger:'blur'}],name:[{required:true,message:'请输入名称',trigger:'blur'}]}
 const templates=ref([]),giftOptions=ref([]),templateMappings=ref([]),templateEditorRef=ref(),templateComposeRef=ref()
@@ -98,13 +106,15 @@ async function applyParsedTemplate(){parserError.value='';if(!parserText.value.t
 async function submitTemplate(){if(!templateForm.value.templateName)return proxy.$modal.msgWarning('请输入模板名称');if(!selectedFields.value.length&&!templateForm.value.content.gifts.some(item=>item.giftId))return proxy.$modal.msgWarning('请至少添加一个字段或礼品');try{assertLiveTemplateParsable(templateForm.value.content,giftOptions.value)}catch(error){return proxy.$modal.msgError(error.message)}saving.value=true;try{await saveTemplate(templateForm.value);proxy.$modal.msgSuccess('模板已保存');templateForm.value=emptyTemplate();await loadTemplates()}finally{saving.value=false}}
 async function removeTemplate(){await proxy.$modal.confirm(`确认删除模板“${templateForm.value.templateName}”吗？`);await deleteTemplate(templateForm.value.templateId);proxy.$modal.msgSuccess('模板已删除');templateForm.value=emptyTemplate();await loadTemplates()}
 async function copyPreview(){if(!templatePreview.value)return proxy.$modal.msgWarning('暂无可复制内容');try{const {text}=assertLiveTemplateParsable(templateForm.value.content,giftOptions.value);await navigator.clipboard.writeText(text);proxy.$modal.msgSuccess('已复制，可由系统直接解析')}catch(error){proxy.$modal.msgError(error.message)}}
-onMounted(()=>loadActiveTab(activeTab.value))
+onMounted(()=>{if(route.query.section==='inventory'&&canInventory){activeTab.value='gift';giftSection.value='inventory'}loadActiveTab(activeTab.value)})
 </script>
 
 <style scoped>
 :global(.subject-dialog.el-dialog:not(.is-fullscreen)){margin:auto!important}
+.gift-workbench-nav{display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid #dfe3e8}.gift-workbench-nav button{display:flex;min-width:220px;flex-direction:column;gap:3px;padding:11px 18px;border:0;border-bottom:3px solid transparent;background:transparent;color:#6b7280;text-align:left;cursor:pointer}.gift-workbench-nav button:hover{background:#fafafa;color:#303133}.gift-workbench-nav button.active{border-bottom-color:#f26b21;color:#c2410c}.gift-workbench-nav span{font-size:15px;font-weight:700}.gift-workbench-nav small{font-size:11px;color:#909399}
 .boolean-check{min-height:32px;padding:0 10px;border:1px solid #dcdfe6;border-radius:4px;background:#fafafa}.boolean-check.is-checked{border-color:#f26b21;background:#fff7f2}
 .material-center{max-width:1600px}.page-head{margin-bottom:8px}.page-head h2{margin:0 0 4px;font-size:22px}.page-head p{margin:0;color:#6b7280}.center-tabs :deep(.el-tabs__header){margin-bottom:16px}.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px}.toolbar .el-input{width:320px}.toolbar>.el-button:last-child{margin-left:auto}.staff-alert{margin-bottom:12px}.subject-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;min-height:180px}.subject-card{display:flex;min-width:0;flex-direction:column;padding:16px;border:1px solid #dfe3e8;border-radius:6px;background:#fff}.subject-card:hover{border-color:#f26b21;box-shadow:0 4px 14px rgba(23,32,51,.08)}.subject-card.disabled{background:#f7f8fa;opacity:.75}.subject-head{display:flex;justify-content:space-between;gap:10px}.subject-head small{color:#f26b21}.subject-head h3{overflow:hidden;margin:5px 0;font-size:17px;text-overflow:ellipsis;white-space:nowrap}.platform-id{color:#7a8591;font-family:Consolas,monospace;font-size:12px}.staff-block{margin-top:15px;padding:10px 0;border-top:1px solid #eef0f2;border-bottom:1px solid #eef0f2}.staff-line{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:start;gap:8px;padding:5px 0}.staff-line>span{color:#7a8591}.staff-line>div{display:flex;flex-wrap:wrap;gap:5px}.staff-line em{color:#a1a8b0;font-style:normal}.subject-actions{display:flex;justify-content:flex-end;margin-top:10px}.grid-empty{grid-column:1/-1}.template-toolbar{display:flex;align-items:flex-start;gap:10px;padding-bottom:12px}.template-chips{display:flex;flex:1;gap:8px;overflow-x:auto}.template-chips button,.field-palette button{display:inline-flex;align-items:center;gap:5px;border:1px solid #d8dde3;border-radius:5px;background:#fff;color:#4b5563;cursor:pointer}.template-chips button{flex:none;padding:9px 14px}.template-chips button:hover,.template-chips button.active,.field-palette button:hover{border-color:#f26b21;color:#d85209;background:#fff7f2}.template-editor{display:grid;grid-template-columns:minmax(480px,1.25fr) minmax(320px,.75fr);gap:24px;padding-top:16px;border-top:1px solid #ebeef5;scroll-margin-top:12px}.template-compose{min-width:0}.compose-head,.compose-actions,.gift-heading,.template-preview>div{display:flex;align-items:center}.compose-head{gap:12px}.compose-head>.el-input{max-width:440px}.compose-actions{gap:10px;margin-left:auto}.template-compose h4{margin:22px 0 10px}.field-palette{display:flex;flex-wrap:wrap;gap:8px}.field-palette button{padding:8px 11px}.selected-fields{margin-top:14px}.selected-row{display:grid;grid-template-columns:105px minmax(150px,1fr) 32px 32px 32px;align-items:center;gap:5px;padding:7px 0;border-bottom:1px solid #eef0f2}.selected-row>span{font-weight:600}.selected-row :deep(.el-input-number){width:100%}.gift-heading{justify-content:space-between}.gift-row{display:grid;grid-template-columns:minmax(180px,1fr) 150px 36px;gap:8px;margin-bottom:8px;scroll-margin:80px}.template-preview{position:sticky;top:10px;height:max-content;padding:16px;border-left:3px solid #f26b21;background:#f7f8fa}.template-preview>div{justify-content:space-between}.template-preview pre{min-height:300px;margin:14px 0 0;white-space:pre-wrap;word-break:break-word;font:14px/1.9 Consolas,"Microsoft YaHei",sans-serif}.parser-tip{margin-top:10px;color:#7a8591;font-size:13px}
 @media(max-width:900px){.template-editor{grid-template-columns:1fr}.template-preview{position:static;border-left:0;border-top:3px solid #f26b21}.toolbar .el-input{width:100%}}
+@media(max-width:650px){.gift-workbench-nav button{min-width:0;flex:1;padding:10px}.gift-workbench-nav small{display:none}}
 @media(max-width:600px){.subject-grid{grid-template-columns:1fr}.compose-head{align-items:stretch;flex-direction:column}.compose-actions{width:100%;justify-content:flex-end;margin-left:0}.selected-row{grid-template-columns:88px minmax(110px,1fr) 30px 30px 30px}.gift-row{grid-template-columns:minmax(145px,1fr) 100px 34px}}
 </style>

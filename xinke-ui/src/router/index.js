@@ -59,6 +59,17 @@ export const constantRoutes = [
     hidden: true,
     meta: { title: '直播追单BI', public: true }
   },
+  // Keep legacy live-ops links working after the menu is grouped into folders.
+  ...['giftLedger', 'giftCatalog', 'giftPreference', 'giftSummary', 'giftInventory', 'giftAdmin'].map(path => ({
+    path: `/live-ops/${path}`,
+    redirect: `/live-ops/gift/${path}`,
+    hidden: true
+  })),
+  ...['live-viewer', 'live-room', 'live-bi', 'live-plugin'].map(path => ({
+    path: `/live-ops/${path}`,
+    redirect: `/live-ops/live/${path}`,
+    hidden: true
+  })),
   {
     path: '/live/rpa-workbench',
     component: Layout,

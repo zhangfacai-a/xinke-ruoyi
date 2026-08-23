@@ -10,9 +10,12 @@ public interface ILiveGiftService {
  List<Map<String,Object>> listGifts(Map<String,Object> q); Map<String,Object> getGift(Long id); void saveGift(Map<String,Object> v,String u); void addCost(Map<String,Object> v,String u); void saveGiftPreference(Map<String,Object> v, Long userId, String username);
  Map<String,Object> importGiftCosts(List<LiveGiftCostImportRow> rows,String u);
  Map<String,Object> getOrder(String orderNo); void saveOrderGift(LiveGiftSaveRequest r,String u);
+ Map<String,Object> getRoomPreference(Long userId); void saveRoomPreference(Long userId,Long roomId,String username);
  Map<String,Object> batchSaveOrderGifts(LiveGiftBatchSaveRequest r,String u);
  List<Map<String,Object>> listQuickTemplates(Long userId); Map<String,Object> getQuickTemplate(Long id,Long userId);
  void saveQuickTemplate(Map<String,Object> v,Long userId,String u); void deleteQuickTemplate(Long id,Long userId);
  List<Map<String,Object>> ledger(Map<String,Object> q); Map<String,Object> summary(Map<String,Object> q);
+ List<Map<String,Object>> inventory(Map<String,Object> q); List<Map<String,Object>> inventoryMovements(Map<String,Object> q);
+ Map<String,Object> inventorySummary(Map<String,Object> q); void adjustInventory(Map<String,Object> v,String u);
  Map<String,Object> syncDingTalk(String u);
 }

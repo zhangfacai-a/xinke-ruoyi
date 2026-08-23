@@ -92,12 +92,25 @@ public class LiveGiftController extends BaseController
     @PostMapping("/order") @PreAuthorize("@ss.hasPermi('live:gift:entry')")
     @Log(title="订单录礼品",businessType=BusinessType.UPDATE)
     public AjaxResult orderSave(@Valid @RequestBody LiveGiftSaveRequest request){service.saveOrderGift(request,getUsername());return success();}
+    @GetMapping("/room-preference") @PreAuthorize("@ss.hasPermi('live:gift:entry')")
+    public AjaxResult roomPreference(){return success(service.getRoomPreference(getUserId()));}
+    @PostMapping("/room-preference") @PreAuthorize("@ss.hasPermi('live:gift:entry')")
+    public AjaxResult roomPreferenceSave(@RequestBody Map<String,Object> value){Object id=value.get("roomId");service.saveRoomPreference(getUserId(),id==null?null:Long.valueOf(id.toString()),getUsername());return success();}
     @PostMapping("/order/batch") @PreAuthorize("@ss.hasPermi('live:gift:entry')")
     @Log(title="批量订单录礼品",businessType=BusinessType.UPDATE)
     public AjaxResult orderBatch(@Valid @RequestBody LiveGiftBatchSaveRequest request){return success(service.batchSaveOrderGifts(request,getUsername()));}
 
     @GetMapping("/ledger") @PreAuthorize("@ss.hasPermi('live:gift:ledger')")
     public AjaxResult ledger(@RequestParam Map<String,Object> q){return success(service.ledger(q));}
+    @GetMapping("/inventory") @PreAuthorize("@ss.hasAnyPermi('live:gift:inventory,live:gift:entry')")
+    public AjaxResult inventory(@RequestParam Map<String,Object> q){return success(service.inventory(q));}
+    @GetMapping("/inventory/movements") @PreAuthorize("@ss.hasPermi('live:gift:inventory')")
+    public AjaxResult inventoryMovements(@RequestParam Map<String,Object> q){return success(service.inventoryMovements(q));}
+    @GetMapping("/inventory/summary") @PreAuthorize("@ss.hasAnyPermi('live:gift:inventory,live:gift:summary')")
+    public AjaxResult inventorySummary(@RequestParam Map<String,Object> q){return success(service.inventorySummary(q));}
+    @PostMapping("/inventory/adjust") @PreAuthorize("@ss.hasPermi('live:gift:inventory:adjust')")
+    @Log(title="调整礼品库存",businessType=BusinessType.UPDATE)
+    public AjaxResult inventoryAdjust(@RequestBody Map<String,Object> value){service.adjustInventory(value,getUsername());return success();}
     @PostMapping("/ledger/export") @PreAuthorize("@ss.hasPermi('live:gift:export')")
     @Log(title="导出礼品记录",businessType=BusinessType.EXPORT)
     public void export(HttpServletResponse response,@RequestParam Map<String,Object> q)

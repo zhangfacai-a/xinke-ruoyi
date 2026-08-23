@@ -159,6 +159,9 @@ security:
 
 # 插件上报密钥。配置后，插件必须通过 X-Plugin-Key 请求头携带相同值。
 live:
+  gift:
+    inventory:
+      enabled: true
   dingtalk:
     # 钉钉企业内部应用凭证，生产环境请通过环境变量注入。
     app-key: dingsl2actbbkulcqquf

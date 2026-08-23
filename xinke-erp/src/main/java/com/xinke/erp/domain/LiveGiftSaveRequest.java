@@ -14,6 +14,9 @@ public class LiveGiftSaveRequest
     @NotBlank(message = "请选择礼品处理状态")
     private String processStatus;
     private Long dailyId;
+    private Long roomId;
+    private String roomCodeSnapshot;
+    private String roomNameSnapshot;
     private String operatorNote;
     private Long anchorUserId;
     private String anchorNameSnapshot;
@@ -41,6 +44,12 @@ public class LiveGiftSaveRequest
     public void setProcessStatus(String processStatus) { this.processStatus = processStatus; }
     public Long getDailyId() { return dailyId; }
     public void setDailyId(Long dailyId) { this.dailyId = dailyId; }
+    public Long getRoomId() { return roomId; }
+    public void setRoomId(Long roomId) { this.roomId = roomId; }
+    public String getRoomCodeSnapshot() { return roomCodeSnapshot; }
+    public void setRoomCodeSnapshot(String roomCodeSnapshot) { this.roomCodeSnapshot = roomCodeSnapshot; }
+    public String getRoomNameSnapshot() { return roomNameSnapshot; }
+    public void setRoomNameSnapshot(String roomNameSnapshot) { this.roomNameSnapshot = roomNameSnapshot; }
     public String getOperatorNote() { return operatorNote; }
     public void setOperatorNote(String operatorNote) { this.operatorNote = operatorNote; }
     public List<Map<String, Object>> getGifts() { return gifts; }

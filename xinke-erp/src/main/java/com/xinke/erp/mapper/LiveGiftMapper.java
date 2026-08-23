@@ -83,6 +83,19 @@ public interface LiveGiftMapper
     int insertOrderGift(Map<String, Object> item);
     int insertOrderGiftLog(@Param("orderNo") String orderNo, @Param("actionType") String actionType,
                            @Param("detailJson") String detailJson, @Param("operatorName") String operatorName);
+    Map<String, Object> selectUserRoomPreference(Long userId);
+    int upsertUserRoomPreference(@Param("userId") Long userId, @Param("roomId") Long roomId, @Param("username") String username);
+    List<Map<String, Object>> selectGiftInventory(Map<String, Object> query);
+    List<Map<String, Object>> selectGiftInventoryMovements(Map<String, Object> query);
+    Map<String, Object> selectGiftInventoryBalanceForUpdate(Long giftId);
+    int insertGiftInventory(Map<String, Object> value);
+    int updateGiftInventory(Map<String, Object> value);
+    int insertGiftInventoryMovement(Map<String, Object> value);
+    List<Map<String, Object>> selectOrderInventoryAllocations(String orderNo);
+    int insertOrderInventoryAllocation(Map<String, Object> value);
+    int deleteOrderInventoryAllocations(String orderNo);
+    Map<String, Object> selectGiftInventorySummary(Map<String, Object> query);
+    List<Map<String, Object>> selectGiftInventoryLowStock(Map<String, Object> query);
     List<Map<String, Object>> selectOrderGiftLedger(Map<String, Object> query);
     Map<String, Object> selectGiftSummary(Map<String, Object> query);
     List<Map<String, Object>> selectGiftSummaryGroups(Map<String, Object> query);

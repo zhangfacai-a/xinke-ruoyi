@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -53,6 +54,8 @@ public class LiveGiftServiceImpl implements ILiveGiftService
     private String appKey;
     @Value("${live.dingtalk.app-secret:}")
     private String appSecret;
+    @Value("${live.gift.inventory.enabled:false}")
+    private boolean giftInventoryEnabled;
     @Value("${live.dingtalk.default-password:xk123456}")
     private String defaultPassword;
 
@@ -400,32 +403,39 @@ public class LiveGiftServiceImpl implements ILiveGiftService
             .filter(StringUtils::isNotEmpty).forEach(orderNos::add);
         if (orderNos.isEmpty()) throw new ServiceException("请至少输入一个订单号");
         if (orderNos.size() > MAX_BATCH_ORDERS) throw new ServiceException("单次最多处理500个订单");
-        int success = 0;
-        List<String> failures = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        List<String> targets = new ArrayList<>();
         for (String orderNo : orderNos)
         {
-            try
-            {
-                LiveGiftSaveRequest single = new LiveGiftSaveRequest();
-                single.setOrderNo(orderNo);
-                single.setProcessStatus("selected");
-                single.setDailyId(request.getDailyId());
-                single.setOperatorNote(request.getOperatorNote());
-                single.setGifts(request.getGifts());
-                saveOrderGiftInternal(single, username);
-                success++;
-            }
-            catch (ServiceException ex)
-            {
-                failures.add(orderNo + "：" + ex.getMessage());
-            }
+            if (!Boolean.TRUE.equals(request.getOverwriteExisting()) && hasRow(mapper.selectOrderGiftStatus(orderNo)))
+                skipped.add(orderNo);
+            else targets.add(orderNo);
         }
+        for (String orderNo : targets) saveOrderGiftInternal(batchItem(request, orderNo), username);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", orderNos.size());
-        result.put("success", success);
-        result.put("failure", failures.size());
-        result.put("failures", failures);
+        result.put("success", targets.size());
+        result.put("skipped", skipped.size());
+        result.put("skippedOrderNos", skipped);
+        result.put("failure", 0);
+        result.put("failures", List.of());
         return result;
+    }
+
+    private static LiveGiftSaveRequest batchItem(LiveGiftBatchSaveRequest source, String orderNo)
+    {
+        LiveGiftSaveRequest target = new LiveGiftSaveRequest();
+        target.setOrderNo(orderNo); target.setProcessStatus(source.getGifts().isEmpty() ? "not_applicable" : "selected");
+        target.setDailyId(source.getDailyId()); target.setGifts(source.getGifts()); target.setOperatorNote(source.getOperatorNote());
+        target.setRoomId(source.getRoomId()); target.setRoomCodeSnapshot(source.getRoomCodeSnapshot()); target.setRoomNameSnapshot(source.getRoomNameSnapshot());
+        target.setAnchorUserId(source.getAnchorUserId()); target.setAnchorNameSnapshot(source.getAnchorNameSnapshot());
+        target.setControllerUserId(source.getControllerUserId()); target.setControllerNameSnapshot(source.getControllerNameSnapshot());
+        target.setRefundAmount(source.getRefundAmount()); target.setRefundReason(source.getRefundReason()); target.setOtherRemark(source.getOtherRemark());
+        target.setAfterSaleCompensation(source.getAfterSaleCompensation()); target.setServiceMark(source.getServiceMark());
+        target.setExtendedWarranty(source.getExtendedWarranty()); target.setPriceProtection(source.getPriceProtection()); target.setDelayed(source.getDelayed());
+        target.setFollowUp(source.getFollowUp()); target.setUrgent(source.getUrgent()); target.setTemplateId(source.getTemplateId());
+        target.setTemplateNameSnapshot(source.getTemplateNameSnapshot()); target.setParsedText(source.getParsedText());
+        return target;
     }
 
     private void saveOrderGiftInternal(LiveGiftSaveRequest request, String username)
@@ -482,6 +492,9 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         Map<String, Object> status = new HashMap<>();
         status.put("orderNo", orderNo); status.put("processStatus", request.getProcessStatus());
         status.put("dailyId", request.getDailyId());
+        status.put("roomId", request.getRoomId());
+        status.put("roomCodeSnapshot", request.getRoomCodeSnapshot());
+        status.put("roomNameSnapshot", request.getRoomNameSnapshot());
         String otherRemark = StringUtils.isNotBlank(request.getOtherRemark()) ? request.getOtherRemark() : request.getOperatorNote();
         status.put("operatorNote", otherRemark);
         status.put("anchorUserId", request.getAnchorUserId());
@@ -502,13 +515,138 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         status.put("templateNameSnapshot", request.getTemplateNameSnapshot());
         status.put("parsedText", request.getParsedText());
         status.put("username", username);
+        reconcileOrderInventory(orderNo, "selected".equals(request.getProcessStatus()) ? merged : Map.of(), username);
         mapper.upsertOrderGiftStatus(status);
         mapper.deleteOrderGiftItems(orderNo);
         snapshots.forEach(mapper::insertOrderGift);
         mapper.insertOrderGiftLog(orderNo, exists ? "UPDATE" : "CREATE", JSON.toJSONString(request), username);
     }
 
-    @Override public List<Map<String, Object>> ledger(Map<String, Object> q) { return mapper.selectOrderGiftLedger(q); }
+    @Override public List<Map<String, Object>> ledger(Map<String, Object> q)
+    {
+        List<Map<String, Object>> rows = mapper.selectOrderGiftLedger(q);
+        rows.forEach(row -> {
+            Map<String, Object> status = mapper.selectOrderGiftStatus(Objects.toString(row.get("orderNo"), ""));
+            row.put("roomId", status == null ? null : status.get("roomId"));
+            row.put("roomNameSnapshot", status == null ? null : status.get("roomNameSnapshot"));
+        });
+        Object roomId = q.get("roomId");
+        if (roomId == null || StringUtils.isBlank(roomId.toString())) return rows;
+        return rows.stream().filter(row -> Objects.equals(Objects.toString(row.get("roomId"), ""), roomId.toString())).toList();
+    }
+
+    @Override public Map<String, Object> getRoomPreference(Long userId)
+    {
+        Map<String, Object> value = mapper.selectUserRoomPreference(userId);
+        return value == null ? new LinkedHashMap<>() : value;
+    }
+
+    @Override public void saveRoomPreference(Long userId, Long roomId, String username)
+    {
+        if (roomId != null)
+        {
+            Map<String, Object> room = mapper.selectRoomById(roomId);
+            if (room == null || !"0".equals(Objects.toString(room.get("status"), ""))) throw new ServiceException("直播间不存在或已停用");
+        }
+        mapper.upsertUserRoomPreference(userId, roomId, username);
+    }
+
+    @Override public List<Map<String, Object>> inventory(Map<String, Object> q) { return mapper.selectGiftInventory(q); }
+
+    @Override public List<Map<String, Object>> inventoryMovements(Map<String, Object> q) { return mapper.selectGiftInventoryMovements(q); }
+
+    @Override
+    public Map<String, Object> inventorySummary(Map<String, Object> q)
+    {
+        Map<String, Object> result = new LinkedHashMap<>(mapper.selectGiftInventorySummary(q));
+        result.put("lowStock", mapper.selectGiftInventoryLowStock(q));
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public void adjustInventory(Map<String, Object> value, String username)
+    {
+        required(value, "giftId", "礼品不能为空");
+        Long giftId = Long.valueOf(value.get("giftId").toString());
+        Map<String, Object> gift = mapper.selectGiftById(giftId);
+        if (gift == null) throw new ServiceException("礼品不存在");
+        String type = Objects.toString(value.get("movementType"), "in").trim().toLowerCase(Locale.ROOT);
+        int quantity = value.get("quantity") == null ? 0 : Integer.parseInt(value.get("quantity").toString());
+        if (quantity < 0) throw new ServiceException("库存数量不能小于0");
+        Map<String, Object> balance = mapper.selectGiftInventoryBalanceForUpdate(giftId);
+        int before = balance == null ? 0 : intValue(balance.get("stockQty"));
+        int safety = value.get("safetyQty") == null ? (balance == null ? 0 : intValue(balance.get("safetyQty"))) : Integer.parseInt(value.get("safetyQty").toString());
+        if (safety < 0) throw new ServiceException("安全库存不能小于0");
+        int delta;
+        String movementType;
+        if ("set".equals(type))
+        {
+            delta = quantity - before; movementType = "SET";
+        }
+        else if ("out".equals(type))
+        {
+            delta = -quantity; movementType = "OUT";
+        }
+        else
+        {
+            delta = quantity; movementType = "IN";
+        }
+        int after = before + delta;
+        if (after < 0) throw insufficientInventory(gift, before, quantity);
+        Map<String, Object> data = new HashMap<>();
+        data.put("giftId", giftId); data.put("stockQty", after); data.put("safetyQty", safety); data.put("username", username);
+        if (balance == null) mapper.insertGiftInventory(data); else mapper.updateGiftInventory(data);
+        if (delta != 0)
+        {
+            Map<String, Object> movement = new HashMap<>(); movement.put("giftId", giftId); movement.put("movementType", movementType);
+            movement.put("quantity", delta); movement.put("beforeQty", before); movement.put("afterQty", after);
+            movement.put("sourceType", "MANUAL"); movement.put("sourceNo", value.get("sourceNo")); movement.put("remark", value.get("remark")); movement.put("username", username);
+            mapper.insertGiftInventoryMovement(movement);
+        }
+    }
+
+    private void reconcileOrderInventory(String orderNo, Map<Long, Integer> desired, String username)
+    {
+        if (!giftInventoryEnabled) return;
+        Map<Long, Integer> old = new LinkedHashMap<>();
+        List<Map<String, Object>> allocations = mapper.selectOrderInventoryAllocations(orderNo);
+        // A null result is retained as a compatibility guard for deployments that have not run
+        // the inventory migration yet; the production mapper returns an empty list when enabled.
+        if (allocations == null) return;
+        for (Map<String, Object> row : allocations)
+            old.put(Long.valueOf(row.get("giftId").toString()), Integer.valueOf(row.get("quantity").toString()));
+        for (Map.Entry<Long, Integer> entry : old.entrySet())
+            changeInventory(entry.getKey(), entry.getValue(), "ORDER_RESTORE", orderNo, "订单修改恢复原扣减", username);
+        mapper.deleteOrderInventoryAllocations(orderNo);
+        for (Map.Entry<Long, Integer> entry : desired.entrySet())
+        {
+            changeInventory(entry.getKey(), -entry.getValue(), "ORDER_OUT", orderNo, "订单礼品自动扣库存", username);
+            Map<String, Object> allocation = new HashMap<>(); allocation.put("orderNo", orderNo); allocation.put("giftId", entry.getKey());
+            allocation.put("quantity", entry.getValue()); allocation.put("username", username); mapper.insertOrderInventoryAllocation(allocation);
+        }
+    }
+
+    private void changeInventory(Long giftId, int delta, String movementType, String sourceNo, String remark, String username)
+    {
+        Map<String, Object> gift = mapper.selectGiftById(giftId);
+        Map<String, Object> balance = mapper.selectGiftInventoryBalanceForUpdate(giftId);
+        int before = balance == null ? 0 : intValue(balance.get("stockQty"));
+        int after = before + delta;
+        if (after < 0) throw insufficientInventory(gift, before, -delta);
+        Map<String, Object> data = new HashMap<>(); data.put("giftId", giftId); data.put("stockQty", after);
+        data.put("safetyQty", balance == null ? 0 : intValue(balance.get("safetyQty"))); data.put("username", username);
+        if (balance == null) mapper.insertGiftInventory(data); else mapper.updateGiftInventory(data);
+        Map<String, Object> movement = new HashMap<>(); movement.put("giftId", giftId); movement.put("movementType", movementType);
+        movement.put("quantity", delta); movement.put("beforeQty", before); movement.put("afterQty", after); movement.put("sourceType", "ORDER");
+        movement.put("sourceNo", sourceNo); movement.put("remark", remark); movement.put("username", username); mapper.insertGiftInventoryMovement(movement);
+    }
+
+    private ServiceException insufficientInventory(Map<String, Object> gift, int current, int requested)
+    {
+        return new ServiceException("礼品“" + Objects.toString(gift == null ? null : gift.get("giftName"), "未知礼品")
+            + "”库存不足：当前 " + current + " 件，需要 " + requested + " 件。请先入库或调整库存后再保存订单。");
+    }
 
     @Override
     public Map<String, Object> summary(Map<String, Object> q)
@@ -830,6 +968,12 @@ public class LiveGiftServiceImpl implements ILiveGiftService
     {
         if (value == null) return null;
         return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    private static int intValue(Object value)
+    {
+        if (value == null) return 0;
+        return Integer.parseInt(value.toString());
     }
 
     private record DingDepartment(Long id, Long parentId, String name, int orderNum) { }

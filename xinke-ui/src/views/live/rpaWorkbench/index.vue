@@ -205,7 +205,7 @@ function refundText(row){if(!row.refundStatus&&!row.refundReason&&row.refundAmou
 function formatTime(value){return value?String(value).replace('T',' ').replace(/\.\d+$/,'').slice(0,19):'-'}
 function copyProfile(row){navigator.clipboard?.writeText(row.profileUrl||`https://www.douyin.com/user/${row.secUid}`).then(()=>proxy.$modal.msgSuccess('主页链接已复制'))}
 function loadShops(){listRpaWorkbenchShops().then(res=>shops.value=res.data||[])}
-function openShopSetup(){proxy.$router.push('/live-ops/live-room')}
+function openShopSetup(){proxy.$router.push('/live-ops/live/live-room')}
 loadShops();refreshAll()
 </script>
 
