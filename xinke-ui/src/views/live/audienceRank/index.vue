@@ -18,18 +18,12 @@
 
     <template v-if="activeSection === 'workbench'">
       <section class="work-page">
-        <header class="work-head">
-          <div>
-            <h3>今天要处理的客户</h3>
-            <p>系统已按逾期、意向和榜单信号排好顺序</p>
-          </div>
-          <el-button type="primary" :disabled="!workRows.length" @click="processNextCustomer">处理下一位</el-button>
-        </header>
-        <div class="priority-strip" v-loading="summaryLoading" aria-label="任务概览">
+
+        <div class="priority-strip" style="margin-top: 10px;" v-loading="summaryLoading" aria-label="任务概览">
           <button v-for="item in taskMetrics" :key="item.key"
             :class="[{ active: taskKey === item.key, danger: item.key === 'overdue' && item.value > 0 }]" type="button"
             @click="selectTask(item.key)"><span>{{ item.label }}</span><strong>{{ integer(item.value)
-            }}</strong><small>{{ item.hint }}</small></button>
+              }}</strong><small>{{ item.hint }}</small></button>
         </div>
         <div class="work-toolbar">
           <el-input v-model="workQuery.keyword" :prefix-icon="Search" clearable placeholder="搜索昵称、型号、订单号"
@@ -53,7 +47,7 @@
             primaryReason(row) }}</strong><small class="cell-sub">{{ visitSummary(row)
                 }}</small></template></el-table-column>
           <el-table-column label="来源" min-width="190"><template #default="{ row }"><span>{{ row.roomNameSnapshot || '-'
-          }}</span><small class="cell-sub">主播 {{ row.anchorNameSnapshot || '未设置' }} · 场控 {{
+                }}</span><small class="cell-sub">主播 {{ row.anchorNameSnapshot || '未设置' }} · 场控 {{
                   row.controllerNameSnapshot || '未设置' }}</small></template></el-table-column>
           <el-table-column label="当前进度" min-width="150"><template #default="{ row }"><span
                 :class="['status-name', statusTone(row.status)]">{{ row.intentLevel === 'HIGH' && row.status !==
@@ -82,13 +76,7 @@
     </template>
 
     <section v-else-if="activeSection === 'customers'" class="customers-page">
-      <header class="library-head">
-        <div>
-          <h3>客户库</h3>
-          <p>一个抖音用户一份档案，到访、商机和订单持续累积</p>
-        </div><el-button v-if="canAssignFollowups" :type="batchMode ? 'primary' : 'default'" plain
-          @click="toggleBatchMode">{{ batchMode ? '退出批量操作' : '批量操作' }}</el-button>
-      </header>
+
       <div class="customer-presets" aria-label="客户快捷视图"><button v-for="item in customerPresets" :key="item.key"
           :class="{ active: customerPreset === item.key }" type="button" @click="applyCustomerPreset(item.key)">{{
             item.label }}<b>{{ presetCount(item.key) }}</b></button></div>
@@ -105,6 +93,8 @@
           @click="showCustomerFilters = !showCustomerFilters">更多筛选<span v-if="customerAdvancedCount"> · {{
             customerAdvancedCount }}</span></el-button>
         <el-button v-if="hasCustomerFilters" link type="primary" @click="resetCustomerFilters">清除</el-button>
+        <el-button v-if="canAssignFollowups" :type="batchMode ? 'primary' : 'default'" plain @click="toggleBatchMode">{{
+          batchMode ? '退出批量操作' : '批量操作' }}</el-button>
       </div>
       <el-collapse-transition>
         <div v-show="showCustomerFilters" class="customer-more-filters">
@@ -163,20 +153,22 @@
             </div>
           </template></el-table-column>
         <el-table-column label="最近到访" width="215"><template #default="{ row }"><span>{{ row.roomNameSnapshot || '-'
-        }}</span><small class="cell-sub">{{ shortTime(row.lastSeenAt) }} · {{ visitSummary(row)
+              }}</span><small class="cell-sub">{{ shortTime(row.lastSeenAt) }} · {{ visitSummary(row)
               }}</small></template></el-table-column>
         <el-table-column label="当前商机" min-width="175"><template #default="{ row }"><span>{{ stageLabel(row.status) }}{{
-              row.consultModel ? ` · ${row.consultModel}` : '' }}</span><small class="cell-sub">{{ row.status ===
+          row.consultModel ? ` · ${row.consultModel}` : '' }}</span><small class="cell-sub">{{ row.status ===
                 'OBSERVING' ? '等待新的有效信号' : primaryReason(row) }}</small></template></el-table-column>
         <el-table-column label="评论榜" width="92" align="center"><template #default="{ row }"><span
-              :class="['rank-value', { empty: !row.commentRank }]">{{ tableRankLabel(row.commentRank) }}</span></template></el-table-column>
+              :class="['rank-value', { empty: !row.commentRank }]">{{ tableRankLabel(row.commentRank)
+              }}</span></template></el-table-column>
         <el-table-column label="观看榜" width="92" align="center"><template #default="{ row }"><span
-              :class="['rank-value', { empty: !row.watchRank }]">{{ tableRankLabel(row.watchRank) }}</span></template></el-table-column>
+              :class="['rank-value', { empty: !row.watchRank }]">{{ tableRankLabel(row.watchRank)
+              }}</span></template></el-table-column>
         <el-table-column label="订单" width="110"><template #default="{ row }"><span>{{ Number(row.orderCount ||
           row.orders?.length || (row.orderNo ? 1 : 0)) }} 笔</span><small class="cell-sub">{{ row.orderNo || '尚未下单'
               }}</small></template></el-table-column>
         <el-table-column label="负责人" width="160"><template #default="{ row }"><span>{{ row.ownerNameSnapshot || '待领取'
-        }}</span><small class="cell-sub">{{ row.ownerUserId ? '负责客户跟进' : '尚未分配'
+              }}</span><small class="cell-sub">{{ row.ownerUserId ? '负责客户跟进' : '尚未分配'
               }}</small></template></el-table-column>
         <el-table-column label="下一步" width="150" :fixed="viewportWidth >= 1280 ? 'right' : false"
           align="right"><template #default="{ row }"><small :class="['next-action', { overdue: isOverdue(row) }]">{{
@@ -199,27 +191,17 @@
       @open-sync="switchSection('records')" />
 
     <section v-else class="records-page">
-      <header class="records-head">
-        <div>
-          <h3>同步中心</h3>
-          <p>正常数据自动进入客户库，只有异常批次需要人工处理</p>
-        </div>
-        <div class="records-health"><span :class="{ warning: Number(syncSummary.unmatchedBatchCount) > 0 }"><i></i>{{
-          Number(syncSummary.unmatchedBatchCount) > 0 ? `${integer(syncSummary.unmatchedBatchCount)} 个异常批次` :
-            '插件与系统运行正常'
-            }}</span><el-button v-if="Number(syncSummary.unmatchedBatchCount) > 0" type="warning" plain
-            @click="batchQuery.needsAttention = true; loadBatches(true)">处理异常</el-button></div>
-      </header>
+
       <div class="sync-overview">
         <div><span>最近同步</span><strong>{{ shortSyncTime(syncSummary.latestCapturedAt || batchRows[0]?.capturedAt)
-        }}</strong><small>{{ syncSummary.latestCapturedAt || batchRows[0]?.capturedAt || '暂无记录' }}</small></div>
+            }}</strong><small>{{ syncSummary.latestCapturedAt || batchRows[0]?.capturedAt || '暂无记录' }}</small></div>
         <div><span>本次去重客户</span><strong>{{ integer(batchRows[0]?.uniqueUserCount || 0)
-        }}</strong><small>同一客户只保留一份档案</small>
+            }}</strong><small>同一客户只保留一份档案</small>
         </div>
         <div><span>新增客户</span><strong>{{ integer(batchRows[0]?.newCustomerCount || 0) }}</strong><small>首次进入客户库</small>
         </div>
         <div><span>更新客户</span><strong>{{ integer(batchRows[0]?.updatedCustomerCount || 0)
-        }}</strong><small>再次到访已更新</small>
+            }}</strong><small>再次到访已更新</small>
         </div>
         <div :class="{ warning: Number(syncSummary.unmatchedBatchCount) > 0 }"><span>需要处理</span><strong>{{
           integer(syncSummary.unmatchedBatchCount) }}</strong><small>{{ Number(syncSummary.unmatchedBatchCount) ?
@@ -236,7 +218,7 @@
         <el-table v-loading="recordLoading" :data="batchRows" row-key="batchId" class="record-table">
           <el-table-column label="上传时间" prop="capturedAt" min-width="164" /><el-table-column label="直播间"
             min-width="180"><template #default="{ row }"><strong>{{ row.matchedRoomName || row.roomName || '-'
-            }}</strong><small class="cell-sub">主播 {{ integer(row.anchorCount) }} · 场控 {{
+                }}</strong><small class="cell-sub">主播 {{ integer(row.anchorCount) }} · 场控 {{
                   integer(row.controllerCount) }}</small></template></el-table-column>
           <el-table-column label="数据日期" min-width="188"><template #default="{ row }"><span>评论 {{ row.commentDataDate ||
             '-' }}</span><small class="cell-sub">观看 {{ row.watchDataDate || '-'
@@ -296,7 +278,7 @@
               min-width="180" prop="nickname" /><el-table-column label="评论" min-width="110"><template
                 #default="{ row }">{{ rankLabel(row.commentRank) }}</template></el-table-column><el-table-column
               label="观看" min-width="110"><template #default="{ row }">{{ rankLabel(row.watchRank)
-              }}</template></el-table-column><el-table-column label="操作" width="88" align="right"><template
+                }}</template></el-table-column><el-table-column label="操作" width="88" align="right"><template
                 #default="{ row }"><el-button v-if="row.followupId" link type="primary"
                   @click="openRankCustomer(row)">客户档案</el-button></template></el-table-column></el-table>
         </template>
@@ -1393,25 +1375,64 @@ async function copyUid(secUid) { const value = String(secUid || '').trim(); if (
 
 <style scoped lang="scss">
 /* Compact customer-library rhythm: keep the work surface dense without shrinking controls. */
-.audience-page { padding: 12px 14px 24px; }
-.library-head { min-height: 60px; }
-.customer-presets { min-height: 45px; }
-.customer-presets button { height: 38px; }
-.customer-toolbar { min-height: 49px; }
+.audience-page {
+  padding: 12px 14px 24px;
+}
+
+.library-head {
+  min-height: 60px;
+}
+
+.customer-presets {
+  min-height: 45px;
+}
+
+.customer-presets button {
+  height: 38px;
+}
+
+.customer-toolbar {
+  min-height: 49px;
+}
+
 .customer-more-filters {
   width: fit-content;
   max-width: 100%;
   margin-bottom: 8px;
   padding: 7px 8px;
 }
-.customer-count { min-height: 32px; }
-.customer-table :deep(.el-table__header th) { height: 40px; }
-.customer-table :deep(.el-table__row td) { padding: 8px 0; }
+
+.customer-count {
+  min-height: 32px;
+}
+
+.customer-table :deep(.el-table__header th) {
+  height: 40px;
+}
+
+.customer-table :deep(.el-table__row td) {
+  padding: 8px 0;
+}
+
 @media (max-width: 760px) {
-  .audience-page { padding: 8px 7px 18px; }
-  .customer-more-filters { width: 100%; }
-  .rank-filter { width: 100%; justify-content: space-between; }
-  .rank-filter :deep(.el-input-number) { min-width: 0; flex: 1; width: auto; }
+  .audience-page {
+    padding: 8px 7px 18px;
+  }
+
+  .customer-more-filters {
+    width: 100%;
+  }
+
+  .rank-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rank-filter :deep(.el-input-number) {
+    min-width: 0;
+    flex: 1;
+    width: auto;
+  }
 }
 </style>
 
@@ -1754,6 +1775,7 @@ async function copyUid(secUid) { const value = String(secUid || '').trim(); if (
   border: 1px solid var(--audience-line);
   border-bottom: 0;
   background: #fff;
+
 }
 
 .priority-strip button {

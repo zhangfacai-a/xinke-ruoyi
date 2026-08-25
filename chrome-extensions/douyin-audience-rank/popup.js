@@ -570,7 +570,7 @@ function getSafetyState() {
 
   const expectedYesterday = shanghaiDataDate(-1)
   if (normalizeDataDate(capture.commentDataDate) !== expectedYesterday) {
-    messages.push(`评论榜尚未更新：当前 ${capture.commentDataDate || '-'}，应为 ${expectedYesterday}。请11:30以后重新读取。`)
+    messages.push(`评论榜尚未更新：当前 ${capture.commentDataDate || '-'}，应为 ${expectedYesterday}。请12:00以后重新读取。`)
     blocking = true
   }
 
