@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>观众客户同步</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="app">
+    <section id="mainView" class="view">
+      <header class="topbar">
+        <div class="brand">
+          <img class="brand-mark" src="icons/icon32.png" alt="">
+          <div>
+            <h1>观众客户同步</h1>
+            <p id="headerHint">读取当前直播间</p>
+          </div>
+        </div>
+        <span class="version-label">v3.0</span>
+        <div id="panelControls" class="panel-controls hidden">
+          <button id="collapsePanel" type="button" title="收起悬浮窗" aria-label="收起悬浮窗">−</button>
+          <button id="closePanel" type="button" title="关闭悬浮窗" aria-label="关闭悬浮窗">×</button>
+        </div>
+      </header>
+
+      <section id="wrongPage" class="empty-view hidden">
+        <div class="state-symbol" aria-hidden="true">↗</div>
+        <h2>当前页面无法读取榜单</h2>
+        <p>打开抖音观众分析页后，插件会切换为网页悬浮窗。</p>
+        <button id="goTarget" class="button primary full" type="button">打开观众分析页</button>
+      </section>
+
+      <section id="readyPage" class="hidden">
+        <div class="room-row">
+          <div class="room-copy">
+            <span class="eyebrow">直播间</span>
+            <strong id="anchorName" title="">正在识别</strong>
+          </div>
+          <span id="pageBadge" class="status-chip pending"><i></i>检查中</span>
+        </div>
+
+        <section id="captureEmpty" class="capture-empty">
+          <div class="flow-summary"><span><i>1</i>读取双榜</span><span><i>2</i>校验日期</span><span><i>3</i>自动同步</span></div>
+          <button id="fetchRanks" class="button primary full" type="button">读取并同步</button>
+        </section>
+
+        <div id="readStatus" class="notice hidden" role="status" aria-live="polite"></div>
+
+        <section id="result" class="result hidden">
+          <div class="result-heading">
+            <div>
+              <h2>榜单结果</h2>
+              <p id="capturedAt">-</p>
+            </div>
+            <button id="refreshRanks" class="text-button" type="button">重新读取</button>
+          </div>
+
+          <div class="rank-list" aria-label="榜单读取结果">
+            <div class="rank-row">
+              <span class="rank-accent comment" aria-hidden="true"></span>
+              <div class="rank-name">
+              <strong>评论榜</strong>
+                <small id="commentDate">数据日期 -</small>
+              </div>
+              <span class="rank-value"><b id="commentCount">0</b> 人</span>
+            </div>
+            <div class="rank-row">
+              <span class="rank-accent watch" aria-hidden="true"></span>
+              <div class="rank-name">
+                <strong>最近一场观看榜</strong>
+                <small id="watchDate">数据日期 -</small>
+              </div>
+              <span class="rank-value"><b id="watchCount">0</b> 人</span>
+            </div>
+            <div class="merged-row">
+              <span>合并去重</span>
+              <strong><b id="mergedCount">0</b> 位观众</strong>
+            </div>
+          </div>
+
+          <section id="safetyPanel" class="safety-panel hidden">
+            <strong class="safety-title">本次数据无法同步</strong>
+            <div id="safetyMessage" class="safety-message"></div>
+          </section>
+
+          <button id="upload" class="button upload full hidden" type="button">重新同步</button>
+          <div id="uploadStatus" class="notice hidden" role="status" aria-live="polite"></div>
+          <button id="openErpAfterUpload" class="button secondary full compact hidden" type="button">前往系统处理</button>
+        </section>
+
+        <footer class="connection-row">
+          <span id="connectionState" class="connection-state"><i></i>正在检查系统</span>
+          <button id="retryConnection" class="text-button hidden" type="button">重新检查</button>
+        </footer>
+        <details id="diagnostics" class="diagnostics">
+          <summary>
+            <span>技术信息</span>
+            <small id="diagnosticSummary">暂无读取数据</small>
+          </summary>
+          <div class="diagnostic-body">
+            <p>仅在技术人员排查接口变化时使用，内容不包含上传密钥。</p>
+            <div class="button-row">
+              <button id="copyJson" class="button secondary" type="button">复制 JSON</button>
+              <button id="downloadJson" class="button secondary" type="button">导出 JSON</button>
+            </div>
+            <pre id="rawJson">尚未读取榜单。</pre>
+          </div>
+        </details>
+      </section>
+    </section>
+  </main>
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

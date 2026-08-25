@@ -15,5 +15,5 @@ spring:
       password: 替换为本地Redis密码
 
 live:
-  rpa:
-    api-key: 替换为随机且足够长的影刀接口密钥
+  audience-rank:
+    upload-key: 替换为随机且足够长的观众榜单上传密钥

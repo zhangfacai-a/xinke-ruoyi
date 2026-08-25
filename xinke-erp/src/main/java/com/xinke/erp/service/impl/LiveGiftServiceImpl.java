@@ -99,7 +99,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         }
         catch (Exception ex)
         {
-            throw new ServiceException("直播间编码已经存在");
+            throw new ServiceException("直播间名称或编码已经存在");
         }
     }
 

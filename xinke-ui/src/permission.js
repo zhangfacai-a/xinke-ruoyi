@@ -2,7 +2,7 @@ import router from './router'
 import { ElMessage } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-import { getToken, setToken } from '@/utils/auth'
+import { getToken } from '@/utils/auth'
 import { isHttp, isPathMatch } from '@/utils/validate'
 import { isRelogin } from '@/utils/request'
 import useUserStore from '@/store/modules/user'
@@ -12,7 +12,7 @@ import usePermissionStore from '@/store/modules/permission'
 
 NProgress.configure({ showSpinner: false })
 
-const whiteList = ['/login', '/register', '/live-bi-embed', '/live-ops/live-bi']
+const whiteList = ['/login', '/register']
 
 const isWhiteList = (path) => {
   return whiteList.some(pattern => isPathMatch(pattern, path))
@@ -20,17 +20,7 @@ const isWhiteList = (path) => {
 
 router.beforeEach(async (to, from) => {
   NProgress.start()
-  const queryToken = to.query.token || to.query.accessToken
-  const embedToken = queryToken ? String(queryToken).replace(/^Bearer\s+/i, '') : ''
-  if (queryToken) {
-    setToken(embedToken)
-    useUserStore().token = embedToken
-    const cleanQuery = { ...to.query }
-    delete cleanQuery.token
-    delete cleanQuery.accessToken
-    return { path: to.path, query: cleanQuery, hash: to.hash, replace: true }
-  }
-  if (embedToken || getToken()) {
+  if (getToken()) {
     to.meta.title && useSettingsStore().setTitle(to.meta.title)
     const isLock = useLockStore().isLock
     if (to.path === '/login') {

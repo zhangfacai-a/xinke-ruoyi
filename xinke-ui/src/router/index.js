@@ -47,40 +47,42 @@ export const constantRoutes = [
     component: () => import('@/views/register'),
     hidden: true
   },
-  {
-    path: '/live-bi-embed',
-    component: () => import('@/views/live/bi/index'),
-    hidden: true,
-    meta: { title: '直播追单BI' }
-  },
-  {
-    path: '/live-ops/live-bi',
-    component: () => import('@/views/live/bi/index'),
-    hidden: true,
-    meta: { title: '直播追单BI', public: true }
-  },
   // Keep legacy live-ops links working after the menu is grouped into folders.
-  ...['giftLedger', 'giftCatalog', 'giftPreference', 'giftSummary', 'giftInventory', 'giftAdmin'].map(path => ({
+  ...['giftCatalog', 'giftInventory'].map(path => ({
     path: `/live-ops/${path}`,
     redirect: `/live-ops/gift/${path}`,
     hidden: true
   })),
-  ...['live-viewer', 'live-room', 'live-bi', 'live-plugin'].map(path => ({
-    path: `/live-ops/${path}`,
-    redirect: `/live-ops/live/${path}`,
-    hidden: true
-  })),
   {
-    path: '/live/rpa-workbench',
-    component: Layout,
-    hidden: true,
-    children: [{
-      path: '',
-      component: () => import('@/views/live/rpaWorkbench/index.vue'),
-      name: 'RpaWorkbench',
-      meta: { title: '影刀任务池', activeMenu: '/live/viewer' }
-    }]
+    path: '/live-ops/giftAdmin',
+    redirect: to => to.query.section === 'inventory'
+      ? '/live-ops/giftMaterial?section=inventory'
+      : '/live-ops/giftMaterial',
+    hidden: true
   },
+  {
+    path: '/live-ops/gift/giftAdmin',
+    redirect: to => to.query.section === 'inventory'
+      ? '/live-ops/giftMaterial?section=inventory'
+      : '/live-ops/giftMaterial',
+    hidden: true
+  },
+  ...[
+    ['giftLedger', 'ledger'],
+    ['giftPreference', 'preference'],
+    ['giftSummary', 'bi']
+  ].flatMap(([path, section]) => [
+    {
+      path: `/live-ops/${path}`,
+      redirect: to => ({ path: '/live-ops/giftWorkbench', query: { ...to.query, section } }),
+      hidden: true
+    },
+    {
+      path: `/live-ops/gift/${path}`,
+      redirect: to => ({ path: '/live-ops/giftWorkbench', query: { ...to.query, section } }),
+      hidden: true
+    }
+  ]),
   {
     path: "/:pathMatch(.*)*",
     component: () => import('@/views/error/404'),

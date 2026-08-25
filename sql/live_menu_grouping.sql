@@ -6,11 +6,13 @@ set @live_parent_id = (select menu_id from sys_menu where menu_type='M' and path
 insert into sys_menu(menu_name,parent_id,order_num,path,component,`query`,route_name,is_frame,is_cache,menu_type,visible,status,perms,icon,create_by,create_time,remark)
 select '礼品',@live_parent_id,1,'gift',null,null,'LiveGift',1,0,'M','0','0',null,'gift','admin',sysdate(),'礼品管理功能目录'
 where @live_parent_id is not null
+  and not exists(select 1 from sys_menu where route_name='GiftWorkbench' or component='live/giftWorkbench/index')
   and not exists(select 1 from sys_menu where parent_id=@live_parent_id and path='gift');
 
 insert into sys_menu(menu_name,parent_id,order_num,path,component,`query`,route_name,is_frame,is_cache,menu_type,visible,status,perms,icon,create_by,create_time,remark)
 select '直播',@live_parent_id,2,'live',null,null,'LiveOps',1,0,'M','0','0',null,'video-camera','admin',sysdate(),'直播运营功能目录'
 where @live_parent_id is not null
+  and not exists(select 1 from sys_menu where route_name='GiftWorkbench' or component='live/giftWorkbench/index')
   and not exists(select 1 from sys_menu where parent_id=@live_parent_id and path='live');
 
 set @gift_parent_id=(select menu_id from sys_menu where parent_id=@live_parent_id and path='gift' limit 1);

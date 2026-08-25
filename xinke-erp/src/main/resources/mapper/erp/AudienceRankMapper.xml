@@ -1,0 +1,1074 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.AudienceRankMapper">
+    <resultMap id="BatchResult" type="com.xinke.erp.domain.audience.AudienceRankBatch">
+        <id property="batchId" column="batch_id"/>
+        <result property="payloadHash" column="payload_hash"/>
+        <result property="roomScopeKey" column="room_scope_key"/>
+        <result property="roomName" column="room_name"/>
+        <result property="roomId" column="room_id"/>
+        <result property="matchedRoomName" column="matched_room_name"/>
+        <result property="roomMatchStatus" column="room_match_status"/>
+        <result property="isCurrent" column="is_current"/>
+        <result property="commentDataDate" column="comment_data_date"/>
+        <result property="watchDataDate" column="watch_data_date"/>
+        <result property="capturedAt" column="captured_at"/>
+        <result property="commentRowCount" column="comment_row_count"/>
+        <result property="watchRowCount" column="watch_row_count"/>
+        <result property="uniqueUserCount" column="unique_user_count"/>
+        <result property="newCustomerCount" column="new_customer_count"/>
+        <result property="updatedCustomerCount" column="updated_customer_count"/>
+        <result property="anchorCount" column="anchor_count"/>
+        <result property="controllerCount" column="controller_count"/>
+        <result property="uploadedIp" column="uploaded_ip"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="SnapshotResult" type="com.xinke.erp.domain.audience.AudienceRankSnapshot">
+        <id property="snapshotId" column="snapshot_id"/>
+        <result property="followupId" column="followup_id"/>
+        <result property="batchId" column="batch_id"/>
+        <result property="roomScopeKey" column="room_scope_key"/>
+        <result property="roomName" column="room_name"/>
+        <result property="roomId" column="room_id"/>
+        <result property="secUid" column="sec_uid"/>
+        <result property="nickname" column="nickname"/>
+        <result property="isFollower" column="is_follower"/>
+        <result property="isFollowing" column="is_following"/>
+        <result property="payLevel" column="pay_level"/>
+        <result property="payIconUrl" column="pay_icon_url"/>
+        <result property="commentCount" column="comment_count"/>
+        <result property="commentRank" column="comment_rank"/>
+        <result property="watchSeconds" column="watch_seconds"/>
+        <result property="watchRank" column="watch_rank"/>
+        <result property="commentDataDate" column="comment_data_date"/>
+        <result property="watchDataDate" column="watch_data_date"/>
+        <result property="capturedAt" column="captured_at"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="RoomMatchResult" type="com.xinke.erp.domain.audience.AudienceRankRoomMatch">
+        <id property="roomId" column="room_id"/>
+        <result property="roomCode" column="room_code"/>
+        <result property="roomName" column="room_name"/>
+        <result property="liveAccount" column="live_account"/>
+    </resultMap>
+
+    <resultMap id="SummaryResult" type="com.xinke.erp.domain.audience.AudienceRankSummary">
+        <result property="batchCount" column="batch_count"/>
+        <result property="roomCount" column="room_count"/>
+        <result property="uniqueUserCount" column="unique_user_count"/>
+        <result property="commentUserCount" column="comment_user_count"/>
+        <result property="watchUserCount" column="watch_user_count"/>
+        <result property="bothRankUserCount" column="both_rank_user_count"/>
+        <result property="totalCommentCount" column="total_comment_count"/>
+        <result property="totalWatchSeconds" column="total_watch_seconds"/>
+        <result property="averageWatchSeconds" column="average_watch_seconds"/>
+        <result property="followerCount" column="follower_count"/>
+        <result property="unmatchedBatchCount" column="unmatched_batch_count"/>
+        <result property="latestCapturedAt" column="latest_captured_at"/>
+    </resultMap>
+
+    <sql id="batchColumns">
+        b.batch_id, b.payload_hash, b.room_scope_key, b.room_name, b.room_id,
+        r.room_name as matched_room_name, b.room_match_status, b.is_current, b.comment_data_date,
+        b.watch_data_date, b.captured_at, b.comment_row_count, b.watch_row_count,
+        b.unique_user_count,
+        (select count(*) from dy_audience_followup nf where nf.first_source_batch_id = b.batch_id) as new_customer_count,
+        greatest(b.unique_user_count -
+            (select count(*) from dy_audience_followup uf where uf.first_source_batch_id = b.batch_id), 0) as updated_customer_count,
+        (select count(distinct am.user_id) from live_subject_user_map am
+          where am.subject_type = 'ROOM' and am.subject_id = b.room_id and am.role_code = 'anchor') as anchor_count,
+        (select count(distinct cm.user_id) from live_subject_user_map cm
+          where cm.subject_type = 'ROOM' and cm.subject_id = b.room_id and cm.role_code = 'controller') as controller_count,
+        b.uploaded_ip, b.create_time
+    </sql>
+
+    <sql id="snapshotColumns">
+        s.snapshot_id, f.followup_id, s.batch_id, b.room_scope_key, b.room_name, b.room_id,
+        s.sec_uid, s.nickname, s.is_follower, s.is_following, s.pay_level, s.pay_icon_url,
+        s.comment_count, s.comment_rank, s.watch_seconds, s.watch_rank,
+        b.comment_data_date, b.watch_data_date, b.captured_at, s.create_time
+    </sql>
+
+    <select id="selectBatchByHash" resultMap="BatchResult">
+        select <include refid="batchColumns"/>
+        from dy_audience_rank_batch b
+        left join live_room r on r.room_id = b.room_id
+        where b.payload_hash = #{payloadHash}
+        limit 1
+    </select>
+
+    <select id="selectBatchById" resultMap="BatchResult">
+        select <include refid="batchColumns"/>
+        from dy_audience_rank_batch b
+        left join live_room r on r.room_id = b.room_id
+        where b.batch_id = #{batchId}
+    </select>
+
+    <select id="selectBatchList" resultMap="BatchResult">
+        select <include refid="batchColumns"/>
+        from dy_audience_rank_batch b
+        left join live_room r on r.room_id = b.room_id
+        <where>
+            <if test="roomName != null and roomName != ''">
+                and (b.room_name like concat('%', #{roomName}, '%')
+                     or r.room_name like concat('%', #{roomName}, '%'))
+            </if>
+            <choose>
+                <when test="roomMatchStatus == 'NEEDS_MATCH'">
+                    and b.room_match_status in ('UNMATCHED', 'AMBIGUOUS')
+                </when>
+                <when test="roomMatchStatus != null and roomMatchStatus != ''">
+                    and b.room_match_status = #{roomMatchStatus}
+                </when>
+            </choose>
+            <if test="beginCapturedAt != null">and b.captured_at &gt;= #{beginCapturedAt}</if>
+            <if test="endCapturedAt != null">and b.captured_at &lt; date_add(#{endCapturedAt}, interval 1 day)</if>
+            <if test="currentOnly != null and currentOnly">and b.is_current = 1</if>
+            <if test="needsAttention != null and needsAttention">
+                and b.room_match_status != 'MATCHED'
+            </if>
+        </where>
+        order by b.captured_at desc, b.batch_id desc
+    </select>
+
+    <sql id="snapshotWhere">
+        <where>
+            and b.is_current = 1
+            <if test="batchId != null">and s.batch_id = #{batchId}</if>
+            <if test="roomName != null and roomName != ''">
+                and (b.room_name like concat('%', #{roomName}, '%')
+                     or r.room_name like concat('%', #{roomName}, '%'))
+            </if>
+            <if test="keyword != null and keyword != ''">
+                and (s.nickname like concat('%', #{keyword}, '%') or s.sec_uid like concat('%', #{keyword}, '%'))
+            </if>
+            <if test="nickname != null and nickname != ''">and s.nickname like concat('%', #{nickname}, '%')</if>
+            <if test="secUid != null and secUid != ''">and s.sec_uid = #{secUid}</if>
+            <choose>
+                <when test="rankType == 'comment'">and s.comment_rank is not null</when>
+                <when test="rankType == 'watch'">and s.watch_rank is not null</when>
+                <when test="rankType == 'all'">and s.comment_rank is not null and s.watch_rank is not null</when>
+            </choose>
+            <choose>
+                <when test="rankType == 'comment'">
+                    <if test="beginDataDate != null">and b.comment_data_date &gt;= #{beginDataDate}</if>
+                    <if test="endDataDate != null">and b.comment_data_date &lt;= #{endDataDate}</if>
+                </when>
+                <when test="rankType == 'watch'">
+                    <if test="beginDataDate != null">and b.watch_data_date &gt;= #{beginDataDate}</if>
+                    <if test="endDataDate != null">and b.watch_data_date &lt;= #{endDataDate}</if>
+                </when>
+                <when test="rankType == 'all'">
+                    <if test="beginDataDate != null">
+                        and b.comment_data_date &gt;= #{beginDataDate} and b.watch_data_date &gt;= #{beginDataDate}
+                    </if>
+                    <if test="endDataDate != null">
+                        and b.comment_data_date &lt;= #{endDataDate} and b.watch_data_date &lt;= #{endDataDate}
+                    </if>
+                </when>
+                <otherwise>
+                    <choose>
+                        <when test="beginDataDate != null and endDataDate != null">
+                            and ((s.comment_rank is not null
+                                  and b.comment_data_date between #{beginDataDate} and #{endDataDate})
+                                 or (s.watch_rank is not null
+                                     and b.watch_data_date between #{beginDataDate} and #{endDataDate}))
+                        </when>
+                        <when test="beginDataDate != null">
+                            and ((s.comment_rank is not null and b.comment_data_date &gt;= #{beginDataDate})
+                                 or (s.watch_rank is not null and b.watch_data_date &gt;= #{beginDataDate}))
+                        </when>
+                        <when test="endDataDate != null">
+                            and ((s.comment_rank is not null and b.comment_data_date &lt;= #{endDataDate})
+                                 or (s.watch_rank is not null and b.watch_data_date &lt;= #{endDataDate}))
+                        </when>
+                    </choose>
+                </otherwise>
+            </choose>
+        </where>
+    </sql>
+
+    <select id="selectSnapshotList" resultMap="SnapshotResult">
+        select <include refid="snapshotColumns"/>
+        from dy_audience_rank_snapshot s
+        join dy_audience_rank_batch b on b.batch_id = s.batch_id
+        left join live_room r on r.room_id = b.room_id
+        left join dy_audience_followup f
+          on f.sec_uid = s.sec_uid
+        <include refid="snapshotWhere"/>
+        order by b.captured_at desc,
+                 coalesce(s.comment_rank, 2147483647),
+                 coalesce(s.watch_rank, 2147483647), s.snapshot_id
+    </select>
+
+    <select id="selectSnapshotsByBatchId" resultMap="SnapshotResult">
+        select <include refid="snapshotColumns"/>
+        from dy_audience_rank_snapshot s
+        join dy_audience_rank_batch b on b.batch_id = s.batch_id
+        left join dy_audience_followup f
+          on f.sec_uid = s.sec_uid
+        where s.batch_id = #{batchId}
+        order by coalesce(s.comment_rank, 2147483647),
+                 coalesce(s.watch_rank, 2147483647), s.snapshot_id
+    </select>
+
+    <select id="selectSummary" resultMap="SummaryResult">
+        select
+            count(distinct b.batch_id) as batch_count,
+            count(distinct b.room_scope_key) as room_count,
+            count(distinct b.room_scope_key, s.sec_uid) as unique_user_count,
+            count(distinct case when s.comment_rank is not null then b.room_scope_key end,
+                           case when s.comment_rank is not null then s.sec_uid end) as comment_user_count,
+            count(distinct case when s.watch_rank is not null then b.room_scope_key end,
+                           case when s.watch_rank is not null then s.sec_uid end) as watch_user_count,
+            count(distinct case when s.comment_rank is not null and s.watch_rank is not null then b.room_scope_key end,
+                           case when s.comment_rank is not null and s.watch_rank is not null then s.sec_uid end) as both_rank_user_count,
+            coalesce(sum(s.comment_count), 0) as total_comment_count,
+            coalesce(sum(s.watch_seconds), 0) as total_watch_seconds,
+            coalesce(round(avg(s.watch_seconds), 2), 0) as average_watch_seconds,
+            count(distinct case when s.is_follower = 1 then b.room_scope_key end,
+                           case when s.is_follower = 1 then s.sec_uid end) as follower_count,
+            count(distinct case when b.room_match_status != 'MATCHED' then b.batch_id end) as unmatched_batch_count,
+            max(b.captured_at) as latest_captured_at
+        from dy_audience_rank_snapshot s
+        join dy_audience_rank_batch b on b.batch_id = s.batch_id
+        left join live_room r on r.room_id = b.room_id
+        <include refid="snapshotWhere"/>
+    </select>
+
+    <select id="selectMatchingRooms" resultMap="RoomMatchResult">
+        select room_id, room_code, room_name, live_account
+        from live_room
+        where (lower(trim(room_name)) = lower(trim(#{roomName}))
+               or lower(trim(live_account)) = lower(trim(#{roomName})))
+        order by room_id
+        limit 2
+    </select>
+
+    <insert id="insertAutoRoom" parameterType="com.xinke.erp.domain.audience.AudienceRankRoomMatch"
+            useGeneratedKeys="true" keyProperty="roomId">
+        insert into live_room(
+            room_code, room_name, shop_id, platform_room_id, live_account,
+            owner_staff_id, status, remark, create_by, create_time
+        ) values (
+            #{roomCode}, #{roomName}, null, null, #{roomName},
+            null, '0', '观众榜单上报自动创建', 'audience-plugin', sysdate()
+        )
+    </insert>
+
+    <update id="updateBatchRoom" parameterType="com.xinke.erp.domain.audience.AudienceRankBatch">
+        update dy_audience_rank_batch
+        set room_id = #{roomId}, room_match_status = #{roomMatchStatus}
+        where batch_id = #{batchId}
+    </update>
+
+    <insert id="insertBatch" parameterType="com.xinke.erp.domain.audience.AudienceRankBatch"
+            useGeneratedKeys="true" keyProperty="batchId">
+        insert into dy_audience_rank_batch(
+            payload_hash, room_scope_key, room_name, room_id, room_match_status, is_current,
+            comment_data_date, watch_data_date, captured_at, comment_row_count,
+            watch_row_count, unique_user_count, uploaded_ip, create_time
+        ) values (
+            #{payloadHash}, #{roomScopeKey}, #{roomName}, #{roomId}, #{roomMatchStatus}, 1,
+            #{commentDataDate}, #{watchDataDate}, #{capturedAt}, #{commentRowCount},
+            #{watchRowCount}, #{uniqueUserCount}, #{uploadedIp}, sysdate()
+        )
+    </insert>
+
+    <update id="supersedeCurrentBatches" parameterType="com.xinke.erp.domain.audience.AudienceRankBatch">
+        update dy_audience_rank_batch
+        set is_current = 0
+        where room_scope_key = #{roomScopeKey}
+          and comment_data_date = #{commentDataDate}
+          and watch_data_date = #{watchDataDate}
+          and batch_id != #{batchId}
+          and is_current = 1
+    </update>
+
+    <update id="activateBatch" parameterType="com.xinke.erp.domain.audience.AudienceRankBatch">
+        update dy_audience_rank_batch set is_current = 1 where batch_id = #{batchId}
+    </update>
+
+    <insert id="insertSnapshots">
+        insert into dy_audience_rank_snapshot(
+            batch_id, sec_uid, nickname, is_follower, is_following, pay_level,
+            pay_icon_url, comment_count, comment_rank, watch_seconds, watch_rank, create_time
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.batchId}, #{item.secUid}, #{item.nickname}, #{item.isFollower},
+             #{item.isFollowing}, #{item.payLevel}, #{item.payIconUrl}, #{item.commentCount},
+             #{item.commentRank}, #{item.watchSeconds}, #{item.watchRank}, sysdate())
+        </foreach>
+    </insert>
+
+    <insert id="upsertProfiles">
+        insert into dy_audience_profile(
+            room_scope_key, room_name, room_id, sec_uid, nickname, is_follower,
+            is_following, pay_level, pay_icon_url, first_batch_id, last_batch_id,
+            first_seen_at, last_seen_at, create_time, update_time
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.roomScopeKey}, #{item.roomName}, #{item.roomId}, #{item.secUid},
+             #{item.nickname}, #{item.isFollower}, #{item.isFollowing}, #{item.payLevel},
+             #{item.payIconUrl}, #{item.firstBatchId}, #{item.lastBatchId},
+             #{item.firstSeenAt}, #{item.lastSeenAt}, sysdate(), sysdate())
+        </foreach>
+        on duplicate key update
+            room_name = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                           values(room_name), dy_audience_profile.room_name),
+            room_scope_key = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                                values(room_scope_key), dy_audience_profile.room_scope_key),
+            room_id = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                         coalesce(values(room_id), dy_audience_profile.room_id),
+                         dy_audience_profile.room_id),
+            nickname = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                          values(nickname), dy_audience_profile.nickname),
+            is_follower = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                             coalesce(values(is_follower), dy_audience_profile.is_follower),
+                             dy_audience_profile.is_follower),
+            is_following = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                              coalesce(values(is_following), dy_audience_profile.is_following),
+                              dy_audience_profile.is_following),
+            pay_level = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                           coalesce(values(pay_level), dy_audience_profile.pay_level),
+                           dy_audience_profile.pay_level),
+            pay_icon_url = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                              coalesce(values(pay_icon_url), dy_audience_profile.pay_icon_url),
+                              dy_audience_profile.pay_icon_url),
+            first_batch_id = if(values(first_seen_at) &lt; dy_audience_profile.first_seen_at,
+                                values(first_batch_id), dy_audience_profile.first_batch_id),
+            first_seen_at = least(dy_audience_profile.first_seen_at, values(first_seen_at)),
+            last_batch_id = if(values(last_seen_at) &gt;= dy_audience_profile.last_seen_at,
+                               values(last_batch_id), dy_audience_profile.last_batch_id),
+            last_seen_at = greatest(dy_audience_profile.last_seen_at, values(last_seen_at)),
+            update_time = sysdate()
+    </insert>
+
+    <resultMap id="FollowupResult" type="com.xinke.erp.domain.audience.AudienceFollowup">
+        <id property="followupId" column="followup_id"/>
+        <result property="profileId" column="profile_id"/>
+        <result property="roomScopeKey" column="room_scope_key"/>
+        <result property="roomId" column="room_id"/>
+        <result property="roomNameSnapshot" column="room_name_snapshot"/>
+        <result property="secUid" column="sec_uid"/>
+        <result property="nicknameSnapshot" column="nickname_snapshot"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="contactWechat" column="contact_wechat"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="ownerNameSnapshot" column="owner_name_snapshot"/>
+        <result property="anchorUserId" column="anchor_user_id"/>
+        <result property="anchorNameSnapshot" column="anchor_name_snapshot"/>
+        <result property="controllerUserId" column="controller_user_id"/>
+        <result property="controllerNameSnapshot" column="controller_name_snapshot"/>
+        <result property="status" column="status"/>
+        <result property="followResultCode" column="follow_result_code"/>
+        <result property="intentLevel" column="intent_level"/>
+        <result property="consultModel" column="consult_model"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="orderCount" column="order_count"/>
+        <result property="priority" column="priority"/>
+        <result property="reactivationPending" column="reactivation_pending"/>
+        <result property="qualificationReason" column="qualification_reason"/>
+        <result property="commentCount" column="comment_count"/>
+        <result property="commentRank" column="comment_rank"/>
+        <result property="watchSeconds" column="watch_seconds"/>
+        <result property="watchRank" column="watch_rank"/>
+        <result property="isFollower" column="is_follower"/>
+        <result property="isFollowing" column="is_following"/>
+        <result property="payLevel" column="pay_level"/>
+        <result property="appearanceDays" column="appearance_days"/>
+        <result property="consecutiveDays" column="consecutive_days"/>
+        <result property="bestCommentRank" column="best_comment_rank"/>
+        <result property="bestWatchRank" column="best_watch_rank"/>
+        <result property="latestVisitDate" column="latest_visit_date"/>
+        <result property="visitDatesCsv" column="visit_dates_csv"/>
+        <result property="version" column="version"/>
+        <result property="firstSourceBatchId" column="first_source_batch_id"/>
+        <result property="lastSourceBatchId" column="last_source_batch_id"/>
+        <result property="lastFollowResult" column="last_follow_result"/>
+        <result property="remark" column="remark"/>
+        <result property="closeReason" column="close_reason"/>
+        <result property="closeReasonCode" column="close_reason_code"/>
+        <result property="lastContactAt" column="last_contact_at"/>
+        <result property="nextFollowAt" column="next_follow_at"/>
+        <result property="statusChangedAt" column="status_changed_at"/>
+        <result property="qualifiedAt" column="qualified_at"/>
+        <result property="firstSeenAt" column="first_seen_at"/>
+        <result property="lastSeenAt" column="last_seen_at"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <resultMap id="FollowupLogResult" type="com.xinke.erp.domain.audience.AudienceFollowupLog">
+        <id property="logId" column="log_id"/>
+        <result property="followupId" column="followup_id"/>
+        <result property="actionType" column="action_type"/>
+        <result property="beforeJson" column="before_json"/>
+        <result property="afterJson" column="after_json"/>
+        <result property="contactMethod" column="contact_method"/>
+        <result property="content" column="content"/>
+        <result property="result" column="result"/>
+        <result property="statusBefore" column="status_before"/>
+        <result property="statusAfter" column="status_after"/>
+        <result property="nextFollowAt" column="next_follow_at"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="operatorNameSnapshot" column="operator_name_snapshot"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="followupColumns">
+        f.followup_id, f.profile_id, f.room_scope_key, f.room_id, f.room_name_snapshot,
+        f.sec_uid, f.nickname_snapshot, f.contact_phone, f.contact_wechat,
+        f.owner_user_id, f.owner_name_snapshot,
+        f.anchor_user_id, f.anchor_name_snapshot,
+        f.controller_user_id, f.controller_name_snapshot, f.status, f.follow_result_code,
+        f.intent_level, f.consult_model,
+        f.order_no, (select count(*) from dy_audience_customer_order oc where oc.followup_id = f.followup_id) order_count,
+        f.priority, f.reactivation_pending, f.qualification_reason, f.qualified_at,
+        s.comment_count, s.comment_rank, s.watch_seconds,
+        s.watch_rank, s.is_follower, s.is_following, s.pay_level, f.version,
+        f.first_source_batch_id, f.last_source_batch_id, f.last_follow_result, f.remark,
+        f.close_reason, f.close_reason_code, f.last_contact_at, f.next_follow_at, f.status_changed_at,
+        f.first_seen_at, f.last_seen_at, f.create_time, f.update_time
+    </sql>
+
+    <sql id="followupWhere">
+        <where>
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="roomName != null and roomName != ''">and f.room_name_snapshot like concat('%', #{roomName}, '%')</if>
+            <if test="anchorUserId != null">and f.anchor_user_id = #{anchorUserId}</if>
+            <if test="controllerUserId != null">and f.controller_user_id = #{controllerUserId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="status != null and status != ''">and f.status = #{status}</if>
+            <choose>
+                <when test="stage == 'OBSERVING'">and f.status = 'OBSERVING'</when>
+                <when test="stage == 'UNASSIGNED'">and f.status = 'UNASSIGNED'</when>
+                <when test="stage == 'FOLLOWING'">and f.status in ('PENDING', 'CONTACTED')</when>
+                <when test="stage == 'DEAL_PENDING'">and f.status in ('QUALIFIED', 'QUOTED', 'ORDER_PENDING', 'PAUSED')</when>
+                <when test="stage == 'ORDERED'">and f.status = 'ORDERED'</when>
+                <when test="stage == 'ENDED'">and f.status in ('CLOSED', 'INVALID')</when>
+            </choose>
+            <if test="intentLevel != null and intentLevel != ''">and f.intent_level = #{intentLevel}</if>
+            <if test="followResultCode != null and followResultCode != ''">and f.follow_result_code = #{followResultCode}</if>
+            <if test="priority != null">and f.priority = #{priority}</if>
+            <if test="reactivationPending != null">and f.reactivation_pending = #{reactivationPending}</if>
+            <if test="qualified != null and qualified">and f.status != 'OBSERVING'</if>
+            <if test="qualified != null and qualified == false">and f.status = 'OBSERVING'</if>
+            <if test="hasOrder != null and hasOrder">and f.order_no is not null and trim(f.order_no) != ''</if>
+            <if test="hasOrder != null and hasOrder == false">and (f.order_no is null or trim(f.order_no) = '')</if>
+            <if test="repeatVisit != null and repeatVisit">
+                and (
+                    select count(distinct rv.visit_date)
+                    from (
+                        select rs.sec_uid, rb.comment_data_date as visit_date
+                        from dy_audience_rank_snapshot rs
+                        join dy_audience_rank_batch rb on rb.batch_id = rs.batch_id and rb.is_current = 1
+                        where rs.comment_rank is not null
+                        union all
+                        select rs.sec_uid, rb.watch_data_date as visit_date
+                        from dy_audience_rank_snapshot rs
+                        join dy_audience_rank_batch rb on rb.batch_id = rs.batch_id and rb.is_current = 1
+                        where rs.watch_rank is not null
+                    ) rv
+                    where rv.sec_uid = f.sec_uid
+                ) &gt; 1
+            </if>
+            <if test="uncontacted != null and uncontacted">
+                and f.status in ('UNASSIGNED', 'PENDING')
+                and f.last_contact_at is null
+            </if>
+            <if test="claimed != null and claimed">and f.owner_user_id is not null</if>
+            <if test="contacted != null and contacted">and f.status not in ('UNASSIGNED', 'PENDING')</if>
+            <if test="isFollower != null">and s.is_follower = #{isFollower}</if>
+            <if test="isFollowing != null">and s.is_following = #{isFollowing}</if>
+            <if test="minPayLevel != null">and s.pay_level &gt;= #{minPayLevel}</if>
+            <if test="maxCommentRank != null">and s.comment_rank is not null and s.comment_rank &lt;= #{maxCommentRank}</if>
+            <if test="maxWatchRank != null">and s.watch_rank is not null and s.watch_rank &lt;= #{maxWatchRank}</if>
+            <if test="excludeTerminal != null and excludeTerminal">and f.status not in ('ORDERED', 'CLOSED', 'INVALID')</if>
+            <if test="keyword != null and keyword != ''">
+                and (f.nickname_snapshot like concat('%', #{keyword}, '%')
+                     or f.sec_uid like concat('%', #{keyword}, '%')
+                     or f.contact_phone like concat('%', #{keyword}, '%')
+                     or f.contact_wechat like concat('%', #{keyword}, '%')
+                     or f.consult_model like concat('%', #{keyword}, '%')
+                     or f.order_no like concat('%', #{keyword}, '%')
+                     or exists(select 1 from dy_audience_customer_order co
+                               where co.followup_id = f.followup_id
+                                 and co.order_no like concat('%', #{keyword}, '%')))
+            </if>
+            <if test="sourceBatchId != null">and f.last_source_batch_id = #{sourceBatchId}</if>
+            <if test="beginDate != null">and f.last_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.last_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+            <if test="overdue != null and overdue">
+                and f.status not in ('ORDERED', 'CLOSED', 'INVALID')
+                and f.next_follow_at is not null and f.next_follow_at &lt; now()
+            </if>
+            <if test="todayDue != null and todayDue">
+                and f.status not in ('ORDERED', 'CLOSED', 'INVALID')
+                and f.next_follow_at &gt;= now() and f.next_follow_at &lt; date_add(curdate(), interval 1 day)
+            </if>
+            <choose>
+                <when test="mineAssigned != null and mineAssigned and currentUserId != null">
+                    and f.owner_user_id = #{currentUserId}
+                </when>
+                <when test="onlyMine != null and onlyMine and currentUserId != null">
+                    and (f.owner_user_id = #{currentUserId} or f.status in ('UNASSIGNED', 'OBSERVING'))
+                </when>
+            </choose>
+        </where>
+    </sql>
+
+    <select id="selectFollowupList" resultMap="FollowupResult">
+        select <include refid="followupColumns"/>
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        <include refid="followupWhere"/>
+        order by case when f.status not in ('ORDERED', 'CLOSED', 'INVALID')
+                           and f.next_follow_at is not null and f.next_follow_at &lt; now() then 0 else 1 end,
+                 f.priority desc, f.next_follow_at asc, f.last_seen_at desc, f.followup_id desc
+    </select>
+
+    <select id="selectFollowupVisitStats" resultMap="FollowupResult">
+        select v.sec_uid,
+               count(distinct v.visit_date) as appearance_days,
+               group_concat(distinct date_format(v.visit_date, '%Y-%m-%d')
+                            order by v.visit_date desc separator ',') as visit_dates_csv,
+               max(v.visit_date) as latest_visit_date,
+               min(v.comment_rank) as best_comment_rank,
+               min(v.watch_rank) as best_watch_rank
+        from (
+            select s.sec_uid, b.comment_data_date as visit_date,
+                   s.comment_rank, null as watch_rank
+            from dy_audience_rank_snapshot s
+            join dy_audience_rank_batch b on b.batch_id = s.batch_id and b.is_current = 1
+            where s.comment_rank is not null
+            union all
+            select s.sec_uid, b.watch_data_date as visit_date,
+                   null as comment_rank, s.watch_rank
+            from dy_audience_rank_snapshot s
+            join dy_audience_rank_batch b on b.batch_id = s.batch_id and b.is_current = 1
+            where s.watch_rank is not null
+        ) v
+        where v.sec_uid in
+        <foreach collection="secUids" item="secUid" open="(" separator="," close=")">#{secUid}</foreach>
+        group by v.sec_uid
+    </select>
+
+    <select id="selectFollowupVisits" resultType="com.xinke.erp.domain.audience.AudienceVisitRecord">
+        select v.visit_date as visitDate, v.room_id as roomId, v.room_name as roomName,
+               max(v.batch_id) as batchId, max(v.comment_count) as commentCount,
+               min(v.comment_rank) as commentRank, max(v.watch_seconds) as watchSeconds,
+               min(v.watch_rank) as watchRank, max(v.captured_at) as capturedAt
+        from (
+            select b.comment_data_date as visit_date, b.room_id, b.room_name, b.batch_id,
+                   s.comment_count, s.comment_rank, null as watch_seconds,
+                   null as watch_rank, b.captured_at
+            from dy_audience_rank_snapshot s
+            join dy_audience_rank_batch b on b.batch_id = s.batch_id and b.is_current = 1
+            where s.sec_uid = #{secUid} and s.comment_rank is not null
+            union all
+            select b.watch_data_date as visit_date, b.room_id, b.room_name, b.batch_id,
+                   null as comment_count, null as comment_rank, s.watch_seconds,
+                   s.watch_rank, b.captured_at
+            from dy_audience_rank_snapshot s
+            join dy_audience_rank_batch b on b.batch_id = s.batch_id and b.is_current = 1
+            where s.sec_uid = #{secUid} and s.watch_rank is not null
+        ) v
+        group by v.visit_date, v.room_id, v.room_name
+        order by v.visit_date desc, max(v.captured_at) desc
+    </select>
+
+    <select id="selectFollowupById" resultMap="FollowupResult">
+        select <include refid="followupColumns"/>
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        where f.followup_id = #{followupId}
+    </select>
+
+    <select id="selectFollowupByUid" resultMap="FollowupResult">
+        select <include refid="followupColumns"/>
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        where f.sec_uid = #{secUid}
+    </select>
+
+    <select id="selectFollowupByOrderNo" resultMap="FollowupResult">
+        select <include refid="followupColumns"/>
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        where trim(f.order_no) = trim(#{orderNo})
+          <if test="excludeFollowupId != null">and f.followup_id != #{excludeFollowupId}</if>
+        order by f.update_time desc, f.followup_id desc
+        limit 1
+    </select>
+
+    <select id="selectFollowupLogs" resultMap="FollowupLogResult">
+        select log_id, followup_id, action_type, before_json, after_json,
+               contact_method, content, result, status_before, status_after,
+               next_follow_at, operator_user_id, operator_name_snapshot, create_time
+        from dy_audience_followup_log
+        where followup_id = #{followupId}
+        order by create_time desc, log_id desc
+    </select>
+
+    <insert id="insertFollowups">
+        insert ignore into dy_audience_followup(
+            profile_id, room_scope_key, room_id, room_name_snapshot, sec_uid,
+            nickname_snapshot, owner_user_id, owner_name_snapshot,
+            anchor_user_id, anchor_name_snapshot, controller_user_id,
+            controller_name_snapshot, status, priority, qualification_reason, qualified_at, first_source_batch_id,
+            last_source_batch_id, first_seen_at, last_seen_at, create_time
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.profileId}, #{item.roomScopeKey}, #{item.roomId}, #{item.roomNameSnapshot},
+             #{item.secUid}, #{item.nicknameSnapshot}, #{item.ownerUserId}, #{item.ownerNameSnapshot},
+             #{item.anchorUserId}, #{item.anchorNameSnapshot},
+             #{item.controllerUserId}, #{item.controllerNameSnapshot}, #{item.status}, 0,
+             #{item.qualificationReason}, #{item.qualifiedAt},
+             #{item.firstSourceBatchId}, #{item.lastSourceBatchId}, #{item.firstSeenAt},
+             #{item.lastSeenAt}, sysdate())
+        </foreach>
+    </insert>
+
+    <update id="refreshFollowupSource" parameterType="com.xinke.erp.domain.audience.AudienceFollowup">
+            update dy_audience_followup
+            set profile_id = #{profileId}, room_id = #{roomId},
+                room_name_snapshot = #{roomNameSnapshot}, nickname_snapshot = #{nicknameSnapshot},
+                last_source_batch_id = #{lastSourceBatchId}, last_seen_at = #{lastSeenAt},
+                update_time = sysdate()
+            where sec_uid = #{secUid}
+    </update>
+
+    <update id="updateFollowup" parameterType="com.xinke.erp.domain.audience.AudienceFollowup">
+        update dy_audience_followup
+        <set>
+            room_id = #{roomId},
+            owner_user_id = #{ownerUserId},
+            owner_name_snapshot = #{ownerNameSnapshot},
+            anchor_user_id = #{anchorUserId},
+            anchor_name_snapshot = #{anchorNameSnapshot},
+            controller_user_id = #{controllerUserId},
+            controller_name_snapshot = #{controllerNameSnapshot},
+            status_changed_at = if(not (status &lt;=&gt; #{status}), sysdate(), status_changed_at),
+            status = #{status},
+            follow_result_code = #{followResultCode},
+            intent_level = #{intentLevel},
+            consult_model = #{consultModel},
+            order_no = #{orderNo},
+            priority = #{priority},
+            contact_phone = #{contactPhone},
+            contact_wechat = #{contactWechat},
+            reactivation_pending = #{reactivationPending},
+            qualification_reason = #{qualificationReason},
+            qualified_at = #{qualifiedAt},
+            last_contact_at = #{lastContactAt},
+            next_follow_at = #{nextFollowAt},
+            last_follow_result = #{lastFollowResult},
+            remark = #{remark},
+            close_reason = #{closeReason},
+            close_reason_code = #{closeReasonCode},
+            version = version + 1,
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where followup_id = #{followupId}
+          <if test="version != null">and version = #{version}</if>
+    </update>
+
+    <insert id="insertFollowupLog" parameterType="com.xinke.erp.domain.audience.AudienceFollowupLog"
+            useGeneratedKeys="true" keyProperty="logId">
+        insert into dy_audience_followup_log(
+            followup_id, action_type, before_json, after_json, contact_method,
+            content, result, status_before, status_after, next_follow_at,
+            operator_user_id, operator_name_snapshot, create_time
+        ) values (
+            #{followupId}, #{actionType}, #{beforeJson}, #{afterJson}, #{contactMethod},
+            #{content}, #{result}, #{statusBefore}, #{statusAfter}, #{nextFollowAt},
+            #{operatorUserId}, #{operatorNameSnapshot}, sysdate())
+    </insert>
+
+    <select id="selectCurrentOpportunity" resultType="com.xinke.erp.domain.audience.AudienceOpportunity">
+        select opportunity_id opportunityId, followup_id followupId, sequence_no sequenceNo,
+               is_current `current`, status, follow_result_code followResultCode,
+               intent_level intentLevel, consult_model consultModel, source_room_id sourceRoomId,
+               source_room_name sourceRoomName, owner_user_id ownerUserId,
+               owner_name_snapshot ownerNameSnapshot, close_reason_code closeReasonCode,
+               close_reason closeReason, opened_at openedAt, closed_at closedAt,
+               create_time createTime, update_time updateTime
+        from dy_audience_opportunity
+        where followup_id = #{followupId} and is_current = 1
+        order by opportunity_id desc limit 1
+    </select>
+
+    <select id="selectOpportunities" resultType="com.xinke.erp.domain.audience.AudienceOpportunity">
+        select opportunity_id opportunityId, followup_id followupId, sequence_no sequenceNo,
+               is_current `current`, status, follow_result_code followResultCode,
+               intent_level intentLevel, consult_model consultModel, source_room_id sourceRoomId,
+               source_room_name sourceRoomName, owner_user_id ownerUserId,
+               owner_name_snapshot ownerNameSnapshot, close_reason_code closeReasonCode,
+               close_reason closeReason, opened_at openedAt, closed_at closedAt,
+               create_time createTime, update_time updateTime
+        from dy_audience_opportunity where followup_id = #{followupId}
+        order by sequence_no desc, opportunity_id desc
+    </select>
+
+    <insert id="insertOpportunity" parameterType="com.xinke.erp.domain.audience.AudienceOpportunity"
+            useGeneratedKeys="true" keyProperty="opportunityId">
+        insert into dy_audience_opportunity(
+            followup_id, sequence_no, is_current, status, follow_result_code, intent_level,
+            consult_model, source_room_id, source_room_name, owner_user_id,
+            owner_name_snapshot, close_reason_code, close_reason, opened_at, closed_at,
+            create_by, create_time, update_by, update_time
+        ) values (
+            #{followupId}, #{sequenceNo}, #{current}, #{status}, #{followResultCode}, #{intentLevel},
+            #{consultModel}, #{sourceRoomId}, #{sourceRoomName}, #{ownerUserId},
+            #{ownerNameSnapshot}, #{closeReasonCode}, #{closeReason}, #{openedAt}, #{closedAt},
+            '', sysdate(3), '', sysdate(3)
+        )
+    </insert>
+
+    <update id="updateOpportunity" parameterType="com.xinke.erp.domain.audience.AudienceOpportunity">
+        update dy_audience_opportunity set
+            is_current = #{current}, status = #{status}, follow_result_code = #{followResultCode},
+            intent_level = #{intentLevel}, consult_model = #{consultModel},
+            source_room_id = #{sourceRoomId}, source_room_name = #{sourceRoomName},
+            owner_user_id = #{ownerUserId}, owner_name_snapshot = #{ownerNameSnapshot},
+            close_reason_code = #{closeReasonCode}, close_reason = #{closeReason},
+            closed_at = #{closedAt}, update_time = sysdate(3)
+        where opportunity_id = #{opportunityId}
+    </update>
+
+    <update id="closeCurrentOpportunities">
+        update dy_audience_opportunity set is_current = 0,
+            closed_at = coalesce(closed_at, sysdate(3)), update_time = sysdate(3)
+        where followup_id = #{followupId} and is_current = 1
+    </update>
+
+    <select id="selectCustomerOrders" resultType="com.xinke.erp.domain.audience.AudienceCustomerOrder">
+        select customer_order_id customerOrderId, followup_id followupId,
+               opportunity_id opportunityId, order_no orderNo, order_status orderStatus,
+               product_model productModel, remark, ordered_at orderedAt, version,
+               create_time createTime, update_time updateTime
+        from dy_audience_customer_order where followup_id = #{followupId}
+        order by ordered_at desc, customer_order_id desc
+    </select>
+
+    <select id="selectCustomerOrderByNo" resultType="com.xinke.erp.domain.audience.AudienceCustomerOrder">
+        select customer_order_id customerOrderId, followup_id followupId,
+               opportunity_id opportunityId, order_no orderNo, order_status orderStatus,
+               product_model productModel, remark, ordered_at orderedAt, version,
+               create_time createTime, update_time updateTime
+        from dy_audience_customer_order where trim(order_no) = trim(#{orderNo}) limit 1
+    </select>
+
+    <insert id="insertCustomerOrder" parameterType="com.xinke.erp.domain.audience.AudienceCustomerOrder"
+            useGeneratedKeys="true" keyProperty="customerOrderId">
+        insert into dy_audience_customer_order(
+            followup_id, opportunity_id, order_no, order_status, product_model,
+            remark, ordered_at, version, create_by, create_time, update_by, update_time
+        ) values (
+            #{followupId}, #{opportunityId}, #{orderNo}, #{orderStatus}, #{productModel},
+            #{remark}, #{orderedAt}, 0, '', sysdate(3), '', sysdate(3)
+        )
+    </insert>
+
+    <update id="updateCustomerOrder" parameterType="com.xinke.erp.domain.audience.AudienceCustomerOrder">
+        update dy_audience_customer_order set order_no = #{orderNo},
+            order_status = #{orderStatus}, product_model = #{productModel}, remark = #{remark},
+            ordered_at = #{orderedAt}, version = version + 1, update_time = sysdate(3)
+        where customer_order_id = #{customerOrderId} and version = #{version}
+    </update>
+
+    <update id="markReactivationPending">
+        update dy_audience_followup set reactivation_pending = 1, update_time = sysdate(3)
+        where followup_id = #{followupId}
+          and status in ('ORDERED', 'CLOSED', 'INVALID')
+          and (last_seen_at is null or last_seen_at &lt; #{lastSeenAt})
+    </update>
+
+    <select id="selectFollowupSummary" resultType="java.util.LinkedHashMap">
+        select f.status, count(*) as total_count,
+               sum(case when f.status not in ('ORDERED', 'CLOSED', 'INVALID')
+                              and f.next_follow_at is not null and f.next_follow_at &lt; now() then 1 else 0 end) as overdue_count,
+               sum(case when f.status not in ('ORDERED', 'CLOSED', 'INVALID')
+                              and f.next_follow_at &gt;= now()
+                              and f.next_follow_at &lt; date_add(curdate(), interval 1 day) then 1 else 0 end) as today_count
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        <include refid="followupWhere"/>
+        group by f.status
+    </select>
+
+    <sql id="dashboardCohortWhere">
+        <where>
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="beginDate != null">and f.first_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.first_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+        </where>
+    </sql>
+
+    <select id="selectTeamOverview" resultType="java.util.LinkedHashMap">
+        select count(*) totalCustomers,
+               sum(case when f.status = 'OBSERVING' then 1 else 0 end) observingCustomers,
+               sum(case when f.status != 'OBSERVING' then 1 else 0 end) qualifiedCustomers,
+               sum(case when f.status = 'UNASSIGNED' then 1 else 0 end) unassignedCustomers,
+               sum(case when f.status not in ('ORDERED', 'CLOSED', 'INVALID') and f.next_follow_at &lt; now() then 1 else 0 end) overdueCustomers,
+               sum(case when f.status not in ('ORDERED', 'CLOSED', 'INVALID') and date(f.next_follow_at) = curdate() then 1 else 0 end) todayDueCustomers,
+               sum(case when f.priority = 1 and f.status not in ('ORDERED', 'CLOSED', 'INVALID') then 1 else 0 end) priorityCustomers,
+               sum(case when f.status = 'ORDERED' then 1 else 0 end) orderedCustomers,
+               sum(case when f.status not in ('OBSERVING', 'UNASSIGNED', 'PENDING') then 1 else 0 end) contactedCustomers,
+               sum(case when date(f.last_contact_at) = curdate() then 1 else 0 end) todayContactedCustomers,
+               max(f.last_contact_at) latestContactAt
+        from dy_audience_followup f
+        <include refid="dashboardCohortWhere"/>
+    </select>
+
+    <select id="selectTeamFunnel" resultType="java.util.LinkedHashMap">
+        select 'NEW' stageCode, count(*) totalCount from dy_audience_followup f
+        <where>
+            and f.status != 'OBSERVING'
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="beginDate != null">and f.first_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.first_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+        </where>
+        union all
+        select 'CLAIMED', count(*) from dy_audience_followup f
+        <where>
+            and f.owner_user_id is not null
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="beginDate != null">and f.first_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.first_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+        </where>
+        union all
+        select 'CONTACTED', count(*) from dy_audience_followup f
+        <where>
+            and f.status not in ('OBSERVING', 'UNASSIGNED', 'PENDING')
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="beginDate != null">and f.first_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.first_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+        </where>
+        union all
+        select 'QUALIFIED', count(*) from dy_audience_followup f
+        <where>
+            and (f.intent_level = 'HIGH' or f.status in ('QUALIFIED', 'QUOTED', 'ORDER_PENDING', 'ORDERED', 'CLOSED'))
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="beginDate != null">and f.first_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.first_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+        </where>
+        union all
+        select 'ORDERED', count(*) from dy_audience_followup f
+        <where>
+            and f.status in ('ORDERED', 'CLOSED') and f.order_no is not null and trim(f.order_no) != ''
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="beginDate != null">and f.first_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.first_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+        </where>
+    </select>
+
+    <select id="selectOwnerPerformance" resultType="java.util.LinkedHashMap">
+        select f.owner_user_id ownerUserId, coalesce(max(f.owner_name_snapshot), '未命名账号') ownerName,
+               count(*) assignedCount,
+               sum(case when f.status not in ('OBSERVING', 'UNASSIGNED', 'PENDING') then 1 else 0 end) contactedCount,
+               sum(case when f.status in ('QUALIFIED', 'QUOTED', 'ORDER_PENDING') or f.intent_level = 'HIGH' then 1 else 0 end) qualifiedCount,
+               sum(case when f.status in ('ORDERED', 'CLOSED') and f.order_no is not null and trim(f.order_no) != '' then 1 else 0 end) orderedCount,
+               sum(case when f.status not in ('ORDERED', 'CLOSED', 'INVALID') and date(f.next_follow_at) = curdate() then 1 else 0 end) todayDueCount,
+               sum(case when f.status not in ('ORDERED', 'CLOSED', 'INVALID') and f.next_follow_at &lt; now() then 1 else 0 end) overdueCount
+        from dy_audience_followup f
+        <where>
+            and f.owner_user_id is not null
+            <if test="roomId != null">and f.room_id = #{roomId}</if>
+            <if test="ownerUserId != null">and f.owner_user_id = #{ownerUserId}</if>
+            <if test="beginDate != null">and f.first_seen_at &gt;= #{beginDate}</if>
+            <if test="endDate != null">and f.first_seen_at &lt; date_add(#{endDate}, interval 1 day)</if>
+        </where>
+        group by f.owner_user_id
+        order by orderedCount desc, overdueCount desc, assignedCount desc
+    </select>
+
+    <select id="selectRoomPerformance" resultType="java.util.LinkedHashMap">
+        select f.room_id roomId, max(f.room_name_snapshot) roomName, count(*) customerCount,
+               sum(case when f.appearance_days &gt; 1 then 1 else 0 end) repeatVisitCount,
+               sum(case when f.intent_level = 'HIGH' then 1 else 0 end) highIntentCount,
+               sum(case when f.status in ('ORDERED', 'CLOSED') and f.order_no is not null and trim(f.order_no) != '' then 1 else 0 end) orderedCount
+        from (
+            select base.*, coalesce(stats.appearance_days, 0) appearance_days
+            from dy_audience_followup base
+            left join (
+                select s.sec_uid, count(distinct coalesce(b.comment_data_date, b.watch_data_date)) appearance_days
+                from dy_audience_rank_snapshot s
+                join dy_audience_rank_batch b on b.batch_id = s.batch_id and b.is_current = 1
+                group by s.sec_uid
+            ) stats on stats.sec_uid = base.sec_uid
+        ) f
+        <include refid="dashboardCohortWhere"/>
+        group by f.room_id
+        order by orderedCount desc, highIntentCount desc, customerCount desc
+        limit 20
+    </select>
+
+    <select id="selectDailyTrend" resultType="java.util.LinkedHashMap">
+        select date(f.first_seen_at) statDate, count(*) newCount,
+               sum(case when f.status in ('ORDERED', 'CLOSED') and f.order_no is not null and trim(f.order_no) != '' then 1 else 0 end) orderedCount
+        from dy_audience_followup f
+        <include refid="dashboardCohortWhere"/>
+        group by date(f.first_seen_at)
+        order by statDate
+    </select>
+
+    <select id="selectFollowupRoomOptions" resultType="java.util.LinkedHashMap">
+        select room_id roomId, room_code roomCode, room_name roomName, live_account liveAccount
+        from live_room where status = '0' order by room_name, room_id
+    </select>
+
+    <select id="selectFollowupAssignees" resultType="java.util.LinkedHashMap">
+        select distinct u.user_id userId, u.nick_name userName, u.user_name account,
+               u.phonenumber mobile, m.role_code roleCode
+        from live_subject_user_map m
+        join sys_user u on u.user_id = m.user_id and u.del_flag = '0' and u.status = '0'
+        where m.subject_type = 'ROOM'
+          <if test="roomId != null">and m.subject_id = #{roomId}</if>
+          <if test="roleCode != null and roleCode != ''">and m.role_code = #{roleCode}</if>
+        order by m.role_code, u.nick_name
+    </select>
+
+    <select id="selectAllActiveUsers" resultType="java.util.LinkedHashMap">
+        select u.user_id userId, u.nick_name userName, u.user_name account,
+               u.phonenumber mobile, 'owner' roleCode
+        from sys_user u
+        where u.del_flag = '0' and u.status = '0'
+        order by u.nick_name, u.user_id
+    </select>
+
+    <select id="selectAssignmentRules" resultType="com.xinke.erp.domain.audience.AudienceAssignmentRule">
+        select r.rule_id ruleId, r.room_id roomId, lr.room_name roomName,
+               r.enabled, r.max_active_per_owner maxActivePerOwner,
+               r.reclaim_hours reclaimHours, r.next_member_index nextMemberIndex,
+               r.qualification_enabled qualificationEnabled,
+               r.comment_rank_threshold commentRankThreshold,
+               r.watch_rank_threshold watchRankThreshold,
+               r.min_pay_level minPayLevel, r.min_visit_days minVisitDays,
+               r.follower_qualifies followerQualifies,
+               r.following_qualifies followingQualifies,
+               r.update_by updateBy, r.update_time updateTime
+        from dy_audience_assignment_rule r
+        left join live_room lr on lr.room_id = r.room_id
+        order by lr.room_name, r.room_id
+    </select>
+
+    <select id="selectAssignmentRuleByRoomId" resultType="com.xinke.erp.domain.audience.AudienceAssignmentRule">
+        select r.rule_id ruleId, r.room_id roomId, lr.room_name roomName,
+               r.enabled, r.max_active_per_owner maxActivePerOwner,
+               r.reclaim_hours reclaimHours, r.next_member_index nextMemberIndex,
+               r.qualification_enabled qualificationEnabled,
+               r.comment_rank_threshold commentRankThreshold,
+               r.watch_rank_threshold watchRankThreshold,
+               r.min_pay_level minPayLevel, r.min_visit_days minVisitDays,
+               r.follower_qualifies followerQualifies,
+               r.following_qualifies followingQualifies,
+               r.update_by updateBy, r.update_time updateTime
+        from dy_audience_assignment_rule r
+        left join live_room lr on lr.room_id = r.room_id
+        where r.room_id = #{roomId}
+        limit 1
+    </select>
+
+    <select id="selectAssignmentRuleMembers" resultType="java.util.LinkedHashMap">
+        select m.user_id userId, u.nick_name userName, u.user_name account,
+               u.phonenumber mobile, m.sort_order sortOrder
+        from dy_audience_assignment_member m
+        join sys_user u on u.user_id = m.user_id and u.del_flag = '0' and u.status = '0'
+        where m.rule_id = #{ruleId} and m.enabled = 1
+        order by m.sort_order, m.member_id
+    </select>
+
+    <insert id="upsertAssignmentRule" parameterType="com.xinke.erp.domain.audience.AudienceAssignmentRule"
+            useGeneratedKeys="true" keyProperty="ruleId">
+        insert into dy_audience_assignment_rule(
+            room_id, enabled, max_active_per_owner, reclaim_hours,
+            next_member_index, qualification_enabled, comment_rank_threshold,
+            watch_rank_threshold, min_pay_level, min_visit_days,
+            follower_qualifies, following_qualifies,
+            update_by, create_time, update_time
+        ) values (
+            #{roomId}, #{enabled}, #{maxActivePerOwner}, #{reclaimHours},
+            #{nextMemberIndex}, #{qualificationEnabled}, #{commentRankThreshold},
+            #{watchRankThreshold}, #{minPayLevel}, #{minVisitDays},
+            #{followerQualifies}, #{followingQualifies},
+            #{updateBy}, sysdate(), sysdate()
+        )
+        on duplicate key update
+            rule_id = last_insert_id(rule_id), enabled = values(enabled),
+            max_active_per_owner = values(max_active_per_owner),
+            reclaim_hours = values(reclaim_hours),
+            qualification_enabled = values(qualification_enabled),
+            comment_rank_threshold = values(comment_rank_threshold),
+            watch_rank_threshold = values(watch_rank_threshold),
+            min_pay_level = values(min_pay_level), min_visit_days = values(min_visit_days),
+            follower_qualifies = values(follower_qualifies),
+            following_qualifies = values(following_qualifies),
+            update_by = values(update_by),
+            update_time = sysdate()
+    </insert>
+
+    <delete id="deleteAssignmentRuleMembers">
+        delete from dy_audience_assignment_member where rule_id = #{ruleId}
+    </delete>
+
+    <insert id="insertAssignmentRuleMembers">
+        insert into dy_audience_assignment_member(
+            rule_id, user_id, sort_order, enabled, create_time
+        ) values
+        <foreach collection="userIds" item="userId" index="index" separator=",">
+            (#{ruleId}, #{userId}, #{index}, 1, sysdate())
+        </foreach>
+    </insert>
+
+    <select id="selectReclaimableFollowups" resultMap="FollowupResult">
+        select <include refid="followupColumns"/>
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        where f.room_id = #{roomId}
+          and f.owner_user_id is not null
+          and f.status = 'PENDING'
+          and f.last_contact_at is null
+          and coalesce(f.status_changed_at, f.update_time, f.create_time)
+              &lt; date_sub(now(), interval #{reclaimHours} hour)
+        order by coalesce(f.status_changed_at, f.update_time, f.create_time), f.followup_id
+        limit #{limit}
+    </select>
+
+    <select id="selectUnassignedForAutoAssign" resultMap="FollowupResult">
+        select <include refid="followupColumns"/>
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        where f.room_id = #{roomId} and f.status = 'UNASSIGNED'
+        order by f.priority desc, f.last_seen_at desc, f.followup_id
+        limit #{limit}
+    </select>
+
+    <select id="countActiveFollowupsByOwner" resultType="int">
+        select count(*) from dy_audience_followup
+        where owner_user_id = #{ownerUserId}
+          and status not in ('ORDERED', 'CLOSED', 'INVALID')
+    </select>
+
+    <update id="updateAssignmentRuleCursor">
+        update dy_audience_assignment_rule
+        set next_member_index = #{nextMemberIndex}, update_time = sysdate()
+        where rule_id = #{ruleId}
+    </update>
+</mapper>

@@ -1,6 +1,6 @@
 <template>
   <div class="app-container gift-bi">
-    <header class="page-head"><div><h2>礼品经营 BI</h2><p>礼品成本、订单使用和库存风险集中分析。</p></div><div class="head-actions"><el-button icon="Box" @click="goInventory">库存管理</el-button><el-button icon="Refresh" :loading="loading" title="刷新" @click="load" /></div></header>
+    <header class="page-head"><div class="head-actions"><el-button icon="Box" @click="goInventory">库存管理</el-button><el-button icon="Refresh" :loading="loading" title="刷新" @click="load" /></div></header>
     <section class="filter-strip"><el-button-group><el-button v-for="item in presets" :key="item.value" :type="preset===item.value?'primary':''" @click="setPreset(item.value)">{{ item.label }}</el-button></el-button-group><el-date-picker v-model="dates" type="daterange" value-format="YYYY-MM-DD" start-placeholder="开始日期" end-placeholder="结束日期" @change="preset='';load()" /><span class="period-note">统计所选日期内的礼品记录</span></section>
 
     <section v-loading="loading" class="metric-grid">
@@ -38,7 +38,7 @@ async function load(){loading.value=true;try{const q=baseQuery(),[main,trend,gif
 function setPreset(v){preset.value=v;if(v==='today')dates.value=[today,today];if(v==='week')dates.value=[iso(new Date(Date.now()-6*86400000)),today];if(v==='month')dates.value=[monthStart,today];if(v==='all')dates.value=[];load()}
 function deltaText(c,p){c=Number(c||0);p=Number(p||0);if(!p)return c?'新增':'无变化';const d=Math.round((c-p)*1000/p)/10;return d>0?`↑ ${d}% 较上期`:d<0?`↓ ${Math.abs(d)}% 较上期`:'无变化'}function deltaClass(c,p){return Number(c||0)>Number(p||0)?'up':Number(c||0)<Number(p||0)?'down':'flat'}
 function barWidth(v,max){return Math.max(2,Math.round(Number(v||0)*100/max))}function shortDate(v){return String(v||'').slice(5)}function costShare(v){return ratio(v,summary.value.giftCost)}function stockFor(row){return inventoryRows.value.find(item=>item.giftName===row.groupName)||{stockQty:0,safetyQty:0,stockStatus:'zero'}}function stockClass(row){return row.stockStatus==='zero'?'danger':row.stockStatus==='low'?'warning':'normal'}function stockTag(row){return row.stockStatus==='zero'?'danger':row.stockStatus==='low'?'warning':'success'}function stockLabel(row){return row.stockStatus==='zero'?'零库存':row.stockStatus==='low'?'低库存':'正常'}
-function goLedger(extra={}){router.push({path:'/live-ops/gift/giftLedger',query:{...baseQuery(),...extra}})}function goInventory(keyword){router.push({path:'/live-ops/gift/giftAdmin',query:{section:'inventory',...(keyword?{keyword}:{})}})}
+function goLedger(extra={}){router.push({path:'/live-ops/giftWorkbench',query:{section:'ledger',...baseQuery(),...extra}})}function goInventory(keyword){router.push({path:'/live-ops/giftMaterial',query:{section:'inventory',...(keyword?{keyword}:{})}})}
 onMounted(load)
 </script>
 

@@ -1,7 +1,6 @@
 <template>
   <div class="app-container gift-preference">
     <div class="page-head">
-      <div><h2>我的礼品设置</h2><p>这里只影响当前登录账号，不会改变礼品的全局启停和成本。</p></div>
       <el-button icon="Refresh" title="刷新" @click="load" />
     </div>
     <div class="toolbar">

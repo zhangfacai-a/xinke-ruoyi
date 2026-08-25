@@ -66,7 +66,7 @@ public class ResourcesConfig implements WebMvcConfigurer
                 .filter(value -> !value.isEmpty())
                 .toList();
         config.setAllowedOriginPatterns(origins);
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Plugin-Key", "X-RPA-Key"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Audience-Upload-Key"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(false);

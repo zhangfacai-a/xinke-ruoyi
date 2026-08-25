@@ -157,8 +157,10 @@ cors:
 security:
   frame-ancestors: http://39.96.157.230
 
-# 插件上报密钥。配置后，插件必须通过 X-Plugin-Key 请求头携带相同值。
 live:
+  audience-rank:
+    # 观众榜单扩展上传密钥。未配置时公开上传接口会拒绝所有请求。
+    upload-key: ${DY_AUDIENCE_RANK_UPLOAD_KEY:}
   gift:
     inventory:
       enabled: true
@@ -169,12 +171,6 @@ live:
     # 新同步用户的初始密码；已有用户密码不会被覆盖。每天 02:30 自动同步。
     default-password: ${DINGTALK_DEFAULT_PASSWORD:xk123456}
     sync-cron: ${DINGTALK_SYNC_CRON:0 30 2 * * ?}
-  plugin:
-    report-key: test-plugin-report-key-2026
-  rpa:
-    # 影刀领取和回传任务使用的固定接口密钥。
-    api-key: test-rpa-key-2026
-    lease-minutes: 30
 
 # 防盗链配置
 referer:

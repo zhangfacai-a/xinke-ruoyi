@@ -88,7 +88,7 @@ where menu_id=@live_admin_id;
 
 update sys_menu set menu_name='礼品管理',parent_id=@live_admin_id,order_num=1,path='',component=null,
   route_name='',menu_type='F',icon='#',remark='资料中心礼品管理页签'
-where menu_id=@gift_catalog_id;
+where menu_id=@gift_catalog_id and @live_admin_id is not null;
 
 insert into sys_menu(menu_name,parent_id,order_num,path,component,`query`,route_name,is_frame,is_cache,menu_type,visible,status,perms,icon,create_by,create_time,remark)
 select '直播间或店铺管理',@live_admin_id,2,'',null,null,'',1,0,'F','0','0','live:gift:room','#','admin',sysdate(),'资料中心直播间或店铺管理页签'

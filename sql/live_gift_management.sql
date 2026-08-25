@@ -24,7 +24,7 @@ create table if not exists live_room (
   owner_staff_id bigint null, status char(1) not null default '0',
   create_by varchar(64) default '', create_time datetime default current_timestamp,
   update_by varchar(64) default '', update_time datetime null, remark varchar(500) null,
-  primary key (room_id), unique key uk_live_room_code (room_code),
+  primary key (room_id), unique key uk_live_room_code (room_code), unique key uk_live_room_name (room_name),
   key idx_live_room_shop (shop_id, status)
 ) engine=InnoDB default charset=utf8mb4 comment='直播间';
 

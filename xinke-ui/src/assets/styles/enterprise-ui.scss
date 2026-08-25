@@ -125,7 +125,6 @@ body { background: var(--erp-bg); color: var(--erp-text); }
 
 /* Business pages: one continuous workspace instead of stacked floating cards. */
 #app .app-main :is(
-  .live-room-page, .plugin-page, .live-bi-page, .token-page,
   .fulfillment-page, .purchase-page, .supplier-page,
   .cash-ledger-page, .finance-center, .payable-page,
   .inventory-page, .warehouse-page, .flow-workbench, .ledger-page
@@ -136,7 +135,6 @@ body { background: var(--erp-bg); color: var(--erp-text); }
 }
 
 #app .app-main :is(
-  .room-hero, .plugin-hero, .bi-hero, .token-hero,
   .page-hero, .page-intro, .page-heading, .ledger-hero, .finance-hero,
   .warehouse-overview, .flow-header
 ) {
@@ -151,7 +149,6 @@ body { background: var(--erp-bg); color: var(--erp-text); }
 }
 
 #app .app-main :is(
-  .room-hero, .plugin-hero, .bi-hero, .token-hero,
   .page-hero, .page-intro, .page-heading, .ledger-hero, .finance-hero,
   .warehouse-overview, .flow-header
 ) :is(h1, h2) {
