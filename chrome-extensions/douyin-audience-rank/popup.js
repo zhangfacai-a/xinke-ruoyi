@@ -83,9 +83,9 @@ function initializeDemo() {
     return
   }
   const emptyMode = mode === 'empty'
-  const commentEnd = mode === 'warning' || emptyMode ? 0 : 126
-  const watchStart = mode === 'warning' || emptyMode ? 1 : 44
-  const watchEnd = emptyMode ? 0 : (mode === 'warning' ? 86 : 243)
+  const commentEnd = emptyMode ? 0 : 126
+  const watchStart = emptyMode ? 1 : 44
+  const watchEnd = emptyMode ? 0 : 243
   const rows = (start, end) => Array.from(
     { length: Math.max(0, end - start + 1) },
     (_, index) => ({ secUid: `demo-${start + index}` })
@@ -100,7 +100,7 @@ function initializeDemo() {
     watchDataDate: formatDataDate(new Date()),
     commentRanks: rows(1, commentEnd),
     watchRanks: rows(watchStart, watchEnd),
-    mergedCount: emptyMode ? 0 : (mode === 'warning' ? 86 : 243),
+    mergedCount: emptyMode ? 0 : 243,
     raw: {
       comment: { code: 0, data: { ranks: '[演示数据]' } },
       watch: { code: 0, data: { ranks: '[演示数据]' } }
@@ -548,30 +548,33 @@ function renderCapture() {
 }
 
 function getSafetyState() {
-  if (!capture || capture.uploadState) return { messages: [], blocking: false }
+  if (!capture) return { messages: [], blocking: false }
   const messages = []
   let blocking = false
   const commentCount = capture.commentRanks.length
   const watchCount = capture.watchRanks.length
   const age = Date.now() - Number(capture.capturedAt)
 
-  if (!Number.isFinite(age) || age < -60000 || age > RESULT_TTL_MS) {
-    messages.push('读取结果已超过 30 分钟，请重新读取后再上传。')
-    blocking = true
-  }
+  // A completed upload no longer needs freshness or empty-list checks, but date
+  // reminders remain visible so operators can still see that Douyin is behind.
+  if (!capture.uploadState) {
+    if (!Number.isFinite(age) || age < -60000 || age > RESULT_TTL_MS) {
+      messages.push('读取结果已超过 30 分钟，请重新读取后再上传。')
+      blocking = true
+    }
 
-  if (commentCount === 0 && watchCount === 0) {
-    messages.push('两个榜单都没有数据，请检查抖音页面后重新读取。')
-    blocking = true
-  } else if (commentCount === 0 || watchCount === 0) {
-    messages.push(commentCount === 0 ? '评论榜为空，请稍后重新读取。' : '观看榜为空，请稍后重新读取。')
-    blocking = true
+    if (commentCount === 0 && watchCount === 0) {
+      messages.push('两个榜单都没有数据，请检查抖音页面后重新读取。')
+      blocking = true
+    } else if (commentCount === 0 || watchCount === 0) {
+      messages.push(commentCount === 0 ? '评论榜为空，请稍后重新读取。' : '观看榜为空，请稍后重新读取。')
+      blocking = true
+    }
   }
 
   const expectedYesterday = shanghaiDataDate(-1)
   if (normalizeDataDate(capture.commentDataDate) !== expectedYesterday) {
     messages.push(`评论榜尚未更新：当前 ${capture.commentDataDate || '-'}，应为 ${expectedYesterday}。请12:00以后重新读取。`)
-    blocking = true
   }
 
   return { messages, blocking }
@@ -582,6 +585,7 @@ function renderSafetyState() {
   elements.safetyMessage.replaceChildren()
   elements.safetyPanel.classList.toggle('hidden', safety.messages.length === 0)
   elements.safetyPanel.classList.toggle('blocking', safety.blocking)
+  elements.safetyTitle.textContent = safety.blocking ? '本次数据无法同步' : '数据日期提醒'
   if (safety.messages.length > 0) {
     const list = document.createElement('ul')
     for (const message of safety.messages) {

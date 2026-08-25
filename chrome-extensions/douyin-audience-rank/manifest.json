@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "观众客户同步",
-  "version": "3.0.0",
+  "version": "3.0.2",
   "description": "一键读取当前直播间榜单并同步到观众客户。",
   "permissions": [
     "activeTab",
@@ -10,7 +10,7 @@
   ],
   "host_permissions": [
     "https://anchor.douyin.com/*",
-    "http://127.0.0.1:8080/*"
+    "http://47.116.62.234/*"
   ],
   "action": {
     "default_title": "观众客户同步",

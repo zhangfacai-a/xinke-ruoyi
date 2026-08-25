@@ -16,4 +16,5 @@ spring:
 
 live:
   audience-rank:
-    upload-key: 替换为随机且足够长的观众榜单上传密钥
+    # 固定上传密钥，与插件 config.js 保持一致。
+    upload-key: 26fac28f8fd697cf7a2701f3e6401947d8fe22eb26028a6f925f6effbf9dfe98

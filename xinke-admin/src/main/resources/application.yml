@@ -159,8 +159,8 @@ security:
 
 live:
   audience-rank:
-    # 观众榜单扩展上传密钥。未配置时公开上传接口会拒绝所有请求。
-    upload-key: ${DY_AUDIENCE_RANK_UPLOAD_KEY:}
+    # 观众榜单扩展固定上传密钥，与插件 config.js 保持一致。
+    upload-key: 26fac28f8fd697cf7a2701f3e6401947d8fe22eb26028a6f925f6effbf9dfe98
   gift:
     inventory:
       enabled: true

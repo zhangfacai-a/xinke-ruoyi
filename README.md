@@ -155,7 +155,6 @@ pnpm build:prod
 | `REDIS_HOST`     | Redis 地址   | 47.116.62.234 |
 | `REDIS_PORT`     | Redis 端口   | 6379          |
 | `JWT_SECRET`     | JWT 签名密钥 | —             |
-| `DY_AUDIENCE_RANK_UPLOAD_KEY` | 观众榜单插件上传密钥 | — |
 
 ## SQL 脚本说明
 
