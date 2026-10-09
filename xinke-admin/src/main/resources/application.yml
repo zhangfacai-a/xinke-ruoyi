@@ -12,6 +12,12 @@ xinke:
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
+  thread-pool:
+    core-size: ${XINKE_ASYNC_CORE_SIZE:4}
+    max-size: ${XINKE_ASYNC_MAX_SIZE:16}
+    queue-capacity: ${XINKE_ASYNC_QUEUE_CAPACITY:200}
+    keep-alive-seconds: 60
+    scheduled-size: ${XINKE_SCHEDULED_POOL_SIZE:3}
 
 # 开发环境配置
 server:
@@ -24,17 +30,19 @@ server:
     # tomcat的URI编码
     uri-encoding: UTF-8
     # 连接数满后的排队数，默认为100
-    accept-count: 1000
+    accept-count: 100
+    max-connections: 300
+    connection-timeout: 15s
     threads:
       # tomcat最大线程数，默认为200
-      max: 800
+      max: 48
       # Tomcat启动初始化的线程数，默认值10
-      min-spare: 100
+      min-spare: 4
 
 # 日志配置
 logging:
   level:
-    com.xinke: debug
+    com.xinke: info
     org.springframework: warn
 
 # 用户配置
@@ -47,6 +55,9 @@ user:
 
 # Spring配置
 spring:
+  config:
+    # Local private settings (COS credentials, etc.). Missing in production is allowed.
+    import: optional:file:./config/application-local.yml
   # 资源信息
   messages:
     # 国际化资源文件路径
@@ -57,25 +68,32 @@ spring:
   servlet:
     multipart:
       # 单个文件大小
-      max-file-size: 30MB
+      max-file-size: 10MB
       # 设置总上传的文件大小
-      max-request-size: 35MB
+      max-request-size: 12MB
   # 服务模块
   devtools:
     restart:
       # 热部署开关
-      enabled: true
+      enabled: false
+  quartz:
+    # Quartz has its own pool in addition to the application scheduler.
+    # Three workers are sufficient for the small number of reminder jobs.
+    properties:
+      org.quartz.threadPool.threadCount: ${XINKE_QUARTZ_POOL_SIZE:3}
   data:
     # redis 配置
     redis:
-      # 地址
-      host: 47.116.62.234
+      # 生产服务器使用本机 Redis，开发环境可用 REDIS_HOST 覆盖。
+      # 不再让服务器绕公网 IP 访问自身，避免重启期间连接失败。
+      host: ${REDIS_HOST:47.116.62.234}
+#      host: ${REDIS_HOST:127.0.0.1}
       # 端口，默认为6379
       port: 6379
       # 数据库索引
       database: 0
       # 密码
-      password: Xinke123.
+      password: ${REDIS_PASSWORD:Xinke123.}
       # 连接超时时间
       timeout: 10s
       lettuce:
@@ -87,7 +105,7 @@ spring:
           # 连接池的最大数据库连接数
           max-active: 8
           # #连接池最大阻塞等待时间（使用负值表示没有限制）
-          max-wait: -1ms
+          max-wait: 3s
 
 # token配置
 token:
@@ -158,16 +176,42 @@ security:
   frame-ancestors: http://39.96.157.230
 
 live:
+  metrics:
+    reminder-cron: 0 */5 * * * ?
+  crm:
+    v2:
+      # 插件上传正文使用 RSA-OAEP + AES-GCM。私钥应在生产环境通过 LIVE_CRM_V2_RSA_PRIVATE_KEY_V3 注入。
+      encryption:
+        enabled: true
+        allow-plaintext: true
+        private-key-v3: ${LIVE_CRM_V2_RSA_PRIVATE_KEY_V3:}
+      latest-version: ${LIVE_CRM_V2_LATEST_VERSION:3.0.0}
+      # Keep deployed 2.4.x collectors working unless production explicitly raises the floor.
+      plugin-min-version: ${LIVE_CRM_V2_PLUGIN_MIN_VERSION:2.4.0}
+      update-url: ${LIVE_CRM_V2_UPDATE_URL:}
+      update-sha256: ${LIVE_CRM_V2_UPDATE_SHA256:}
   audience-rank:
     # 观众榜单扩展固定上传密钥，与插件 config.js 保持一致。
     upload-key: 26fac28f8fd697cf7a2701f3e6401947d8fe22eb26028a6f925f6effbf9dfe98
   gift:
     inventory:
       enabled: true
+  # 客户截图使用腾讯云 COS 私有桶直传。密钥只在后端读取，前端和插件不会接触。
+  cos:
+    enabled: ${LIVE_COS_ENABLED:false}
+    region: ${LIVE_COS_REGION:ap-shanghai}
+    bucket: ${LIVE_COS_BUCKET:img-1318762153}
+    secret-id: ${LIVE_COS_SECRET_ID:}
+    secret-key: ${LIVE_COS_SECRET_KEY:}
+    presign-seconds: ${LIVE_COS_PRESIGN_SECONDS:300}
+    download-seconds: ${LIVE_COS_DOWNLOAD_SECONDS:300}
+    max-file-size: ${LIVE_COS_MAX_FILE_SIZE:10485760}
   dingtalk:
     # 钉钉企业内部应用凭证，生产环境请通过环境变量注入。
     app-key: dingsl2actbbkulcqquf
     app-secret: tEefFZT8IfHby1YNslE8U8FJBBBywk-WIFkaJPPTE9hjkCWeNOeB4Jxhpn-Lz1AH
+    robot-code: dingsl2actbbkulcqquf
+    test-user-id: 101387942
     # 新同步用户的初始密码；已有用户密码不会被覆盖。每天 02:30 自动同步。
     default-password: ${DINGTALK_DEFAULT_PASSWORD:xk123456}
     sync-cron: ${DINGTALK_SYNC_CRON:0 30 2 * * ?}

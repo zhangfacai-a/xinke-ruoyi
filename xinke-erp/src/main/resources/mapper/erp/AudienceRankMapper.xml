@@ -212,6 +212,7 @@
         where s.batch_id = #{batchId}
         order by coalesce(s.comment_rank, 2147483647),
                  coalesce(s.watch_rank, 2147483647), s.snapshot_id
+        limit 500
     </select>
 
     <select id="selectSummary" resultMap="SummaryResult">
@@ -579,6 +580,7 @@
         ) v
         group by v.visit_date, v.room_id, v.room_name
         order by v.visit_date desc, max(v.captured_at) desc
+        limit 500
     </select>
 
     <select id="selectFollowupById" resultMap="FollowupResult">
@@ -595,6 +597,15 @@
         left join dy_audience_rank_snapshot s
           on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
         where f.sec_uid = #{secUid}
+    </select>
+
+    <select id="selectFollowupsByUids" resultMap="FollowupResult">
+        select <include refid="followupColumns"/>
+        from dy_audience_followup f
+        left join dy_audience_rank_snapshot s
+          on s.batch_id = f.last_source_batch_id and s.sec_uid = f.sec_uid
+        where f.sec_uid in
+        <foreach collection="secUids" item="secUid" open="(" separator="," close=")">#{secUid}</foreach>
     </select>
 
     <select id="selectFollowupByOrderNo" resultMap="FollowupResult">
@@ -615,10 +626,11 @@
         from dy_audience_followup_log
         where followup_id = #{followupId}
         order by create_time desc, log_id desc
+        limit 200
     </select>
 
     <insert id="insertFollowups">
-        insert ignore into dy_audience_followup(
+        insert into dy_audience_followup(
             profile_id, room_scope_key, room_id, room_name_snapshot, sec_uid,
             nickname_snapshot, owner_user_id, owner_name_snapshot,
             anchor_user_id, anchor_name_snapshot, controller_user_id,
@@ -634,6 +646,12 @@
              #{item.firstSourceBatchId}, #{item.lastSourceBatchId}, #{item.firstSeenAt},
              #{item.lastSeenAt}, sysdate())
         </foreach>
+        on duplicate key update
+            profile_id = values(profile_id), room_id = values(room_id),
+            room_name_snapshot = values(room_name_snapshot),
+            nickname_snapshot = values(nickname_snapshot),
+            last_source_batch_id = values(last_source_batch_id),
+            last_seen_at = values(last_seen_at), update_time = sysdate()
     </insert>
 
     <update id="refreshFollowupSource" parameterType="com.xinke.erp.domain.audience.AudienceFollowup">
@@ -715,6 +733,7 @@
                create_time createTime, update_time updateTime
         from dy_audience_opportunity where followup_id = #{followupId}
         order by sequence_no desc, opportunity_id desc
+        limit 100
     </select>
 
     <insert id="insertOpportunity" parameterType="com.xinke.erp.domain.audience.AudienceOpportunity"
@@ -730,6 +749,27 @@
             #{ownerNameSnapshot}, #{closeReasonCode}, #{closeReason}, #{openedAt}, #{closedAt},
             '', sysdate(3), '', sysdate(3)
         )
+    </insert>
+
+    <insert id="insertMissingInitialOpportunities">
+        insert into dy_audience_opportunity(
+            followup_id, sequence_no, is_current, status, follow_result_code, intent_level,
+            consult_model, source_room_id, source_room_name, owner_user_id,
+            owner_name_snapshot, close_reason_code, close_reason, opened_at, closed_at,
+            create_by, create_time, update_by, update_time
+        )
+        select f.followup_id, 1, 1, f.status, f.follow_result_code, f.intent_level,
+               f.consult_model, f.room_id, f.room_name_snapshot, f.owner_user_id,
+               f.owner_name_snapshot, f.close_reason_code, f.close_reason,
+               coalesce(f.first_seen_at, sysdate(3)),
+               case when f.status in ('ORDERED', 'CLOSED', 'INVALID') then f.status_changed_at else null end,
+               '', sysdate(3), '', sysdate(3)
+        from dy_audience_followup f
+        left join dy_audience_opportunity o
+          on o.followup_id = f.followup_id and o.is_current = 1
+        where f.sec_uid in
+        <foreach collection="secUids" item="secUid" open="(" separator="," close=")">#{secUid}</foreach>
+          and o.opportunity_id is null
     </insert>
 
     <update id="updateOpportunity" parameterType="com.xinke.erp.domain.audience.AudienceOpportunity">
@@ -756,6 +796,7 @@
                create_time createTime, update_time updateTime
         from dy_audience_customer_order where followup_id = #{followupId}
         order by ordered_at desc, customer_order_id desc
+        limit 100
     </select>
 
     <select id="selectCustomerOrderByNo" resultType="com.xinke.erp.domain.audience.AudienceCustomerOrder">

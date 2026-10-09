@@ -1,0 +1,636 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.livecrm.mapper.LiveCrmMapper">
+  <select id="findOpenSession" resultType="map">
+    select * from dy_audience_v2_live_session where room_name_key=#{roomNameKey} and live_date=#{liveDate} and status='LIVE' order by id desc limit 1
+  </select>
+  <select id="findRoomByNameKey" resultType="map">
+    select room_id roomId,room_code roomCode,room_name roomName
+    from live_room
+    where lower(trim(regexp_replace(room_name,'[[:space:]]+',' ')))=#{roomNameKey}
+       or lower(trim(regexp_replace(live_account,'[[:space:]]+',' ')))=#{roomNameKey}
+    order by room_id limit 1
+  </select>
+  <select id="findRoomById" resultType="map">select room_id roomId,room_name roomName from live_room where room_id=#{roomId}</select>
+  <insert id="insertDiscoveredRoom" useGeneratedKeys="true" keyProperty="roomId">
+    insert into live_room(
+      room_code,room_name,shop_id,platform_room_id,live_account,
+      owner_staff_id,status,remark,create_by,create_time
+    ) values (
+      concat('LC-',substring(sha2(#{roomNameKey},256),1,24)),#{roomName},null,#{platformRoomId},#{roomName},
+      null,'0','直播客户插件自动创建','live-customer-plugin',sysdate()
+    )
+  </insert>
+  <insert id="syncDiscoveredRooms">
+    insert into live_room(room_code,room_name,shop_id,platform_room_id,live_account,owner_staff_id,status,remark,create_by,create_time)
+    select concat('LC-',substring(sha2(x.room_name_key,256),1,24)),x.room_name,null,x.platform_room_id,x.room_name,null,'0','直播客户插件自动创建','live-customer-plugin',sysdate()
+    from (
+      select s.room_name_key,min(s.room_name) room_name,max(s.platform_room_id) platform_room_id
+      from dy_audience_v2_live_session s
+      where nullif(trim(s.room_name_key),'') is not null
+      group by s.room_name_key
+    ) x
+    where not exists (
+      select 1 from live_room r
+      where lower(trim(regexp_replace(r.room_name,'[[:space:]]+',' ')))=x.room_name_key
+         or lower(trim(regexp_replace(r.live_account,'[[:space:]]+',' ')))=x.room_name_key
+    )
+  </insert>
+  <delete id="deleteRoomAttachments">delete a from dy_audience_v2_attachment a where a.opportunity_id in (select o.id from dy_audience_v2_opportunity o join dy_audience_v2_live_session s on s.id=o.session_id where s.room_name_key=#{roomNameKey}) or a.order_id in (select ol.id from dy_audience_v2_order_link ol join dy_audience_v2_opportunity o on o.id=ol.opportunity_id join dy_audience_v2_live_session s on s.id=o.session_id where s.room_name_key=#{roomNameKey})</delete>
+  <delete id="deleteRoomOrders">delete ol from dy_audience_v2_order_link ol join dy_audience_v2_opportunity o on o.id=ol.opportunity_id join dy_audience_v2_live_session s on s.id=o.session_id where s.room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomTasks">delete t from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id join dy_audience_v2_live_session s on s.id=o.session_id where s.room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomOpportunities">delete o from dy_audience_v2_opportunity o join dy_audience_v2_live_session s on s.id=o.session_id where s.room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomRegistrations">delete r from dy_audience_v2_manual_registration r join dy_audience_v2_live_session s on s.id=r.session_id where s.room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomInteractions">delete e from dy_audience_v2_interaction_event e join dy_audience_v2_live_session s on s.id=e.session_id where s.room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomPresence">delete p from dy_audience_v2_viewer_presence p join dy_audience_v2_live_session s on s.id=p.session_id where s.room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomBatches">delete b from dy_audience_v2_ingest_batch b join dy_audience_v2_live_session s on s.id=b.session_id where s.room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomSessions">delete from dy_audience_v2_live_session where room_name_key=#{roomNameKey}</delete>
+  <delete id="deleteRoomStaff">delete from live_subject_user_map where subject_type='ROOM' and subject_id=#{roomId}</delete>
+  <delete id="deleteRoom">delete from live_room where room_id=#{roomId}</delete>
+  <select id="getSession" resultType="map">select id sessionId,room_name roomName,room_name_key roomNameKey,live_date liveDate,status from dy_audience_v2_live_session where id=#{id}</select>
+  <insert id="insertSession" useGeneratedKeys="true" keyProperty="id">
+    insert into dy_audience_v2_live_session(room_name,room_name_key,platform_room_id,anchor_id,live_date,status,created_by)
+    values(#{roomName},#{roomNameKey},#{platformRoomId},#{anchorId},#{liveDate},'LIVE',#{createdBy})
+  </insert>
+  <select id="listSessions" resultType="map">
+    select id sessionId,room_name roomName,live_date liveDate,status from dy_audience_v2_live_session
+    order by live_date desc,id desc limit #{limit}
+  </select>
+  <select id="listRoomOptions" resultType="map">
+    select r.room_id roomId,r.room_name roomName,r.room_code roomCode,
+      (select s.id from dy_audience_v2_live_session s where s.room_name_key=lower(trim(regexp_replace(r.room_name,'[[:space:]]+',' '))) and s.live_date=current_date and s.status='LIVE' order by s.id desc limit 1) sessionId,
+      (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type='ROOM' and m.subject_id=r.room_id and m.role_code='anchor') anchorIds,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type='ROOM' and m.subject_id=r.room_id and m.role_code='anchor') anchorNames,
+      (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type='ROOM' and m.subject_id=r.room_id and m.role_code='controller') controllerIds,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type='ROOM' and m.subject_id=r.room_id and m.role_code='controller') controllerNames
+    from live_room r where r.status='0' order by r.room_name
+  </select>
+  <select id="listEnabledUsers" resultType="map">
+    select u.user_id userId,u.nick_name userName,u.user_name account,d.dept_name departmentName
+    from sys_user u left join sys_dept d on d.dept_id=u.dept_id
+    where u.status='0' and u.del_flag='0' order by u.nick_name,u.user_id
+  </select>
+  <select id="findEnabledUser" resultType="map">select user_id userId,nick_name userName,user_name account from sys_user where user_id=#{userId} and status='0' and del_flag='0'</select>
+  <select id="listRoomStaff" resultType="map">
+    select m.user_id userId,u.nick_name userName,m.role_code roleCode
+    from live_room r join live_subject_user_map m on m.subject_type='ROOM' and m.subject_id=r.room_id
+      join sys_user u on u.user_id=m.user_id and u.status='0' and u.del_flag='0'
+    where lower(trim(regexp_replace(r.room_name,'[[:space:]]+',' ')))=#{roomNameKey} order by m.role_code,u.nick_name
+  </select>
+  <!-- Shared filters for the new customer-center inbox.  The inbox is
+       intentionally action-oriented: customers without an interaction are
+       kept in the archive, not mixed into today's work queue. -->
+  <sql id="inboxWhere">
+    <where>
+      e.id is not null
+      and e.occurred_at&gt;=date_sub(current_date,interval 1 day)
+      and c.owner_user_id is null
+      and not exists(select 1 from dy_audience_v2_opportunity claimed_o where claimed_o.customer_id=c.id and claimed_o.owner_user_id is not null and claimed_o.status not in ('RELEASED','COMPLETED'))
+      and not exists(select 1 from dy_audience_v2_followup_task claimed_t join dy_audience_v2_opportunity claimed_to on claimed_to.id=claimed_t.opportunity_id where claimed_to.customer_id=c.id and (claimed_t.status='IN_PROGRESS' or claimed_t.assignee_user_id is not null))
+      <if test="keyword!=null and keyword!=''">
+        and (c.display_name like concat('%',#{keyword},'%')
+          or e.content like concat('%',#{keyword},'%')
+          or exists(select 1 from dy_audience_v2_identity ik where ik.customer_id=c.id and (ik.nickname like concat('%',#{keyword},'%') or ik.sec_uid like concat('%',#{keyword},'%')))
+          or exists(select 1 from dy_audience_v2_order_link ok where ok.customer_id=c.id and ok.order_no like concat('%',#{keyword},'%')))
+      </if>
+      <if test="stage!=null and stage!=''">and c.consult_stage=#{stage}</if>
+      <if test="sessionId!=null">and e.session_id=#{sessionId}</if>
+      <if test="beginDate!=null">and e.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if>
+      <if test="endDate!=null">and e.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>
+      <if test="interactionType=='COMMENT'">
+        and exists(select 1 from dy_audience_v2_interaction_event ie where ie.customer_id=c.id and ie.event_type='COMMENT' <if test="sessionId!=null">and ie.session_id=#{sessionId}</if><if test="beginDate!=null">and ie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and ie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)
+      </if>
+      <if test="interactionType=='VIEWER'">
+        and exists(select 1 from dy_audience_v2_interaction_event ie where ie.customer_id=c.id and ie.event_type='VIEWER' <if test="sessionId!=null">and ie.session_id=#{sessionId}</if><if test="beginDate!=null">and ie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and ie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)
+        and not exists(select 1 from dy_audience_v2_interaction_event ie where ie.customer_id=c.id and ie.event_type='COMMENT' <if test="sessionId!=null">and ie.session_id=#{sessionId}</if><if test="beginDate!=null">and ie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and ie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)
+      </if>
+      <choose>
+        <when test="filter=='pending'">
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id <if test="sessionId!=null">and mr.session_id=#{sessionId}</if>)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+          )
+        </when>
+        <when test="filter=='today'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date=cast(convert_tz(now(),'+00:00','+08:00') as date) <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+        </when>
+        <when test="filter=='overdue'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+        </when>
+        <when test="filter=='consulting'">
+          and c.consult_stage='CONSULTING'
+        </when>
+        <when test="filter=='orderpending' or filter=='order-pending'">
+          and exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC') <if test="sessionId!=null">and oo.session_id=#{sessionId}</if>)
+        </when>
+        <when test="filter=='phonehandoff' or filter=='phone-handoff'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.task_type='PHONE_SERVICE' and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+        </when>
+        <otherwise>
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id <if test="sessionId!=null">and mr.session_id=#{sessionId}</if>)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+            or exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC') <if test="sessionId!=null">and oo.session_id=#{sessionId}</if>)
+          )
+        </otherwise>
+      </choose>
+    </where>
+  </sql>
+
+  <!-- Fast path for the normal inbox view. updateCustomer is called after
+       every accepted plugin event, so customer.updated_at is an indexed,
+       inexpensive candidate order. Expensive interaction aggregation is then
+       limited to the requested page instead of every customer seen in 3 days. -->
+  <sql id="inboxRecentCustomerWhere">
+    <where>
+      c.updated_at&gt;=date_sub(current_date,interval 1 day)
+      and c.owner_user_id is null
+      and exists(select 1 from dy_audience_v2_interaction_event re where re.customer_id=c.id and re.occurred_at&gt;=date_sub(current_date,interval 1 day))
+      and not exists(select 1 from dy_audience_v2_opportunity claimed_o where claimed_o.customer_id=c.id and claimed_o.owner_user_id is not null and claimed_o.status not in ('RELEASED','COMPLETED'))
+      and not exists(select 1 from dy_audience_v2_followup_task claimed_t join dy_audience_v2_opportunity claimed_to on claimed_to.id=claimed_t.opportunity_id where claimed_to.customer_id=c.id and (claimed_t.status='IN_PROGRESS' or claimed_t.assignee_user_id is not null))
+      <if test="stage!=null and stage!=''">and c.consult_stage=#{stage}</if>
+      <if test="interactionType=='COMMENT'">
+        and exists(select 1 from dy_audience_v2_interaction_event ie where ie.customer_id=c.id and ie.event_type='COMMENT' and ie.occurred_at&gt;=date_sub(current_date,interval 1 day))
+      </if>
+      <if test="interactionType=='VIEWER'">
+        and c.interaction_status='HAS_INTERACTION'
+      </if>
+      <choose>
+        <when test="filter=='pending'">
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED'))
+          )
+        </when>
+        <when test="filter=='today'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date=cast(convert_tz(now(),'+00:00','+08:00') as date))
+        </when>
+        <when test="filter=='overdue'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date))
+        </when>
+        <when test="filter=='consulting'">and c.consult_stage='CONSULTING'</when>
+        <when test="filter=='orderpending' or filter=='order-pending'">
+          and exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC'))
+        </when>
+        <when test="filter=='phonehandoff' or filter=='phone-handoff'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.task_type='PHONE_SERVICE' and ft.status not in ('DONE','RELEASED'))
+        </when>
+        <otherwise>
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED'))
+            or exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC'))
+          )
+        </otherwise>
+      </choose>
+    </where>
+  </sql>
+
+  <!-- COMMENT is a common filter and the event table is much smaller than
+       probing every customer with a correlated exists.  Start from the
+       event_type/time index, reduce to customer ids, then apply workflow
+       predicates. -->
+  <sql id="inboxRecentCommentWhere">
+    <where>
+      ce.event_type='COMMENT'
+      and ce.occurred_at&gt;=date_sub(current_date,interval 1 day)
+      and c.owner_user_id is null
+      and not exists(select 1 from dy_audience_v2_opportunity claimed_o where claimed_o.customer_id=c.id and claimed_o.owner_user_id is not null and claimed_o.status not in ('RELEASED','COMPLETED'))
+      and not exists(select 1 from dy_audience_v2_followup_task claimed_t join dy_audience_v2_opportunity claimed_to on claimed_to.id=claimed_t.opportunity_id where claimed_to.customer_id=c.id and (claimed_t.status='IN_PROGRESS' or claimed_t.assignee_user_id is not null))
+      <if test="stage!=null and stage!=''">and c.consult_stage=#{stage}</if>
+      <choose>
+        <when test="filter=='pending'">
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED'))
+          )
+        </when>
+        <when test="filter=='today'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date=cast(convert_tz(now(),'+00:00','+08:00') as date))
+        </when>
+        <when test="filter=='overdue'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date))
+        </when>
+        <when test="filter=='consulting'">and c.consult_stage='CONSULTING'</when>
+        <when test="filter=='orderpending' or filter=='order-pending'">
+          and exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC'))
+        </when>
+        <when test="filter=='phonehandoff' or filter=='phone-handoff'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.task_type='PHONE_SERVICE' and ft.status not in ('DONE','RELEASED'))
+        </when>
+        <otherwise>
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED'))
+            or exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC'))
+          )
+        </otherwise>
+      </choose>
+    </where>
+  </sql>
+
+  <!-- Workflow predicates applied after interactions have been reduced to one
+       row per customer.  Keeping these checks outside the event scan prevents
+       the same task/order subqueries from running once for every event. -->
+  <sql id="inboxWorkflowWhere">
+    <where>
+      c.owner_user_id is null
+      and not exists(select 1 from dy_audience_v2_opportunity claimed_o where claimed_o.customer_id=c.id and claimed_o.owner_user_id is not null and claimed_o.status not in ('RELEASED','COMPLETED'))
+      and not exists(select 1 from dy_audience_v2_followup_task claimed_t join dy_audience_v2_opportunity claimed_to on claimed_to.id=claimed_t.opportunity_id where claimed_to.customer_id=c.id and (claimed_t.status='IN_PROGRESS' or claimed_t.assignee_user_id is not null))
+      <if test="stage!=null and stage!=''">and c.consult_stage=#{stage}</if>
+      <choose>
+        <when test="filter=='pending'">
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id <if test="sessionId!=null">and mr.session_id=#{sessionId}</if>)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+          )
+        </when>
+        <when test="filter=='today'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date=cast(convert_tz(now(),'+00:00','+08:00') as date) <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+        </when>
+        <when test="filter=='overdue'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status in ('PENDING','IN_PROGRESS') and ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+        </when>
+        <when test="filter=='consulting'">and c.consult_stage='CONSULTING'</when>
+        <when test="filter=='orderpending' or filter=='order-pending'">
+          and exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC') <if test="sessionId!=null">and oo.session_id=#{sessionId}</if>)
+        </when>
+        <when test="filter=='phonehandoff' or filter=='phone-handoff'">
+          and exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.task_type='PHONE_SERVICE' and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+        </when>
+        <otherwise>
+          and (
+            not exists(select 1 from dy_audience_v2_manual_registration mr where mr.customer_id=c.id <if test="sessionId!=null">and mr.session_id=#{sessionId}</if>)
+            or exists(select 1 from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>)
+            or exists(select 1 from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id and ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC') <if test="sessionId!=null">and oo.session_id=#{sessionId}</if>)
+          )
+        </otherwise>
+      </choose>
+    </where>
+  </sql>
+
+  <sql id="inboxEventAggregate">
+    select e.customer_id customerId,
+      cast(substring_index(group_concat(e.session_id order by e.occurred_at desc,e.id desc),',',1) as unsigned) sessionId,
+      max(e.occurred_at) lastInteractionAt,count(e.id) interactionCount,
+      sum(case when e.event_type='COMMENT' then 1 else 0 end) commentCount,
+      case when sum(case when e.event_type='COMMENT' then 1 else 0 end)&gt;0 then 'COMMENT' else 'VIEWER' end interactionType,
+      case when sum(case when e.source_type='PLUGIN_REALTIME' then 1 else 0 end)&gt;0 then 'PLUGIN' else 'MANUAL' end sourceType
+    from dy_audience_v2_interaction_event e
+    <choose>
+      <when test="sessionId!=null">force index (idx_av2_event_session_time_customer)</when>
+      <otherwise>force index (idx_av2_event_time_customer)</otherwise>
+    </choose>
+    where e.occurred_at&gt;=date_sub(current_date,interval 1 day)
+      <if test="sessionId!=null">and e.session_id=#{sessionId}</if>
+      <if test="beginDate!=null">and e.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if>
+      <if test="endDate!=null">and e.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>
+    group by e.customer_id
+    <if test="interactionType=='COMMENT'">having commentCount&gt;0</if>
+    <if test="interactionType=='VIEWER'">having commentCount=0</if>
+  </sql>
+
+  <select id="listInbox" resultType="map">
+    select /*+ MAX_EXECUTION_TIME(5000) */ c.id customerId,c.display_name nickname,
+      case when c.consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id) then 'CONTACTED' else c.consult_stage end stage,
+      c.interaction_status interactionStatus,c.fan_status fanStatus,c.owner_user_id ownerUserId,c.owner_name ownerName,
+      page.sessionId,page.lastInteractionAt,page.interactionCount,page.commentCount,page.interactionType,
+      (select ce.content from dy_audience_v2_interaction_event ce where ce.customer_id=c.id and ce.event_type='COMMENT'
+        <if test="sessionId!=null">and ce.session_id=#{sessionId}</if>
+        <if test="beginDate!=null">and ce.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if>
+        <if test="endDate!=null">and ce.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>
+        order by ce.occurred_at desc,ce.id desc limit 1) lastComment,
+      (select count(distinct vp.session_id) from dy_audience_v2_viewer_presence vp where vp.customer_id=c.id <if test="sessionId!=null">and vp.session_id=#{sessionId}</if><if test="beginDate!=null">and vp.first_seen_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and vp.first_seen_at&lt;date_add(#{endDate},interval 1 day)</if>) visitCount,
+      (select coalesce(sum(least(greatest(timestampdiff(second,vp.first_seen_at,vp.last_seen_at),0),greatest(vp.seen_count,0)*300,21600)),0) from dy_audience_v2_viewer_presence vp where vp.customer_id=c.id <if test="sessionId!=null">and vp.session_id=#{sessionId}</if><if test="beginDate!=null">and vp.first_seen_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and vp.first_seen_at&lt;date_add(#{endDate},interval 1 day)</if>) watchSeconds,
+      s.room_name roomName,s.live_date liveDate,
+      (select o.id from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) opportunityId,
+      (select o.anchor_user_id from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) anchorUserId,
+      (select o.anchor_name from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) anchorName,
+      (select o.controller_user_id from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) controllerUserId,
+      (select o.controller_name from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) controllerName,
+      (select o.special_mark from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) specialMark,
+      (select ft.id from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date)) desc,ft.task_date,ft.id desc limit 1) taskId,
+      (select case when ft.status='PENDING' and ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) then 'OVERDUE' else ft.status end from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date)) desc,ft.task_date,ft.id desc limit 1) taskStatus,
+      (select ft.task_type from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;current_date) desc,ft.task_date,ft.id desc limit 1) taskType,
+      (select ft.task_date from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;current_date) desc,ft.task_date,ft.id desc limit 1) taskDate,
+      (select ft.assignee_user_id from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;current_date) desc,ft.task_date,ft.id desc limit 1) taskAssigneeUserId,
+      (select ft.assignee_name from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;current_date) desc,ft.task_date,ft.id desc limit 1) taskAssigneeName,
+      (select ol.order_no from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id <if test="sessionId!=null">and oo.session_id=#{sessionId}</if> order by ol.id desc limit 1) orderNo,
+      (select ol.order_status from dy_audience_v2_order_link ol join dy_audience_v2_opportunity oo on oo.id=ol.opportunity_id where ol.customer_id=c.id <if test="sessionId!=null">and oo.session_id=#{sessionId}</if> order by ol.id desc limit 1) orderStatus,
+      case when exists(select 1 from dy_audience_v2_identity si where si.customer_id=c.id and si.same_name_multi_identity=1) then 1 else 0 end sameNameMultiIdentity,
+      page.sourceType,
+      case when exists(select 1 from dy_audience_v2_followup_task itask join dy_audience_v2_opportunity ao on ao.id=itask.opportunity_id where ao.customer_id=c.id and itask.task_type='PHONE_SERVICE' and itask.status not in ('DONE','RELEASED')) then 'VIEW_HANDOFF'
+        when exists(select 1 from dy_audience_v2_followup_task itask join dy_audience_v2_opportunity ao on ao.id=itask.opportunity_id where ao.customer_id=c.id and itask.status not in ('DONE','RELEASED')) then 'CONTINUE'
+        when not exists(select 1 from dy_audience_v2_manual_registration ar where ar.customer_id=c.id <if test="sessionId!=null">and ar.session_id=#{sessionId}</if>) then 'REGISTER' else 'VIEW' end primaryAction
+    from (
+      <choose>
+        <when test="(keyword==null or keyword=='') and (sessionId!=null or beginDate!=null or endDate!=null)">
+          select aggregate.customerId,aggregate.sessionId,aggregate.lastInteractionAt,
+            aggregate.interactionCount,aggregate.commentCount,aggregate.interactionType,aggregate.sourceType
+          from (<include refid="inboxEventAggregate"/>) aggregate
+          join dy_audience_v2_customer c on c.id=aggregate.customerId
+          <include refid="inboxWorkflowWhere"/>
+          order by aggregate.lastInteractionAt desc,aggregate.customerId desc
+          limit #{offset},#{limit}
+        </when>
+        <when test="(keyword==null or keyword=='') and sessionId==null and beginDate==null and endDate==null and interactionType=='COMMENT'">
+          select candidate.customerId,
+            cast(substring_index(group_concat(e.session_id order by e.occurred_at desc,e.id desc),',',1) as unsigned) sessionId,
+            max(e.occurred_at) lastInteractionAt,count(e.id) interactionCount,
+            sum(case when e.event_type='COMMENT' then 1 else 0 end) commentCount,
+            'COMMENT' interactionType,
+            case when sum(case when e.source_type='PLUGIN_REALTIME' then 1 else 0 end)&gt;0 then 'PLUGIN' else 'MANUAL' end sourceType
+          from (
+            select c.id customerId
+            from dy_audience_v2_interaction_event ce force index (idx_av2_event_type_time_customer)
+            join dy_audience_v2_customer c on c.id=ce.customer_id
+            <include refid="inboxRecentCommentWhere"/>
+            group by c.id
+            order by max(ce.occurred_at) desc,c.id desc
+            limit #{offset},#{limit}
+          ) candidate
+          join dy_audience_v2_interaction_event e on e.customer_id=candidate.customerId
+            and e.occurred_at&gt;=date_sub(current_date,interval 1 day)
+          group by candidate.customerId
+        </when>
+        <when test="(keyword==null or keyword=='') and sessionId==null and beginDate==null and endDate==null">
+          select candidate.customerId,
+            cast(substring_index(group_concat(e.session_id order by e.occurred_at desc,e.id desc),',',1) as unsigned) sessionId,
+            max(e.occurred_at) lastInteractionAt,count(e.id) interactionCount,
+            sum(case when e.event_type='COMMENT' then 1 else 0 end) commentCount,
+            case when sum(case when e.event_type='COMMENT' then 1 else 0 end)&gt;0 then 'COMMENT' else 'VIEWER' end interactionType,
+            case when sum(case when e.source_type='PLUGIN_REALTIME' then 1 else 0 end)&gt;0 then 'PLUGIN' else 'MANUAL' end sourceType
+          from (
+            select c.id customerId
+            from dy_audience_v2_customer c
+            <include refid="inboxRecentCustomerWhere"/>
+            order by c.updated_at desc,c.id desc
+            limit #{offset},#{limit}
+          ) candidate
+          join dy_audience_v2_interaction_event e on e.customer_id=candidate.customerId
+            and e.occurred_at&gt;=date_sub(current_date,interval 1 day)
+          group by candidate.customerId
+        </when>
+        <otherwise>
+          select c.id customerId,
+            cast(substring_index(group_concat(e.session_id order by e.occurred_at desc,e.id desc),',',1) as unsigned) sessionId,
+            max(e.occurred_at) lastInteractionAt,count(e.id) interactionCount,
+            sum(case when e.event_type='COMMENT' then 1 else 0 end) commentCount,
+            case when sum(case when e.event_type='COMMENT' then 1 else 0 end)&gt;0 then 'COMMENT' else 'VIEWER' end interactionType,
+            case when sum(case when e.source_type='PLUGIN_REALTIME' then 1 else 0 end)&gt;0 then 'PLUGIN' else 'MANUAL' end sourceType
+          from dy_audience_v2_customer c join dy_audience_v2_interaction_event e on e.customer_id=c.id
+          <include refid="inboxWhere"/>
+          group by c.id
+          order by lastInteractionAt desc,c.id desc
+          limit #{offset},#{limit}
+        </otherwise>
+      </choose>
+    ) page
+    join dy_audience_v2_customer c on c.id=page.customerId
+    left join dy_audience_v2_live_session s on s.id=page.sessionId
+    order by page.lastInteractionAt desc,page.customerId desc
+  </select>
+  <select id="countInbox" resultType="long">
+    select /*+ MAX_EXECUTION_TIME(5000) */ count(*) from (
+      <choose>
+        <when test="(keyword==null or keyword=='') and (sessionId!=null or beginDate!=null or endDate!=null)">
+          select aggregate.customerId
+          from (<include refid="inboxEventAggregate"/>) aggregate
+          join dy_audience_v2_customer c on c.id=aggregate.customerId
+          <include refid="inboxWorkflowWhere"/>
+          limit 10001
+        </when>
+        <when test="(keyword==null or keyword=='') and sessionId==null and beginDate==null and endDate==null and interactionType=='COMMENT'">
+          select c.id
+          from dy_audience_v2_interaction_event ce force index (idx_av2_event_type_time_customer)
+          join dy_audience_v2_customer c on c.id=ce.customer_id
+          <include refid="inboxRecentCommentWhere"/>
+          group by c.id
+          order by max(ce.occurred_at) desc,c.id desc
+          limit 10001
+        </when>
+        <when test="(keyword==null or keyword=='') and sessionId==null and beginDate==null and endDate==null">
+          select c.id
+          from dy_audience_v2_customer c
+          <include refid="inboxRecentCustomerWhere"/>
+          order by c.updated_at desc,c.id desc
+          limit 10001
+        </when>
+        <otherwise>
+          select c.id
+          from dy_audience_v2_customer c join dy_audience_v2_interaction_event e on e.customer_id=c.id
+          <include refid="inboxWhere"/>
+          group by c.id
+          limit 10001
+        </otherwise>
+      </choose>
+    ) capped
+  </select>
+  <select id="inboxSummary" resultType="map">
+    select /*+ MAX_EXECUTION_TIME(5000) */
+      (select count(distinct pt.id) from dy_audience_v2_followup_task pt join dy_audience_v2_opportunity po on po.id=pt.opportunity_id where pt.status in ('PENDING','IN_PROGRESS') and pt.task_date=cast(convert_tz(now(),'+00:00','+08:00') as date) <if test="sessionId!=null">and po.session_id=#{sessionId}</if>
+        <if test="interactionType!=null or beginDate!=null or endDate!=null">and exists(select 1 from dy_audience_v2_interaction_event tie where tie.customer_id=po.customer_id <if test="interactionType!=null">and tie.event_type=#{interactionType}</if><if test="sessionId!=null">and tie.session_id=#{sessionId}</if><if test="beginDate!=null">and tie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and tie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)</if>) today,
+      (select count(distinct ot.id) from dy_audience_v2_followup_task ot join dy_audience_v2_opportunity oo on oo.id=ot.opportunity_id where ot.status in ('PENDING','IN_PROGRESS') and ot.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) <if test="sessionId!=null">and oo.session_id=#{sessionId}</if>
+        <if test="interactionType!=null or beginDate!=null or endDate!=null">and exists(select 1 from dy_audience_v2_interaction_event tie where tie.customer_id=oo.customer_id <if test="interactionType!=null">and tie.event_type=#{interactionType}</if><if test="sessionId!=null">and tie.session_id=#{sessionId}</if><if test="beginDate!=null">and tie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and tie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)</if>) overdue,
+      (select count(distinct cc.id) from dy_audience_v2_customer cc where cc.consult_stage='CONSULTING' <if test="sessionId!=null or interactionType!=null or beginDate!=null or endDate!=null">and exists(select 1 from dy_audience_v2_interaction_event cie where cie.customer_id=cc.id <if test="sessionId!=null">and cie.session_id=#{sessionId}</if><if test="interactionType!=null">and cie.event_type=#{interactionType}</if><if test="beginDate!=null">and cie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and cie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)</if>) consulting,
+      (select count(distinct ol.id) from dy_audience_v2_order_link ol join dy_audience_v2_opportunity op on op.id=ol.opportunity_id where ol.order_status in ('ORDERED_PENDING_NO','ENTERED_PENDING_SYNC') <if test="sessionId!=null">and op.session_id=#{sessionId}</if>
+        <if test="interactionType!=null or beginDate!=null or endDate!=null">and exists(select 1 from dy_audience_v2_interaction_event tie where tie.customer_id=op.customer_id <if test="interactionType!=null">and tie.event_type=#{interactionType}</if><if test="sessionId!=null">and tie.session_id=#{sessionId}</if><if test="beginDate!=null">and tie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and tie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)</if>) orderPending,
+      (select count(distinct ft.id) from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where ft.task_type='PHONE_SERVICE' and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if>
+        <if test="interactionType!=null or beginDate!=null or endDate!=null">and exists(select 1 from dy_audience_v2_interaction_event tie where tie.customer_id=fo.customer_id <if test="interactionType!=null">and tie.event_type=#{interactionType}</if><if test="sessionId!=null">and tie.session_id=#{sessionId}</if><if test="beginDate!=null">and tie.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and tie.occurred_at&lt;date_add(#{endDate},interval 1 day)</if>)</if>) phoneHandoff
+  </select>
+  <select id="findCustomerByUid" resultType="map">select c.id,c.display_name displayName,c.nickname_key nicknameKey,c.consult_stage stage,c.owner_user_id ownerUserId,c.owner_name ownerName from dy_audience_v2_customer c join dy_audience_v2_identity i on i.customer_id=c.id where i.sec_uid=#{secUid} limit 1</select>
+  <select id="findCustomerByNickname" resultType="map">select id,display_name displayName,nickname_key nicknameKey,consult_stage stage,owner_user_id ownerUserId,owner_name ownerName from dy_audience_v2_customer where nickname_key=#{nicknameKey} order by id limit 1</select>
+  <select id="findIdentity" resultType="map">select id,customer_id customerId,sec_uid secUid from dy_audience_v2_identity where customer_id=#{customerId} and ((#{secUid} is not null and sec_uid=#{secUid}) or (#{secUid} is null and sec_uid is null and nickname_key=#{nicknameKey})) order by id limit 1</select>
+  <select id="countDistinctIdentityUids" resultType="long">select count(distinct sec_uid) from dy_audience_v2_identity where customer_id=#{customerId} and sec_uid is not null and sec_uid!=''</select>
+  <update id="markSameNameMultiIdentity">update dy_audience_v2_identity set same_name_multi_identity=1 where customer_id=#{customerId}</update>
+  <insert id="insertCustomer" useGeneratedKeys="true" keyProperty="id">
+    insert into dy_audience_v2_customer(display_name,nickname_key,consult_stage) values(#{displayName},#{nicknameKey},'NOT_CONSULTED')
+  </insert>
+  <update id="updateCustomer">
+    update dy_audience_v2_customer
+    set display_name=coalesce(#{displayName},display_name),
+      consult_stage=coalesce(#{stage},consult_stage),
+      interaction_status=case
+        when #{interactionStatus} is null then interaction_status
+        when interaction_status='BUY_INTENT' then interaction_status
+        when interaction_status='HAS_COMMENT' and #{interactionStatus}='HAS_INTERACTION' then interaction_status
+        else #{interactionStatus}
+      end,
+      fan_status=coalesce(#{fanStatus},fan_status),
+      douyin_account=coalesce(#{douyinAccount},douyin_account),
+      phone=coalesce(#{phone},phone),
+      wechat=coalesce(#{wechat},wechat),
+      owner_user_id=coalesce(#{ownerUserId},owner_user_id),
+      owner_name=coalesce(#{ownerName},owner_name),
+      updated_at=now()
+    where id=#{id}
+  </update>
+  <update id="updateCustomerOwnerByOpportunity">
+    update dy_audience_v2_customer c
+    join dy_audience_v2_opportunity o on o.customer_id=c.id
+    set c.owner_user_id=#{ownerUserId},c.owner_name=#{ownerName},c.updated_at=now()
+    where o.id=#{opportunityId}
+  </update>
+  <insert id="insertIdentity" useGeneratedKeys="true" keyProperty="id">
+    insert ignore into dy_audience_v2_identity(customer_id,sec_uid,nickname,nickname_key,source_type,same_name_multi_identity) values(#{customerId},#{secUid},#{nickname},#{nicknameKey},#{sourceChannel},#{sameNameMultiIdentity})
+  </insert>
+  <update id="touchIdentity">update dy_audience_v2_identity set last_seen_at=now(),nickname=#{nickname} where id=#{id}</update>
+  <insert id="insertBatch" useGeneratedKeys="true" keyProperty="id">
+    insert into dy_audience_v2_ingest_batch(batch_id,session_id,installation_id,plugin_version,event_count,status) values(#{batchId},#{sessionId},#{installationId},#{pluginVersion},#{eventCount},'RECEIVING')
+  </insert>
+  <update id="updateBatch">update dy_audience_v2_ingest_batch set accepted_count=#{acceptedCount},new_customer_count=coalesce(#{newCustomerCount},new_customer_count),updated_customer_count=coalesce(#{updatedCustomerCount},updated_customer_count),duplicate_count=#{duplicateCount},rejected_count=#{rejectedCount},status=coalesce(#{status},'ACCEPTED') where id=#{id}</update>
+  <insert id="insertInteraction">
+    insert ignore into dy_audience_v2_interaction_event(event_id,dedup_key,ingest_batch_id,session_id,customer_id,event_type,nickname,sec_uid,content,is_follower,is_following,occurred_at,source_type,payload_json)
+    values(#{eventId},#{dedupKey},#{ingestBatchId},#{sessionId},#{customerId},#{eventType},#{nickname},#{secUid},#{content},#{isFollower},#{isFollowing},#{occurredAt},#{sourceChannel},#{payloadJson})
+  </insert>
+  <insert id="insertPresence">
+    insert into dy_audience_v2_viewer_presence(session_id,customer_id,nickname,sec_uid,first_seen_at,last_seen_at,seen_count,is_follower,is_following)
+    values(#{sessionId},#{customerId},#{nickname},#{secUid},#{firstSeenAt},#{lastSeenAt},1,#{isFollower},#{isFollowing})
+    on duplicate key update first_seen_at=least(first_seen_at,values(first_seen_at)),last_seen_at=greatest(last_seen_at,values(last_seen_at)),seen_count=seen_count+1,customer_id=values(customer_id),is_follower=values(is_follower),is_following=values(is_following)
+  </insert>
+  <update id="updatePresence">update dy_audience_v2_viewer_presence set last_seen_at=#{lastSeenAt},seen_count=seen_count+1 where id=#{id}</update>
+  <select id="listWorkbench" resultType="map">
+    select c.id customerId,c.display_name nickname,c.douyin_account douyinAccount,c.phone,c.wechat,
+      case when c.consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id) then 'CONTACTED' else c.consult_stage end stage,
+      c.interaction_status interactionStatus,c.fan_status fanStatus,c.owner_name ownerName,
+      (select i.sec_uid from dy_audience_v2_identity i where i.customer_id=c.id and i.sec_uid is not null order by i.last_seen_at desc limit 1) secUid,
+      (select o.special_mark from dy_audience_v2_opportunity o where o.customer_id=c.id order by o.id desc limit 1) specialMark,
+      (select s.room_name from dy_audience_v2_interaction_event le join dy_audience_v2_live_session s on s.id=le.session_id where le.customer_id=c.id order by le.occurred_at desc,le.id desc limit 1) roomName,
+      (select s.live_date from dy_audience_v2_interaction_event le join dy_audience_v2_live_session s on s.id=le.session_id where le.customer_id=c.id order by le.occurred_at desc,le.id desc limit 1) liveDate,
+      (select o.consult_model from dy_audience_v2_opportunity o where o.customer_id=c.id order by o.id desc limit 1) consultModel,
+      (select ol.order_no from dy_audience_v2_order_link ol where ol.customer_id=c.id order by ol.id desc limit 1) orderNo,
+      max(e.session_id) sessionId,
+      max(e.occurred_at) lastInteractionAt,count(e.id) interactionCount,
+      sum(case when e.event_type='COMMENT' then 1 else 0 end) commentCount,
+      max(case when e.event_type='COMMENT' then e.content end) lastComment,
+      (select count(distinct vp.session_id) from dy_audience_v2_viewer_presence vp where vp.customer_id=c.id <if test="sessionId!=null">and vp.session_id=#{sessionId}</if><if test="beginDate!=null">and vp.first_seen_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and vp.first_seen_at&lt;date_add(#{endDate},interval 1 day)</if>) visitCount,
+      (select coalesce(sum(least(greatest(timestampdiff(second,vp.first_seen_at,vp.last_seen_at),0),greatest(vp.seen_count,0)*300,21600)),0) from dy_audience_v2_viewer_presence vp where vp.customer_id=c.id <if test="sessionId!=null">and vp.session_id=#{sessionId}</if><if test="beginDate!=null">and vp.first_seen_at&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null">and vp.first_seen_at&lt;date_add(#{endDate},interval 1 day)</if>) watchSeconds,
+      case when sum(case when e.source_type='PLUGIN_REALTIME' then 1 else 0 end)>0 then 'PLUGIN' else 'MANUAL' end sourceType
+    from dy_audience_v2_customer c left join dy_audience_v2_interaction_event e on e.customer_id=c.id
+    <where><if test="keyword!=null and keyword!=''">and (c.display_name like concat('%',#{keyword},'%') or e.content like concat('%',#{keyword},'%')
+        or exists(select 1 from dy_audience_v2_order_link ko where ko.customer_id=c.id and ko.order_no like concat('%',#{keyword},'%'))
+        or exists(select 1 from dy_audience_v2_opportunity km where km.customer_id=c.id and (km.consult_model like concat('%',#{keyword},'%') or km.concern like concat('%',#{keyword},'%'))))</if>
+      <if test="stage!=null and stage!='' and stage!='CONTACTED'">and c.consult_stage=#{stage}</if>
+      <if test="stage=='CONTACTED'">and (c.consult_stage='CONTACTED' or (c.consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id)))</if>
+      <if test="claimedOnly!=null and claimedOnly">and c.owner_user_id is not null </if>
+      <if test="sessionId!=null">and e.session_id=#{sessionId} </if>
+      <if test="ownerUserId!=null">and c.owner_user_id=#{ownerUserId}</if>
+      <if test="beginDate!=null">and e.occurred_at&gt;=concat(#{beginDate},' 00:00:00')</if>
+      <if test="endDate!=null">and e.occurred_at&lt;date_add(#{endDate},interval 1 day)</if></where>
+    group by c.id order by lastInteractionAt desc,c.id desc limit #{offset},#{limit}
+  </select>
+  <select id="countWorkbench" resultType="long">
+    select count(*) from dy_audience_v2_customer c
+    <where>
+      <if test="keyword!=null and keyword!=''">
+        and (c.display_name like concat('%',#{keyword},'%')
+          or exists(select 1 from dy_audience_v2_interaction_event ek where ek.customer_id=c.id and ek.content like concat('%',#{keyword},'%'))
+          or exists(select 1 from dy_audience_v2_order_link ko where ko.customer_id=c.id and ko.order_no like concat('%',#{keyword},'%'))
+          or exists(select 1 from dy_audience_v2_opportunity km where km.customer_id=c.id and (km.consult_model like concat('%',#{keyword},'%') or km.concern like concat('%',#{keyword},'%'))))
+      </if>
+      <if test="stage!=null and stage!='' and stage!='CONTACTED'">and c.consult_stage=#{stage} </if>
+      <if test="stage=='CONTACTED'">and (c.consult_stage='CONTACTED' or (c.consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id))) </if>
+      <if test="claimedOnly!=null and claimedOnly">and c.owner_user_id is not null </if>
+      <if test="ownerUserId!=null">and c.owner_user_id=#{ownerUserId} </if>
+      <if test="sessionId!=null or beginDate!=null or endDate!=null">
+        and exists(select 1 from dy_audience_v2_interaction_event es where es.customer_id=c.id
+          <if test="sessionId!=null">and es.session_id=#{sessionId} </if>
+          <if test="beginDate!=null">and es.occurred_at&gt;=concat(#{beginDate},' 00:00:00') </if>
+          <if test="endDate!=null">and es.occurred_at&lt;date_add(#{endDate},interval 1 day) </if>)
+      </if>
+    </where>
+  </select>
+  <select id="workbenchSummary" resultType="map">
+    select count(distinct case when e.id is not null then e.id end) interactions,
+      count(distinct case when e.id is not null and mr.id is null then c.id end) unregistered,
+      count(distinct case when c.fan_status in ('FOLLOWED','MUTUAL') then c.id end) followed,
+      count(distinct case when c.consult_stage='CONSULTING' then c.id end) consulting
+    from dy_audience_v2_customer c
+      left join dy_audience_v2_interaction_event e on e.customer_id=c.id
+      left join dy_audience_v2_manual_registration mr on mr.customer_id=c.id
+      <where><if test="sessionId!=null">e.session_id=#{sessionId}</if></where>
+  </select>
+  <select id="getCustomer" resultType="map">
+    select id customerId,display_name nickname,douyin_account douyinAccount,phone,wechat,interaction_status interactionStatus,fan_status fanStatus,
+      case when consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id) then 'CONTACTED' else consult_stage end stage,owner_user_id ownerUserId,owner_name ownerName,priority,created_at createdAt,updated_at updatedAt
+      ,case when exists(select 1 from dy_audience_v2_identity si where si.customer_id=c.id and si.same_name_multi_identity=1) then 1 else 0 end sameNameMultiIdentity,
+      case when exists(select 1 from dy_audience_v2_interaction_event pe where pe.customer_id=c.id and pe.source_type='PLUGIN_REALTIME') then 'PLUGIN' else 'MANUAL' end sourceType
+    from dy_audience_v2_customer c where c.id=#{customerId}
+  </select>
+  <select id="listCustomerIdentities" resultType="map">select id,sec_uid secUid,nickname,source_type sourceType,same_name_multi_identity sameNameMultiIdentity,first_seen_at firstSeenAt,last_seen_at lastSeenAt from dy_audience_v2_identity where customer_id=#{customerId} order by last_seen_at desc limit 50</select>
+  <select id="listCustomerInteractions" resultType="map">select e.id,e.session_id sessionId,e.event_type eventType,e.content,e.occurred_at occurredAt,e.source_type sourceType,e.payload_json payloadJson,s.room_name roomName,s.live_date liveDate,coalesce(wp.watch_seconds,0) watchSeconds from dy_audience_v2_interaction_event e left join dy_audience_v2_live_session s on s.id=e.session_id left join (select session_id,customer_id,least(max(cast(json_unquote(json_extract(payload_json,'$.watchSeconds')) as unsigned)),21600) watch_seconds from dy_audience_v2_interaction_event where customer_id=#{customerId} and event_type='VIEWER' and json_valid(payload_json) and cast(json_unquote(json_extract(payload_json,'$.watchSeconds')) as unsigned)&gt;=300 group by session_id,customer_id) wp on wp.customer_id=e.customer_id and wp.session_id=e.session_id where e.customer_id=#{customerId} order by e.occurred_at desc,e.id desc limit 100</select>
+  <select id="listCustomerRegistrations" resultType="map">select r.id,r.session_id sessionId,r.interaction_type interactionType,r.consult_stage stage,r.consult_model consultModel,r.concern,r.special_mark specialMark,r.fan_status fanStatus,r.note,r.order_no orderNo,coalesce(nullif(u.nick_name,''),r.registered_name) registeredName,r.created_at createdAt,s.room_name roomName,s.live_date liveDate,(select o.id from dy_audience_v2_opportunity o where o.customer_id=r.customer_id and (r.session_id is null or o.session_id=r.session_id) order by o.id desc limit 1) opportunityId from dy_audience_v2_manual_registration r left join dy_audience_v2_live_session s on s.id=r.session_id left join sys_user u on u.user_id=r.registered_by where r.customer_id=#{customerId} order by r.id desc limit 100</select>
+  <select id="listCustomerOpportunities" resultType="map">select id,session_id sessionId,consult_stage stage,consult_model consultModel,concern,special_mark specialMark,owner_user_id ownerUserId,owner_name ownerName,anchor_user_id anchorUserId,anchor_name anchorName,controller_user_id controllerUserId,controller_name controllerName,controller_first_followup_at controllerFirstFollowupAt,controller_first_followup_user_id controllerFirstFollowupUserId,controller_first_followup_name controllerFirstFollowupName,status,handoff_reason handoffReason,handoff_at handoffAt,first_followed_at firstFollowedAt,last_followed_at lastFollowedAt,created_at createdAt,updated_at updatedAt from dy_audience_v2_opportunity where customer_id=#{customerId} order by id desc limit 100</select>
+  <select id="listCustomerOrders" resultType="map">select id,order_no orderNo,order_status orderStatus,product_model productModel,pay_amount payAmount,submitted_at submittedAt,updated_at updatedAt from dy_audience_v2_order_link where customer_id=#{customerId} order by id desc limit 100</select>
+  <select id="listCustomerAttachments" resultType="map">select id,opportunity_id opportunityId,order_id orderId,original_name originalName,content_type contentType,file_size fileSize,status,uploaded_by uploadedBy,created_at createdAt from dy_audience_v2_attachment where customer_id=#{customerId} and status='READY' order by id desc limit 100</select>
+  <select id="listCustomerTasks" resultType="map">select t.id,t.opportunity_id opportunityId,t.task_date taskDate,t.status,t.task_type taskType,t.result,t.created_at createdAt from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id where o.customer_id=#{customerId} order by (t.status not in ('DONE','RELEASED')) desc,t.id desc limit 100</select>
+  <select id="getAttachment" resultType="map">select id,customer_id customerId,opportunity_id opportunityId,order_id orderId,object_key objectKey,original_name originalName,content_type contentType,file_size fileSize,sha256,status,uploaded_by uploadedBy from dy_audience_v2_attachment where id=#{id}</select>
+  <insert id="insertAttachment" useGeneratedKeys="true" keyProperty="id">insert into dy_audience_v2_attachment(customer_id,opportunity_id,order_id,object_key,original_name,content_type,file_size,sha256,status,uploaded_by) values(#{customerId},#{opportunityId},#{orderId},#{objectKey},#{originalName},#{contentType},#{fileSize},#{sha256},'PENDING',#{uploadedBy})</insert>
+  <update id="completeAttachment">update dy_audience_v2_attachment set status='READY',sha256=coalesce(#{sha256},sha256),uploaded_at=now(),failure_reason=null where id=#{id}</update>
+  <update id="updateAttachmentObjectKey">update dy_audience_v2_attachment set object_key=#{objectKey} where id=#{id}</update>
+  <update id="markAttachmentFailed">update dy_audience_v2_attachment set status='FAILED',failure_reason=#{reason} where id=#{id}</update>
+  <insert id="insertRegistration" useGeneratedKeys="true" keyProperty="id">
+    insert into dy_audience_v2_manual_registration(session_id,customer_id,interaction_type,stage,consult_stage,consult_model,concern,special_mark,add_fan_status,fan_status,note,order_no,registered_by,registered_name)
+    values(#{sessionId},#{customerId},#{interactionType},#{stage},#{stage},#{consultModel},#{concern},#{specialMark},#{addFanStatus},#{addFanStatus},#{note},#{orderNo},#{registeredBy},#{registeredName})
+  </insert>
+  <select id="findOpenOpportunity" resultType="map">select id,status from dy_audience_v2_opportunity where customer_id=#{customerId} and (#{sessionId} is null or session_id=#{sessionId}) and status not in ('COMPLETED','RELEASED','TRANSFERRED_TO_PHONE') order by id desc limit 1</select>
+  <insert id="insertOpportunity" useGeneratedKeys="true" keyProperty="id">insert into dy_audience_v2_opportunity(customer_id,session_id,interaction_status,fan_status,consult_stage,consult_model,concern,special_mark,owner_user_id,owner_name,anchor_user_id,anchor_name,controller_user_id,controller_name,controller_first_followup_at,controller_first_followup_user_id,controller_first_followup_name,status,first_followed_at,last_followed_at) values(#{customerId},#{sessionId},#{interactionStatus},#{fanStatus},#{stage},#{consultModel},#{concern},#{specialMark},#{ownerUserId},#{ownerName},#{anchorUserId},#{anchorName},#{controllerUserId},#{controllerName},case when #{controllerFirstFollowupUserId} is null then null else now() end,#{controllerFirstFollowupUserId},#{controllerFirstFollowupName},'IN_PROGRESS',now(),now())</insert>
+  <update id="updateOpportunity">update dy_audience_v2_opportunity set interaction_status=coalesce(#{interactionStatus},interaction_status),fan_status=coalesce(#{fanStatus},fan_status),consult_stage=coalesce(#{stage},consult_stage),consult_model=coalesce(#{consultModel},consult_model),concern=coalesce(#{concern},concern),special_mark=coalesce(#{specialMark},special_mark),owner_user_id=coalesce(#{ownerUserId},owner_user_id),owner_name=coalesce(#{ownerName},owner_name),anchor_user_id=coalesce(#{anchorUserId},anchor_user_id),anchor_name=coalesce(#{anchorName},anchor_name),controller_user_id=coalesce(#{controllerUserId},controller_user_id),controller_name=coalesce(#{controllerName},controller_name),controller_first_followup_at=case when controller_first_followup_at is null and #{controllerFirstFollowupUserId} is not null then now() else controller_first_followup_at end,controller_first_followup_user_id=coalesce(controller_first_followup_user_id,#{controllerFirstFollowupUserId}),controller_first_followup_name=coalesce(controller_first_followup_name,#{controllerFirstFollowupName}),status=coalesce(#{status},status),first_followed_at=coalesce(first_followed_at,now()),last_followed_at=now(),updated_at=now() where id=#{id}</update>
+  <select id="findOpenTask" resultType="map">select id,status,task_type taskType from dy_audience_v2_followup_task where opportunity_id=#{opportunityId} and status not in ('DONE','RELEASED') order by id desc limit 1</select>
+  <insert id="insertTask" useGeneratedKeys="true" keyProperty="id">insert into dy_audience_v2_followup_task(opportunity_id,task_date,status) values(#{opportunityId},#{taskDate},'PENDING')</insert>
+  <update id="updateTaskDate">update dy_audience_v2_followup_task set task_date=#{taskDate},updated_at=now() where id=#{id} and status not in ('DONE','RELEASED')</update>
+  <select id="getTask" resultType="map">select t.id,t.opportunity_id opportunityId,t.task_type taskType,t.task_date taskDate,t.status,t.assignee_user_id assigneeUserId,t.assignee_name assigneeName,t.handoff_reason handoffReason,o.customer_id customerId,o.owner_user_id ownerUserId,o.owner_name ownerName from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id where t.id=#{id}</select>
+  <update id="updateTask">update dy_audience_v2_followup_task set status=#{status},result=#{result},assignee_user_id=coalesce(#{assigneeUserId},assignee_user_id),assignee_name=coalesce(#{assigneeName},assignee_name),completed_at=#{completedAt},completed_by=#{completedBy},completed_name=#{completedName},updated_at=now() where id=#{id}</update>
+  <select id="findOrderByOpportunity" resultType="map">select id,order_no orderNo,order_status orderStatus from dy_audience_v2_order_link where opportunity_id=#{opportunityId} order by id desc limit 1</select>
+  <insert id="insertOrder" useGeneratedKeys="true" keyProperty="id">insert into dy_audience_v2_order_link(opportunity_id,customer_id,order_no,order_status,product_model,submitted_at,source_type) values(#{opportunityId},#{customerId},#{orderNo},#{orderStatus},#{productModel},now(),'MANUAL')</insert>
+  <update id="updateOrder">update dy_audience_v2_order_link set order_no=coalesce(#{orderNo},order_no),order_status=#{orderStatus},product_model=coalesce(#{productModel},product_model),pay_amount=coalesce(#{payAmount},pay_amount),shipped_at=case when #{orderStatus}='SHIPPED' and shipped_at is null then now() else shipped_at end,completed_at=case when #{orderStatus}='COMPLETED' and completed_at is null then now() else completed_at end,refunded_at=case when #{orderStatus}='REFUNDED' and refunded_at is null then now() else refunded_at end,updated_at=now() where id=#{id}</update>
+  <select id="getOrder" resultType="map">select id,opportunity_id opportunityId,customer_id customerId,order_no orderNo,order_status orderStatus,product_model productModel,pay_amount payAmount from dy_audience_v2_order_link where id=#{id}</select>
+  <select id="listTasks" resultType="map">select t.id,t.task_date taskDate,t.task_type taskType,t.assignee_user_id assigneeUserId,t.assignee_name assigneeName,t.handoff_reason handoffReason,case when t.status='PENDING' and t.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) then 'OVERDUE' else t.status end status,o.consult_stage stage,o.consult_model consultModel,o.owner_name ownerName,c.display_name nickname,c.id customerId,o.session_id sessionId from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id join dy_audience_v2_customer c on c.id=o.customer_id where t.status not in ('DONE','RELEASED') order by (t.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date)) desc,t.task_date,t.id limit #{offset},#{limit}</select>
+  <select id="countTasks" resultType="long">select count(*) from dy_audience_v2_followup_task where status not in ('DONE','RELEASED')</select>
+  <select id="listPhoneHandoffCandidates" resultType="map">
+    select o.id opportunityId,
+      case when datediff(current_date,date(coalesce(o.first_followed_at,o.created_at))) &gt;= 3 then 'THREE_DAYS_NO_ORDER' else 'NO_CONTROLLER_MARK' end handoffReason
+    from dy_audience_v2_opportunity o
+    where o.status not in ('COMPLETED','RELEASED','TRANSFERRED_TO_PHONE')
+      and o.consult_stage not in ('ORDERED')
+      and not exists (select 1 from dy_audience_v2_order_link ol where ol.opportunity_id=o.id and ol.order_status not in ('REFUNDED','CLOSED'))
+      and ((datediff(current_date,date(coalesce(o.first_followed_at,o.created_at))) &gt;= 3) or (nullif(trim(o.special_mark),'') is null and datediff(current_date,date(coalesce(o.first_followed_at,o.created_at))) &gt;= 2))
+    order by coalesce(o.first_followed_at,o.created_at),o.id
+    limit 200
+  </select>
+  <select id="findOpenPhoneTask" resultType="map">select id,status from dy_audience_v2_followup_task where opportunity_id=#{opportunityId} and task_type='PHONE_SERVICE' and status not in ('DONE','RELEASED') order by id desc limit 1</select>
+  <update id="markOpportunityHandoff">update dy_audience_v2_opportunity set status='TRANSFERRED_TO_PHONE',handoff_reason=#{reason},handoff_at=now(),updated_at=now() where id=#{id} and status not in ('COMPLETED','RELEASED','TRANSFERRED_TO_PHONE')</update>
+  <insert id="insertPhoneTask" useGeneratedKeys="true" keyProperty="id">insert into dy_audience_v2_followup_task(opportunity_id,task_date,task_type,status,handoff_reason) values(#{opportunityId},#{taskDate},'PHONE_SERVICE','PENDING',#{handoffReason})</insert>
+  <select id="listOrders" resultType="map">select ol.id,ol.order_no orderNo,ol.order_status orderStatus,ol.product_model productModel,ol.pay_amount payAmount,ol.updated_at updatedAt,c.display_name nickname,c.id customerId from dy_audience_v2_order_link ol join dy_audience_v2_customer c on c.id=ol.customer_id order by ol.updated_at desc,ol.id desc limit #{offset},#{limit}</select>
+  <select id="countOrders" resultType="long">select count(*) from dy_audience_v2_order_link</select>
+  <select id="listBatches" resultType="map">
+    with recent as (
+      select session_id,max(id) batchId
+      from dy_audience_v2_ingest_batch
+      group by session_id
+      order by batchId desc
+      limit #{offset},#{limit}
+    ), daily as (
+      select x.session_id,date(x.created_at) uploadDay,
+        coalesce(sum(x.accepted_count),0) dayAccepted,
+        coalesce(sum(x.event_count),0) dayReceived,
+        max(x.created_at) dayLastUpload
+      from recent r
+      join dy_audience_v2_ingest_batch latest on latest.id=r.batchId
+      join dy_audience_v2_ingest_batch x force index (idx_av2_batch_session_created)
+        on x.session_id=r.session_id
+        and x.created_at&gt;=date(latest.created_at)
+        and x.created_at&lt;date_add(date(latest.created_at),interval 1 day)
+      group by x.session_id,date(x.created_at)
+    )
+    select b.*,s.room_name,s.live_date,d.dayAccepted,d.dayReceived,d.dayLastUpload
+    from recent r
+    join dy_audience_v2_ingest_batch b on b.id=r.batchId
+    join dy_audience_v2_live_session s on s.id=b.session_id
+    left join daily d on d.session_id=b.session_id and d.uploadDay=date(b.created_at)
+    order by b.id desc
+  </select>
+  <select id="countBatches" resultType="long">select count(distinct session_id) from dy_audience_v2_ingest_batch</select>
+  <select id="getBatch" resultType="map">select b.*,s.room_name roomName,s.live_date liveDate from dy_audience_v2_ingest_batch b join dy_audience_v2_live_session s on s.id=b.session_id where b.id=#{id}</select>
+  <select id="listBatchEvents" resultType="map">select e.id,e.event_id eventId,e.event_type eventType,e.nickname,e.sec_uid secUid,e.content,e.occurred_at occurredAt,e.created_at createdAt from dy_audience_v2_interaction_event e where e.ingest_batch_id=#{id} order by e.id limit 500</select>
+</mapper>

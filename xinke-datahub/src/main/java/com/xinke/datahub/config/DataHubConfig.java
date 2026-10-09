@@ -17,8 +17,8 @@ public class DataHubConfig
     {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(4);
-        executor.setQueueCapacity(20);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(10);
         executor.setKeepAliveSeconds(60);
         executor.setThreadNamePrefix("datahub-import-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());

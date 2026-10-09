@@ -79,6 +79,7 @@ service.interceptors.response.use(res => {
     // 未设置状态码则默认成功状态
     const code = res.data.code || 200
     const skipAuthDialog = (res.config.headers || {}).skipAuthDialog === true || (res.config.headers || {}).skipAuthDialog === 'true'
+    const skipError = (res.config.headers || {}).skipError === true || (res.config.headers || {}).skipError === 'true'
     // 获取错误信息
     const msg = errorCode[code] || res.data.msg || errorCode['default']
     // 二进制数据则直接返回
@@ -99,12 +100,15 @@ service.interceptors.response.use(res => {
     }
       return Promise.reject('无效的会话，或者会话已过期，请重新登录。')
     } else if (code === 500) {
+      if (skipError) return Promise.reject(new Error(msg))
       ElMessage({ message: msg, type: 'error' })
       return Promise.reject(new Error(msg))
     } else if (code === 601) {
+      if (skipError) return Promise.reject(new Error(msg))
       ElMessage({ message: msg, type: 'warning' })
       return Promise.reject(new Error(msg))
     } else if (code !== 200) {
+      if (skipError) { const error = new Error(msg); error.code = code; error.response = res; return Promise.reject(error) }
       ElNotification.error({ title: msg })
       const error = new Error(msg)
       error.code = code
@@ -124,7 +128,7 @@ service.interceptors.response.use(res => {
     } else if (message.includes("Request failed with status code")) {
       message = "系统接口" + message.slice(-3) + "异常"
     }
-    ElMessage({ message: message, type: 'error', duration: 5 * 1000 })
+    if (!(error.config && error.config.headers && (error.config.headers.skipError === true || error.config.headers.skipError === 'true'))) ElMessage({ message: message, type: 'error', duration: 5 * 1000 })
     return Promise.reject(error)
   }
 )

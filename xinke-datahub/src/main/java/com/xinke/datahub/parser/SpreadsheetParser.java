@@ -2,11 +2,13 @@ package com.xinke.datahub.parser;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.StringReader;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.math.BigDecimal;
-import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -120,16 +122,18 @@ public class SpreadsheetParser
 
     private ParsedSpreadsheet parseCsv(Path file, String originalFileName, String requestedSheet) throws IOException
     {
-        byte[] bytes = Files.readAllBytes(file);
-        String content = decodeCsv(bytes);
-        if (!content.isEmpty() && content.charAt(0) == '\uFEFF') content = content.substring(1);
-        char delimiter = detectDelimiter(content);
+        Charset charset = detectCsvCharset(file);
+        char delimiter;
+        try (BufferedReader reader = openCsvReader(file, charset))
+        {
+            delimiter = detectDelimiter(reader.readLine());
+        }
         String syntheticSheet = baseName(originalFileName);
         if (requestedSheet != null && !requestedSheet.isBlank() && !syntheticSheet.equals(requestedSheet))
             throw new ServiceException("CSV不存在Sheet：" + requestedSheet);
 
         CSVFormat format = CSVFormat.DEFAULT.builder().setDelimiter(delimiter).setIgnoreEmptyLines(false).build();
-        try (CSVParser csv = new CSVParser(new StringReader(content), format))
+        try (Reader reader = openCsvReader(file, charset); CSVParser csv = new CSVParser(reader, format))
         {
             var records = csv.iterator();
             if (!records.hasNext()) throw new ServiceException("CSV中没有可读取的数据");
@@ -239,26 +243,39 @@ public class SpreadsheetParser
         return formatter.formatCellValue(cell, evaluator).strip();
     }
 
-    private String decodeCsv(byte[] bytes)
+    private Charset detectCsvCharset(Path file)
     {
-        try { return decode(bytes, StandardCharsets.UTF_8); }
-        catch (CharacterCodingException ignored)
+        if (canDecode(file, StandardCharsets.UTF_8)) return StandardCharsets.UTF_8;
+        Charset gb18030 = Charset.forName("GB18030");
+        if (canDecode(file, gb18030)) return gb18030;
+        throw new ServiceException("CSV编码无法识别，请使用UTF-8或GB18030");
+    }
+
+    private boolean canDecode(Path file, Charset charset)
+    {
+        CharsetDecoder decoder = charset.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT);
+        try (Reader reader = new InputStreamReader(Files.newInputStream(file), decoder))
         {
-            try { return decode(bytes, Charset.forName("GB18030")); }
-            catch (CharacterCodingException e) { throw new ServiceException("CSV编码无法识别，请使用UTF-8或GB18030"); }
+            char[] buffer = new char[8192];
+            while (reader.read(buffer) != -1) { }
+            return true;
         }
+        catch (CharacterCodingException e) { return false; }
+        catch (IOException e) { throw new ServiceException("CSV文件读取失败").setDetailMessage(e.getMessage()); }
     }
 
-    private String decode(byte[] bytes, Charset charset) throws CharacterCodingException
+    private BufferedReader openCsvReader(Path file, Charset charset) throws IOException
     {
-        return charset.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
+        BufferedReader reader = Files.newBufferedReader(file, charset);
+        reader.mark(1);
+        if (reader.read() != '\uFEFF') reader.reset();
+        return reader;
     }
 
-    private char detectDelimiter(String content)
+    private char detectDelimiter(String firstLine)
     {
-        int end = content.indexOf('\n');
-        String line = end < 0 ? content : content.substring(0, end);
+        String line = firstLine == null ? "" : firstLine;
         char[] candidates = { ',', '\t', ';' };
         char selected = ',';
         int max = -1;

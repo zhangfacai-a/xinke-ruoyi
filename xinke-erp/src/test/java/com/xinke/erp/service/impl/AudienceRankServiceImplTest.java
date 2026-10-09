@@ -345,20 +345,18 @@ class AudienceRankServiceImplTest
         AudienceFollowup observing = followup(10L, "OBSERVING", null, null);
         observing.setRoomId(30L);
         observing.setSecUid("repeat-user");
-        AudienceFollowup promoted = followup(10L, "UNASSIGNED", null, null);
-        promoted.setRoomId(30L);
-        promoted.setSecUid("repeat-user");
         AudienceFollowup stats = new AudienceFollowup();
         stats.setSecUid("repeat-user");
         stats.setAppearanceDays(2);
-        when(mapper.selectFollowupByUid("repeat-user")).thenReturn(observing, observing, promoted);
+        when(mapper.selectFollowupsByUids(List.of("repeat-user")))
+                .thenReturn(List.of(observing), List.of(observing));
         when(mapper.selectFollowupVisitStats(anyList())).thenReturn(List.of(stats));
         when(mapper.updateFollowup(any(AudienceFollowup.class))).thenReturn(1);
 
         service.importRanks(request, null);
 
         ArgumentCaptor<AudienceFollowup> updates = ArgumentCaptor.forClass(AudienceFollowup.class);
-        verify(mapper, times(2)).updateFollowup(updates.capture());
+        verify(mapper).updateFollowup(updates.capture());
         AudienceFollowup qualificationUpdate = updates.getAllValues().stream()
                 .filter(value -> value.getQualificationReason() != null).findFirst().orElseThrow();
         assertEquals("UNASSIGNED", qualificationUpdate.getStatus());

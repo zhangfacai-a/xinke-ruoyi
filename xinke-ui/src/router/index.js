@@ -67,6 +67,47 @@ export const constantRoutes = [
       : '/live-ops/giftMaterial',
     hidden: true
   },
+  // The old all-in-one customer workbench is frozen. Keep existing
+  // bookmarks useful by sending them to the new customer center while the
+  // database menu migration is rolled out.
+  {
+    path: '/live-ops/customer-workbench',
+    redirect: to => ({ path: '/live-ops/customer-center', query: to.query }),
+    hidden: true
+  },
+  {
+    path: '/live-ops/live/customer-workbench',
+    redirect: to => ({ path: '/live-ops/customer-center', query: to.query }),
+    hidden: true
+  },
+  // Keep the new center reachable while the backend menu migration or
+  // dynamic-menu cache is being rolled out. Visibility and permissions for
+  // the sidebar remain controlled by the backend menu tree.
+  {
+    path: '/live-ops/customer-center',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/liveCustomer/center/index.vue'),
+        name: 'LiveCustomerCenterDirect',
+        meta: { title: '直播客户中心', icon: 'user' }
+      }
+    ]
+  },
+  {
+    path: '/live-ops/liveMetrics',
+    component: Layout,
+    hidden: true,
+    children: [{ path: '', component: () => import('@/views/live/metrics/index.vue'), name: 'LiveMetricsScheduleDirect', meta: { title: '主播排班', icon: 'calendar' } }]
+  },
+  {
+    path: '/live-ops/liveMetricsReport',
+    component: Layout,
+    hidden: true,
+    children: [{ path: '', component: () => import('@/views/live/metrics/report.vue'), name: 'LiveMetricsReportDirect', meta: { title: '数据上报', icon: 'chart' } }]
+  },
   ...[
     ['giftLedger', 'ledger'],
     ['giftPreference', 'preference'],

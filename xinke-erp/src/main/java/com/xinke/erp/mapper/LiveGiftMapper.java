@@ -35,6 +35,7 @@ public interface LiveGiftMapper
     int insertShop(Map<String, Object> shop);
     int updateShop(Map<String, Object> shop);
     List<Map<String, Object>> selectRooms(Map<String, Object> query);
+    int syncAudienceRooms();
     Map<String, Object> selectRoomById(Long roomId);
     int insertRoom(Map<String, Object> room);
     int updateRoom(Map<String, Object> room);

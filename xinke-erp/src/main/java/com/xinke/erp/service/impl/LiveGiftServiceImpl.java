@@ -46,7 +46,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
     private static final int MAX_BATCH_ORDERS = 500;
     private static final Pattern ASCII_ALIAS_CHAR = Pattern.compile("[A-Za-z0-9]");
     private static final String DING_API = "https://api.dingtalk.com";
-    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     @Autowired
     private LiveGiftMapper mapper;
@@ -59,10 +59,10 @@ public class LiveGiftServiceImpl implements ILiveGiftService
     @Value("${live.dingtalk.default-password:xk123456}")
     private String defaultPassword;
 
-    @Override public List<Map<String, Object>> listLiveUserOptions(Map<String, Object> q) { return mapper.selectLiveUserOptions(q); }
+    @Override public List<Map<String, Object>> listLiveUserOptions(Map<String, Object> q) { return mapper.selectLiveUserOptions(limitedQuery(q, 500, 500)); }
     @Override public List<Map<String, Object>> listShopOptions() { return mapper.selectShopOptions(); }
 
-    @Override public List<Map<String, Object>> listShops(Map<String, Object> q) { return mapper.selectShops(q); }
+    @Override public List<Map<String, Object>> listShops(Map<String, Object> q) { return mapper.selectShops(limitedQuery(q, 200, 500)); }
     @Override public Map<String, Object> getShop(Long id) { return mapper.selectShopById(id); }
 
     @Override
@@ -82,7 +82,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         }
     }
 
-    @Override public List<Map<String, Object>> listRooms(Map<String, Object> q) { return mapper.selectRooms(q); }
+    @Override public List<Map<String, Object>> listRooms(Map<String, Object> q) { mapper.syncAudienceRooms(); return mapper.selectRooms(limitedQuery(q, 200, 500)); }
     @Override public Map<String, Object> getRoom(Long id) { return mapper.selectRoomById(id); }
 
     @Override
@@ -103,7 +103,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         }
     }
 
-    @Override public List<Map<String, Object>> listSubjectMappings(Map<String, Object> q) { return mapper.selectSubjectMappings(q); }
+    @Override public List<Map<String, Object>> listSubjectMappings(Map<String, Object> q) { return mapper.selectSubjectMappings(limitedQuery(q, 500, 500)); }
 
     @Override
     @Transactional
@@ -122,7 +122,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
             .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "controller", username));
     }
 
-    @Override public List<Map<String, Object>> listDaily(Map<String, Object> q) { return mapper.selectDailyRecords(q); }
+    @Override public List<Map<String, Object>> listDaily(Map<String, Object> q) { return mapper.selectDailyRecords(limitedQuery(q, 200, 500)); }
     @Override public Map<String, Object> getDaily(Long id) { return mapper.selectDailyById(id); }
 
     @Override
@@ -154,6 +154,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
     @Override
     public List<Map<String, Object>> listGifts(Map<String, Object> query)
     {
+        query = limitedQuery(query, 500, 500);
         String keyword = Objects.toString(query.get("keyword"), "").trim();
         if (keyword.isEmpty() || !keyword.matches("[A-Za-z0-9]+")) return mapper.selectGifts(query);
         Map<String, Object> allQuery = new HashMap<>(query);
@@ -524,15 +525,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
 
     @Override public List<Map<String, Object>> ledger(Map<String, Object> q)
     {
-        List<Map<String, Object>> rows = mapper.selectOrderGiftLedger(q);
-        rows.forEach(row -> {
-            Map<String, Object> status = mapper.selectOrderGiftStatus(Objects.toString(row.get("orderNo"), ""));
-            row.put("roomId", status == null ? null : status.get("roomId"));
-            row.put("roomNameSnapshot", status == null ? null : status.get("roomNameSnapshot"));
-        });
-        Object roomId = q.get("roomId");
-        if (roomId == null || StringUtils.isBlank(roomId.toString())) return rows;
-        return rows.stream().filter(row -> Objects.equals(Objects.toString(row.get("roomId"), ""), roomId.toString())).toList();
+        return mapper.selectOrderGiftLedger(limitedQuery(q, 500, 10000));
     }
 
     @Override public Map<String, Object> getRoomPreference(Long userId)
@@ -551,9 +544,9 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         mapper.upsertUserRoomPreference(userId, roomId, username);
     }
 
-    @Override public List<Map<String, Object>> inventory(Map<String, Object> q) { return mapper.selectGiftInventory(q); }
+    @Override public List<Map<String, Object>> inventory(Map<String, Object> q) { return mapper.selectGiftInventory(limitedQuery(q, 500, 500)); }
 
-    @Override public List<Map<String, Object>> inventoryMovements(Map<String, Object> q) { return mapper.selectGiftInventoryMovements(q); }
+    @Override public List<Map<String, Object>> inventoryMovements(Map<String, Object> q) { return mapper.selectGiftInventoryMovements(limitedQuery(q, 500, 500)); }
 
     @Override
     public Map<String, Object> inventorySummary(Map<String, Object> q)
@@ -897,7 +890,7 @@ public class LiveGiftServiceImpl implements ILiveGiftService
 
     private JSONObject postJson(String url, JSONObject body, String token) throws Exception
     {
-        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15))
             .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body.toJSONString()));
         if (StringUtils.isNotBlank(token)) builder.header("x-acs-dingtalk-access-token", token);
         HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
@@ -974,6 +967,19 @@ public class LiveGiftServiceImpl implements ILiveGiftService
     {
         if (value == null) return 0;
         return Integer.parseInt(value.toString());
+    }
+
+    private static Map<String, Object> limitedQuery(Map<String, Object> query, int defaultLimit, int maxLimit)
+    {
+        Map<String, Object> result = query == null ? new HashMap<>() : new HashMap<>(query);
+        int limit = defaultLimit;
+        try
+        {
+            if (result.get("limit") != null) limit = Integer.parseInt(result.get("limit").toString());
+        }
+        catch (NumberFormatException ignored) { }
+        result.put("limit", Math.max(1, Math.min(maxLimit, limit)));
+        return result;
     }
 
     private record DingDepartment(Long id, Long parentId, String name, int orderNum) { }

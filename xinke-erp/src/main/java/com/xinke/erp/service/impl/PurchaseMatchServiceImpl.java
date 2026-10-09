@@ -314,7 +314,10 @@ public class PurchaseMatchServiceImpl implements PurchaseMatchService
         batch.put("importType", importType);
         batch.put("supplierId", supplierId);
         batch.put("originalFileName", file.getOriginalFilename());
-        batch.put("fileHash", sha256(file.getBytes()));
+        try (java.io.InputStream input = file.getInputStream())
+        {
+            batch.put("fileHash", sha256(input));
+        }
         batch.put("uploadUserId", userId);
         batch.put("uploadUserName", username);
         mapper.insertImportBatch(batch);
@@ -870,10 +873,13 @@ public class PurchaseMatchServiceImpl implements PurchaseMatchService
         if (file.getSize() > 30L * 1024 * 1024) throw new ServiceException("文件不能超过30MB");
     }
 
-    private String sha256(byte[] bytes) throws Exception
+    private String sha256(java.io.InputStream input) throws Exception
     {
         MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] digest = md.digest(bytes);
+        byte[] buffer = new byte[8192];
+        int count;
+        while ((count = input.read(buffer)) != -1) md.update(buffer, 0, count);
+        byte[] digest = md.digest();
         StringBuilder sb = new StringBuilder();
         for (byte b : digest) sb.append(String.format("%02x", b));
         return sb.toString();

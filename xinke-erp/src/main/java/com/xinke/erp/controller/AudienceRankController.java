@@ -31,6 +31,7 @@ import com.xinke.erp.domain.audience.AudienceVisitRecord;
 import com.xinke.erp.domain.audience.AudienceAssignmentRule;
 import com.xinke.erp.domain.audience.AudienceCustomerOrder;
 import com.xinke.erp.service.IAudienceRankService;
+import com.github.pagehelper.PageHelper;
 
 @RestController
 @RequestMapping("/live/audience-rank")
@@ -103,6 +104,10 @@ public class AudienceRankController extends BaseController
     @Log(title = "导出观众跟单", businessType = BusinessType.EXPORT)
     public void followupExport(AudienceFollowupQuery query, HttpServletResponse response)
     {
+        // The legacy export builds an XLSX workbook in memory. Keep one request
+        // from exhausting a small server when the historical table grows.
+        PageHelper.startPage(1, 10000, false);
+        response.setHeader("X-Export-Row-Limit", "10000");
         List<AudienceFollowupExport> rows = audienceRankService.selectFollowupList(query, getUserId())
                 .stream().map(AudienceFollowupExport::from).toList();
         new ExcelUtil<>(AudienceFollowupExport.class).exportExcel(response, rows, "观众跟单");

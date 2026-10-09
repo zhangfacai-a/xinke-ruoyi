@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "直播客户采集器 V2",
+  "version": "3.0.0",
+  "description": "采集直播评论与观看用户并同步到直播客户中心",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["http://47.116.62.234/*", "http://47.116.62.234:8080/*", "http://127.0.0.1:8080/*", "http://localhost:8080/*", "https://anchor.douyin.com/*"],
+  "background": {"service_worker": "background.js", "type": "module"},
+  "action": {"default_title": "直播客户采集器", "default_popup": "popup.html", "default_icon": {"16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png"}},
+  "icons": {"16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png"},
+  "content_scripts": [{"matches": ["https://anchor.douyin.com/anchor/dashboard*", "https://anchor.douyin.com/anchor/analyze/audience_rank*"], "js": ["content.js"], "run_at": "document_start"}]
+}

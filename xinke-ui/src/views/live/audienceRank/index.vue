@@ -33,7 +33,7 @@
               :label="roomLabel(room)" :value="Number(room.roomId)" /></el-select>
           <el-button v-if="hasWorkFilters" link type="primary" @click="resetWorkFilters">清除筛选</el-button>
           <span class="work-count">{{ taskLabel(taskKey) }} · {{ integer(workTotal) }} 人</span>
-        </div>
+        </div>ws
         <el-table v-loading="workLoading" :data="workRows" row-key="followupId" class="work-table"
           @row-click="openWorkbenchCustomer">
           <el-table-column label="客户" min-width="190" :fixed="viewportWidth >= 1280 ? 'left' : false"><template

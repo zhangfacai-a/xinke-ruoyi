@@ -4,8 +4,8 @@ const TARGET_PATH = '/anchor/analyze/audience_rank'
 const API_PATH = '/anchor_pc_tinker_proxy/lego/native/webcast_api/anchor/public/rank'
 const PING_PATH = '/open-api/douyin/audience-rank/ping'
 const IMPORT_PATH = '/open-api/douyin/audience-rank/import'
+const ERP_BASE_URL = 'http://47.116.62.234/prod-api'
 const SESSION_KEY = 'douyinAudienceRankCapture'
-const UPLOAD_HEADER = 'X-Audience-Upload-Key'
 const RESULT_TTL_MS = 30 * 60 * 1000
 const IS_PANEL = new URLSearchParams(location.search).get('panel') === '1'
 const DEMO_MODE = ['127.0.0.1', 'localhost'].includes(location.hostname) &&
@@ -19,7 +19,7 @@ const elements = Object.fromEntries(
 
 let activeTab = null
 let roomName = ''
-const settings = validateBuiltInConfig(globalThis.AUDIENCE_RANK_CONFIG)
+const settings = validateBuiltInConfig({ erpBaseUrl: ERP_BASE_URL })
 let capture = null
 let diagnosticRaw = null
 let reading = false
@@ -247,12 +247,11 @@ async function readRoomName() {
 function validateBuiltInConfig(value) {
   if (!value || typeof value !== 'object') throw new Error('插件缺少内置连接配置')
   const erpBaseUrl = String(value.erpBaseUrl || '').trim().replace(/\/$/, '')
-  const uploadKey = String(value.uploadKey || '').trim()
   const url = new URL(erpBaseUrl)
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || !uploadKey) {
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
     throw new Error('插件内置连接配置无效')
   }
-  return Object.freeze({ erpBaseUrl, uploadKey })
+  return Object.freeze({ erpBaseUrl })
 }
 
 async function checkBuiltInConnection() {
@@ -781,42 +780,19 @@ async function openErp() {
   await chrome.tabs.create({ url: settings.erpBaseUrl })
 }
 
-async function fetchErp(connection, path, options) {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20000)
-  try {
-    const response = await fetch(joinUrl(connection.erpBaseUrl, path), {
-      ...options,
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        [UPLOAD_HEADER]: connection.uploadKey,
-        ...(options.method === 'POST' ? { 'Content-Type': 'application/json' } : {})
-      }
-    })
-    const text = await response.text()
-    let body = null
-    if (text) {
-      try {
-        body = JSON.parse(text)
-      } catch {
-        throw new Error(`ERP 没有返回 JSON（HTTP ${response.status}）`)
-      }
-    }
-    if (!response.ok) {
-      const message = body?.msg || body?.message || `HTTP ${response.status}`
-      const error = new Error(`ERP 请求失败：${message}`)
-      error.httpStatus = response.status
-      throw error
-    }
-    return { body }
-  } catch (error) {
-    if (error.name === 'AbortError') throw new Error('ERP 连接超时，请检查地址和服务状态')
+async function fetchErp(_connection, path, options) {
+  const result = await chrome.runtime.sendMessage({
+    type: 'XINKE_AUDIENCE_ERP_REQUEST',
+    path,
+    method: options.method,
+    body: options.body || null
+  })
+  if (!result?.ok) {
+    const error = new Error(result?.error || 'ERP 请求失败')
+    if (result?.httpStatus) error.httpStatus = result.httpStatus
     throw error
-  } finally {
-    clearTimeout(timeout)
   }
+  return { body: result.body }
 }
 
 function assertErpSuccess(body, fallback) {
@@ -825,10 +801,6 @@ function assertErpSuccess(body, fallback) {
     throw new Error(`${fallback}：${body.msg || body.message || `错误码 ${body.code}`}`)
   }
   return body.data && typeof body.data === 'object' ? body.data : body
-}
-
-function joinUrl(baseUrl, path) {
-  return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
 }
 
 function updateConnectionState() {

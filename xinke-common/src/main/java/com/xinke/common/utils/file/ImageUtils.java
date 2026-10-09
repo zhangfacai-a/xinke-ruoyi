@@ -21,6 +21,7 @@ import com.xinke.common.utils.StringUtils;
 public class ImageUtils
 {
     private static final Logger log = LoggerFactory.getLogger(ImageUtils.class);
+    private static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
     public static byte[] getImage(String imagePath)
     {
@@ -71,8 +72,8 @@ public class ImageUtils
                 // 网络地址
                 URL urlObj = new URL(url);
                 URLConnection urlConnection = urlObj.openConnection();
-                urlConnection.setConnectTimeout(30 * 1000);
-                urlConnection.setReadTimeout(60 * 1000);
+                urlConnection.setConnectTimeout(5 * 1000);
+                urlConnection.setReadTimeout(15 * 1000);
                 urlConnection.setDoInput(true);
                 in = urlConnection.getInputStream();
             }
@@ -83,7 +84,12 @@ public class ImageUtils
                 String downloadPath = localPath + StringUtils.substringAfter(url, Constants.RESOURCE_PREFIX);
                 in = new FileInputStream(downloadPath);
             }
-            return IOUtils.toByteArray(in);
+            byte[] bytes = in.readNBytes(MAX_IMAGE_BYTES + 1);
+            if (bytes.length > MAX_IMAGE_BYTES)
+            {
+                throw new IllegalArgumentException("图片不能超过10MB");
+            }
+            return bytes;
         }
         catch (Exception e)
         {

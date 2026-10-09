@@ -3,8 +3,6 @@ package com.xinke.common.utils.http;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.xinke.common.utils.StringUtils;
-import nl.basjes.parse.useragent.UserAgent;
-import nl.basjes.parse.useragent.UserAgentAnalyzer;
 
 /**
  * UserAgent解析工具类
@@ -36,26 +34,12 @@ public class UserAgentUtils
     private static final Pattern LINUX_PATTERN = Pattern.compile("Linux");
     private static final Pattern CHROMEOS_PATTERN = Pattern.compile("CrOS");
 
-    private static final UserAgentAnalyzer userAgentAnalyzer = UserAgentAnalyzer
-            .newBuilder().hideMatcherLoadStats()
-            .withCache(5000)
-            .showMinimalVersion()
-            .withField(UserAgent.AGENT_NAME_VERSION)
-            .withField(UserAgent.OPERATING_SYSTEM_NAME_VERSION)
-            .build();
-
     /**
      * 获取客户端浏览器
      */
     public static String getBrowser(String userAgent)
     {
-        UserAgent.ImmutableUserAgent iua = userAgentAnalyzer.parse(userAgent);
-        String agentNameVersion = iua.get(UserAgent.AGENT_NAME_VERSION).getValue();
-        if (StringUtils.isBlank(agentNameVersion) || agentNameVersion.contains("??"))
-        {
-            return formatBrowser(userAgent);
-        }
-        return agentNameVersion;
+        return StringUtils.isBlank(userAgent) ? UNKNOWN : formatBrowser(userAgent);
     }
 
     /**
@@ -63,13 +47,7 @@ public class UserAgentUtils
      */
     public static String getOperatingSystem(String userAgent)
     {
-        UserAgent.ImmutableUserAgent iua = userAgentAnalyzer.parse(userAgent);
-        String operatingSystemNameVersion = iua.get(UserAgent.OPERATING_SYSTEM_NAME_VERSION).getValue();
-        if (StringUtils.isBlank(operatingSystemNameVersion) || operatingSystemNameVersion.contains("??"))
-        {
-            return formatOperatingSystem(userAgent);
-        }
-        return operatingSystemNameVersion;
+        return StringUtils.isBlank(userAgent) ? UNKNOWN : formatOperatingSystem(userAgent);
     }
 
     /**
@@ -77,6 +55,22 @@ public class UserAgentUtils
      */
     private static String formatBrowser(String browser)
     {
+        // Chromium based browsers must be checked before generic Chrome.
+        Matcher edgeMatcher = EDGE_PATTERN.matcher(browser);
+        if (edgeMatcher.find())
+        {
+            return "Edge" + edgeMatcher.group(1);
+        }
+        Matcher operaMatcher = OPERA_PATTERN.matcher(browser);
+        if (operaMatcher.find())
+        {
+            return "Opera" + operaMatcher.group(1);
+        }
+        Matcher samsungMatcher = SAMSUNG_PATTERN.matcher(browser);
+        if (samsungMatcher.find())
+        {
+            return "Samsung Browser" + samsungMatcher.group(1);
+        }
         // Chrome系列浏览器
         Matcher chromeMatcher = CHROME_PATTERN.matcher(browser);
         if (chromeMatcher.find() && (browser.contains("Chrome") || browser.contains("CriOS")))
@@ -88,12 +82,6 @@ public class UserAgentUtils
         if (firefoxMatcher.find())
         {
             return "Firefox" + firefoxMatcher.group(1);
-        }
-        // Edge浏览器
-        Matcher edgeMatcher = EDGE_PATTERN.matcher(browser);
-        if (edgeMatcher.find())
-        {
-            return "Edge" + edgeMatcher.group(1);
         }
         // Safari浏览器（需排除Chrome）
         Matcher safariMatcher = SAFARI_PATTERN.matcher(browser);
@@ -124,18 +112,6 @@ public class UserAgentUtils
         if (baiduMatcher.find())
         {
             return "Baidu Browser" + baiduMatcher.group(1);
-        }
-        // Samsung浏览器
-        Matcher samsungMatcher = SAMSUNG_PATTERN.matcher(browser);
-        if (samsungMatcher.find())
-        {
-            return "Samsung Browser" + samsungMatcher.group(1);
-        }
-        // Opera浏览器
-        Matcher operaMatcher = OPERA_PATTERN.matcher(browser);
-        if (operaMatcher.find())
-        {
-            return "Opera" + operaMatcher.group(1);
         }
         // IE浏览器
         Matcher ieMatcher = IE_PATTERN.matcher(browser);

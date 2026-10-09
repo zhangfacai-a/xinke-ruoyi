@@ -31,6 +31,14 @@ import org.springframework.http.MediaType;
 public class HttpUtils
 {
     private static final Logger log = LoggerFactory.getLogger(HttpUtils.class);
+    private static final int CONNECT_TIMEOUT_MILLIS = 5_000;
+    private static final int READ_TIMEOUT_MILLIS = 15_000;
+
+    private static void configureTimeouts(URLConnection connection)
+    {
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
+        connection.setReadTimeout(READ_TIMEOUT_MILLIS);
+    }
 
     /**
      * 向指定 URL 发送GET方法的请求
@@ -73,6 +81,7 @@ public class HttpUtils
             log.info("sendGet - {}", urlNameString);
             URL realUrl = new URL(urlNameString);
             URLConnection connection = realUrl.openConnection();
+            configureTimeouts(connection);
             connection.setRequestProperty("accept", "*/*");
             connection.setRequestProperty("connection", "Keep-Alive");
             connection.setRequestProperty("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
@@ -148,6 +157,7 @@ public class HttpUtils
             log.info("sendPost - {}", url);
             URL realUrl = new URL(url);
             URLConnection conn = realUrl.openConnection();
+            configureTimeouts(conn);
             conn.setRequestProperty("accept", "*/*");
             conn.setRequestProperty("connection", "Keep-Alive");
             conn.setRequestProperty("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
@@ -219,6 +229,7 @@ public class HttpUtils
             sc.init(null, new TrustManager[] { new TrustAnyTrustManager() }, new java.security.SecureRandom());
             URL console = new URL(urlNameString);
             HttpsURLConnection conn = (HttpsURLConnection) console.openConnection();
+            configureTimeouts(conn);
             conn.setRequestProperty("accept", "*/*");
             conn.setRequestProperty("connection", "Keep-Alive");
             conn.setRequestProperty("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");

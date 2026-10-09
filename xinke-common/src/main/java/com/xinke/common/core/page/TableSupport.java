@@ -10,6 +10,8 @@ import com.xinke.common.utils.ServletUtils;
  */
 public class TableSupport
 {
+    /** Prevent one malformed or abusive list request from exhausting memory. */
+    public static final int MAX_PAGE_SIZE = 500;
     /**
      * 当前记录起始索引
      */
@@ -42,7 +44,8 @@ public class TableSupport
     {
         PageDomain pageDomain = new PageDomain();
         pageDomain.setPageNum(Convert.toInt(ServletUtils.getParameter(PAGE_NUM), 1));
-        pageDomain.setPageSize(Convert.toInt(ServletUtils.getParameter(PAGE_SIZE), 10));
+        int requestedSize = Convert.toInt(ServletUtils.getParameter(PAGE_SIZE), 10);
+        pageDomain.setPageSize(Math.min(Math.max(requestedSize, 1), MAX_PAGE_SIZE));
         pageDomain.setOrderByColumn(ServletUtils.getParameter(ORDER_BY_COLUMN));
         pageDomain.setIsAsc(ServletUtils.getParameter(IS_ASC));
         pageDomain.setReasonable(ServletUtils.getParameterToBool(REASONABLE));

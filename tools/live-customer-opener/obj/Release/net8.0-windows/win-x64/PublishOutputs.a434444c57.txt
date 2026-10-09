@@ -1,0 +1,7 @@
+C:\Users\adzuki\Desktop\xinke-ruoyi\build\live-customer-opener\XinkeLiveCustomerOpener.pdb
+C:\Users\adzuki\Desktop\xinke-ruoyi\build\live-customer-opener\D3DCompiler_47_cor3.dll
+C:\Users\adzuki\Desktop\xinke-ruoyi\build\live-customer-opener\PenImc_cor3.dll
+C:\Users\adzuki\Desktop\xinke-ruoyi\build\live-customer-opener\PresentationNative_cor3.dll
+C:\Users\adzuki\Desktop\xinke-ruoyi\build\live-customer-opener\vcruntime140_cor3.dll
+C:\Users\adzuki\Desktop\xinke-ruoyi\build\live-customer-opener\wpfgfx_cor3.dll
+C:\Users\adzuki\Desktop\xinke-ruoyi\build\live-customer-opener\XinkeLiveCustomerOpener.exe

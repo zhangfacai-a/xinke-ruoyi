@@ -55,6 +55,7 @@ public interface AudienceRankMapper
     List<AudienceVisitRecord> selectFollowupVisits(String secUid);
     AudienceFollowup selectFollowupById(Long followupId);
     AudienceFollowup selectFollowupByUid(@Param("secUid") String secUid);
+    List<AudienceFollowup> selectFollowupsByUids(@Param("secUids") List<String> secUids);
     AudienceFollowup selectFollowupByOrderNo(@Param("orderNo") String orderNo,
                                               @Param("excludeFollowupId") Long excludeFollowupId);
     List<AudienceFollowupLog> selectFollowupLogs(Long followupId);
@@ -65,6 +66,7 @@ public interface AudienceRankMapper
     AudienceOpportunity selectCurrentOpportunity(Long followupId);
     List<AudienceOpportunity> selectOpportunities(Long followupId);
     int insertOpportunity(AudienceOpportunity opportunity);
+    int insertMissingInitialOpportunities(@Param("secUids") List<String> secUids);
     int updateOpportunity(AudienceOpportunity opportunity);
     int closeCurrentOpportunities(Long followupId);
     List<AudienceCustomerOrder> selectCustomerOrders(Long followupId);

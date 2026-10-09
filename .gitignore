@@ -47,6 +47,10 @@ nbdist/
 !xinke-ui/.env.production
 !xinke-ui/.env.staging
 /config/application-local.yml
+/config/live-metrics.local.yml
+/chrome-extensions/jinritemai-live-metrics/.env*
+/chrome-extensions/jinritemai-live-metrics/dist/
+.codex-tmp/live-crm-v2-private.key
 
 ######################################################################
 # Frontend

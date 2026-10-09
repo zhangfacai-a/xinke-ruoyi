@@ -44,7 +44,8 @@
             pay_amount decimal(12,2) path '$.payAmount',
             product_cost decimal(12,2) path '$.productCost'
         )) jt
-        where date(o.pay_time) = date(#{dt})
+        where o.pay_time &gt;= date(#{dt})
+          and o.pay_time &lt; date_add(date(#{dt}), interval 1 day)
     </insert>
 
     <insert id="rebuildDwsFinanceDayProfit">

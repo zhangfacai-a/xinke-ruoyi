@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.livecrm.mapper.LiveCrmCenterMapper">
+
+  <!-- One compact activity row per customer. Comments qualify immediately;
+       passive viewers qualify only after five minutes in the same session. -->
+  <sql id="activityCtes">
+    with qualified_presence as (
+      select e.customer_id customerId,e.session_id sessionId,
+        min(coalesce(from_unixtime(cast(json_unquote(json_extract(e.payload_json,'$.firstSeenAt')) as unsigned)/1000),e.occurred_at)) firstAt,
+        max(e.occurred_at) activityAt,
+        greatest(max(cast(json_unquote(json_extract(e.payload_json,'$.watchSeconds')) as unsigned)),300) watchSeconds
+      from dy_audience_v2_ingest_batch b
+      straight_join dy_audience_v2_interaction_event e force index (idx_av2_event_batch)
+        on e.ingest_batch_id=b.id
+      join dy_audience_v2_live_session s on s.id=e.session_id
+      where cast(substring_index(b.plugin_version,'.',1) as unsigned)&gt;=3
+        and e.event_type='VIEWER' and e.occurred_at&gt;=#{beginAt} and e.occurred_at&lt;#{endAt}
+        and json_valid(e.payload_json)
+        and cast(json_unquote(json_extract(e.payload_json,'$.watchSeconds')) as unsigned)&gt;=300
+        <if test="roomNameKey!=null">and s.room_name_key=#{roomNameKey}</if>
+      group by e.customer_id,e.session_id
+    ),
+    activity_rows as (
+      select e.customer_id customerId,e.session_id sessionId,e.occurred_at firstAt,e.occurred_at activityAt,
+        1 commentCount,0 watchSeconds,e.id commentEventId
+      from dy_audience_v2_interaction_event e
+      join dy_audience_v2_live_session s on s.id=e.session_id
+      where e.event_type='COMMENT' and e.occurred_at&gt;=#{beginAt} and e.occurred_at&lt;#{endAt}
+        <if test="roomNameKey!=null">and s.room_name_key=#{roomNameKey}</if>
+      union all
+      select p.customerId,p.sessionId,p.firstAt,p.activityAt,
+        0 commentCount,least(p.watchSeconds,21600) watchSeconds,null commentEventId
+      from qualified_presence p
+    ),
+    activity as (
+      select customerId,
+        cast(substring_index(group_concat(sessionId order by activityAt desc separator ','),',',1) as unsigned) sessionId,
+        min(firstAt) firstInteractionAt,max(activityAt) lastInteractionAt,
+        sum(commentCount) commentCount,count(distinct sessionId) visitCount,sum(watchSeconds) watchSeconds,
+        cast(substring_index(group_concat(commentEventId order by activityAt desc,commentEventId desc separator ','),',',1) as unsigned) lastCommentId
+      from activity_rows group by customerId
+    ),
+    latest_opportunity as (
+      select ranked.* from (
+        select o.*,row_number() over(partition by o.customer_id order by o.id desc) rowNo
+        from dy_audience_v2_opportunity o
+      ) ranked where ranked.rowNo=1
+    ),
+    latest_task as (
+      select ranked.* from (
+        select t.*,row_number() over(partition by o.customer_id order by t.id desc) rowNo,o.customer_id
+        from dy_audience_v2_followup_task t
+        join dy_audience_v2_opportunity o on o.id=t.opportunity_id
+        where t.status not in ('DONE','RELEASED')
+      ) ranked where ranked.rowNo=1
+    ),
+    latest_order as (
+      select ranked.* from (
+        select ol.*,row_number() over(partition by ol.customer_id order by ol.id desc) rowNo
+        from dy_audience_v2_order_link ol
+      ) ranked where ranked.rowNo=1
+    )
+  </sql>
+
+  <sql id="centerColumns">
+    c.id customerId,c.display_name nickname,c.douyin_account douyinAccount,c.phone,c.wechat,
+    (select i.sec_uid from dy_audience_v2_identity i
+      where i.customer_id=c.id and i.sec_uid is not null and i.sec_uid!='' and i.sec_uid not like 'dom:%'
+      order by i.last_seen_at desc,i.id desc limit 1) secUid,
+    coalesce(o.consult_stage,c.consult_stage) stage,c.interaction_status interactionStatus,c.fan_status fanStatus,
+    coalesce(o.owner_user_id,c.owner_user_id) ownerUserId,coalesce(o.owner_name,c.owner_name) ownerName,
+    a.sessionId,a.firstInteractionAt,a.lastInteractionAt,a.commentCount,a.lastCommentId,a.visitCount,a.watchSeconds,
+    s.room_name roomName,s.live_date liveDate,o.id opportunityId,o.special_mark specialMark,
+    o.controller_user_id controllerUserId,o.controller_name controllerName,
+    coalesce(o.controller_first_followup_at,o.first_followed_at) controllerFirstFollowupAt,
+    coalesce(o.controller_first_followup_user_id,o.controller_user_id,o.owner_user_id) controllerFirstFollowupUserId,
+    coalesce(o.controller_first_followup_name,o.controller_name,o.owner_name) controllerFirstFollowupName,
+    t.id taskId,t.task_type taskType,t.task_date taskDate,
+    case when t.status='PENDING' and t.task_date&lt;current_date then 'OVERDUE' else t.status end taskStatus,
+    t.assignee_user_id taskAssigneeUserId,t.assignee_name taskAssigneeName,
+    ol.id orderId,ol.order_no orderNo,ol.order_status orderStatus
+  </sql>
+
+  <sql id="centerFrom">
+    from activity a
+    join dy_audience_v2_customer c on c.id=a.customerId
+    join dy_audience_v2_live_session s on s.id=a.sessionId
+    left join latest_opportunity o on o.customer_id=c.id
+    left join latest_task t on t.customer_id=c.id
+    left join latest_order ol on ol.customer_id=c.id
+  </sql>
+
+  <sql id="centerWhere">
+    <where>
+      <if test="queue=='INBOX'">coalesce(o.owner_user_id,c.owner_user_id) is null</if>
+      <if test="queue=='FOLLOWUP'">coalesce(o.owner_user_id,c.owner_user_id) is not null</if>
+      <if test="commentedOnly">and a.commentCount&gt;0</if>
+      <if test="stage!=null">and coalesce(o.consult_stage,c.consult_stage)=#{stage}</if>
+      <if test="keyword!=null">
+        and (c.display_name like concat('%',#{keyword},'%')
+          or c.douyin_account like concat('%',#{keyword},'%')
+          or c.phone like concat('%',#{keyword},'%')
+          or c.wechat like concat('%',#{keyword},'%')
+          or exists (
+            select 1 from dy_audience_v2_interaction_event ke
+            join dy_audience_v2_live_session ks on ks.id=ke.session_id
+            where ke.customer_id=c.id and ke.event_type='COMMENT'
+              and ke.occurred_at&gt;=#{beginAt} and ke.occurred_at&lt;#{endAt}
+              and ke.content like concat('%',#{keyword},'%')
+              <if test="roomNameKey!=null">and ks.room_name_key=#{roomNameKey}</if>
+          ))
+      </if>
+    </where>
+  </sql>
+
+  <select id="listCustomers" resultType="map">
+    <include refid="activityCtes"/>
+    select /*+ MAX_EXECUTION_TIME(5000) */ count(*) over() totalCount,<include refid="centerColumns"/>
+    <include refid="centerFrom"/>
+    <include refid="centerWhere"/>
+    order by a.lastInteractionAt desc,c.id desc limit #{offset},#{limit}
+  </select>
+
+  <select id="listCommentContents" resultType="map">
+    select id,content from dy_audience_v2_interaction_event
+    where id in
+    <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+  </select>
+
+  <select id="dashboard" resultType="map">
+    <include refid="activityCtes"/>
+    select /*+ MAX_EXECUTION_TIME(5000) */ count(*) validCustomers,
+      sum(a.commentCount&gt;0) commentedCustomers,
+      sum(a.commentCount=0 and a.watchSeconds&gt;=300) viewerCustomers,
+      sum(coalesce(o.owner_user_id,c.owner_user_id) is null) unclaimed,
+      sum(coalesce(o.owner_user_id,c.owner_user_id) is not null) claimed,
+      sum(a.commentCount&gt;0 and coalesce(o.owner_user_id,c.owner_user_id) is null) unclaimedCommented,
+      sum(a.commentCount&gt;0 and coalesce(o.owner_user_id,c.owner_user_id) is not null) claimedCommented,
+      sum(coalesce(o.consult_stage,c.consult_stage)='CONSULTING') consulting,
+      sum(coalesce(o.consult_stage,c.consult_stage)='ORDERED' or ol.id is not null) ordered,
+      sum(coalesce(o.controller_first_followup_at,o.first_followed_at) is not null) controllerFollowed,
+      round(avg(case when coalesce(o.controller_first_followup_at,o.first_followed_at)&gt;=a.firstInteractionAt
+        then timestampdiff(minute,a.firstInteractionAt,coalesce(o.controller_first_followup_at,o.first_followed_at)) end),1) avgFirstResponseMinutes
+    <include refid="centerFrom"/>
+  </select>
+
+  <select id="ownerRanking" resultType="map">
+    <include refid="activityCtes"/>
+    select coalesce(o.owner_user_id,c.owner_user_id) ownerUserId,
+      coalesce(o.owner_name,c.owner_name,'待领取') ownerName,count(*) customerCount,
+      sum(a.commentCount&gt;0) commentedCount,
+      sum(coalesce(o.consult_stage,c.consult_stage)='CONSULTING') consultingCount,
+      sum(coalesce(o.consult_stage,c.consult_stage)='ORDERED' or ol.id is not null) orderedCount
+    <include refid="centerFrom"/>
+    where coalesce(o.owner_user_id,c.owner_user_id) is not null
+    group by coalesce(o.owner_user_id,c.owner_user_id),coalesce(o.owner_name,c.owner_name,'待领取')
+    order by orderedCount desc,customerCount desc limit 50
+  </select>
+
+  <select id="roomStats" resultType="map">
+    with commented_customer as (
+      select s.room_name_key roomNameKey,s.room_name roomName,e.customer_id customerId,
+        count(*) commentCount,max(e.occurred_at) lastReportedAt
+      from dy_audience_v2_interaction_event e
+      join dy_audience_v2_live_session s on s.id=e.session_id
+      where e.event_type='COMMENT' and e.occurred_at&gt;=#{beginAt} and e.occurred_at&lt;#{endAt}
+        <if test="roomNameKey!=null">and s.room_name_key=#{roomNameKey}</if>
+      group by s.room_name_key,s.room_name,e.customer_id
+    ), latest_opportunity as (
+      select ranked.* from (
+        select o.*,row_number() over(partition by o.customer_id order by o.id desc) rowNo
+        from dy_audience_v2_opportunity o
+      ) ranked where ranked.rowNo=1
+    )
+    select cc.roomName,count(*) reportedCustomers,sum(cc.commentCount) uploadedComments,
+      sum(coalesce(o.owner_user_id,c.owner_user_id) is not null) claimedCustomers,
+      sum(coalesce(o.owner_user_id,c.owner_user_id) is null) unclaimedCustomers,
+      max(cc.lastReportedAt) lastReportedAt
+    from commented_customer cc
+    join dy_audience_v2_customer c on c.id=cc.customerId
+    left join latest_opportunity o on o.customer_id=c.id
+    group by cc.roomNameKey,cc.roomName
+    order by reportedCustomers desc,lastReportedAt desc
+  </select>
+
+  <select id="exportCustomers" resultType="map">
+    <include refid="activityCtes"/>
+    select /*+ MAX_EXECUTION_TIME(10000) */ <include refid="centerColumns"/>,lc.content lastComment
+    <include refid="centerFrom"/>
+    left join dy_audience_v2_interaction_event lc on lc.id=a.lastCommentId
+    <include refid="centerWhere"/>
+    order by a.lastInteractionAt desc,c.id desc limit #{limit}
+  </select>
+</mapper>

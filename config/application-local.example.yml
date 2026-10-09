@@ -15,6 +15,34 @@ spring:
       password: 替换为本地Redis密码
 
 live:
+  audience-v2:
+    enabled: true
+    write-mode: active
+    plugin-min-version: 2.4.0
+    # 每天扫描三天未成交或场控未标记的商机，创建电话客服任务。
+    handoff-cron: 0 15 0 * * ?
+  crm:
+    v2:
+      encryption:
+        enabled: true
+        # 灰度期间允许旧插件明文；确认 2.4.0 全量后改为 false。
+        allow-plaintext: true
+        private-key-v3: ${LIVE_CRM_V2_RSA_PRIVATE_KEY_V3:}
+      # 新版插件远程版本检查；修改 latest-version 后插件会提示更新。
+      latest-version: 2.4.0
+      plugin-min-version: 2.4.0
+      update-url: ''
+      update-sha256: ''
+  cos:
+    enabled: true
+    region: ap-shanghai
+    bucket: img-1318762153
+    # 请填写腾讯云密钥；不要提交 application-local.yml。
+    secret-id: ''
+    secret-key: ''
+    presign-seconds: 300
+    download-seconds: 300
+    max-file-size: 10485760
   audience-rank:
     # 固定上传密钥，与插件 config.js 保持一致。
     upload-key: 26fac28f8fd697cf7a2701f3e6401947d8fe22eb26028a6f925f6effbf9dfe98

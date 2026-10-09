@@ -7,6 +7,7 @@ export const saveShop = data => request({ url: '/live/gift/shop', method: 'post'
 export const listRooms = params => request({ url: '/live/gift/room', method: 'get', params })
 export const getRoom = id => request({ url: `/live/gift/room/${id}`, method: 'get' })
 export const saveRoom = data => request({ url: '/live/gift/room', method: 'post', data })
+export const deleteRoom = id => request({ url: `/live/gift/room/${id}`, method: 'delete' })
 export const listMappings = params => request({ url: '/live/gift/mapping', method: 'get', params })
 export const saveMapping = data => request({ url: '/live/gift/mapping', method: 'post', data })
 export const listTemplates = () => request({ url: '/live/gift/template', method: 'get' })

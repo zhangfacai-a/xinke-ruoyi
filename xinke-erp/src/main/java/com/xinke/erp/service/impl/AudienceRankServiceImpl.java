@@ -609,10 +609,15 @@ public class AudienceRankServiceImpl implements IAudienceRankService
                 : mapper.selectFollowupAssignees(batch.getRoomId(), "anchor");
         List<Map<String, Object>> controllers = batch.getRoomId() == null ? List.of()
                 : mapper.selectFollowupAssignees(batch.getRoomId(), "controller");
+        List<String> secUids = snapshots.stream().map(AudienceRankSnapshot::getSecUid)
+                .filter(Objects::nonNull).distinct().toList();
+        List<AudienceFollowup> previousRows = secUids.isEmpty() ? List.of() : mapper.selectFollowupsByUids(secUids);
+        if (previousRows != null)
+        {
+            for (AudienceFollowup previous : previousRows) previousByUid.put(previous.getSecUid(), previous);
+        }
         for (AudienceRankSnapshot snapshot : snapshots)
         {
-            AudienceFollowup previous = mapper.selectFollowupByUid(snapshot.getSecUid());
-            if (previous != null) previousByUid.put(snapshot.getSecUid(), previous);
             AudienceFollowup value = new AudienceFollowup();
             value.setRoomScopeKey(batch.getRoomScopeKey());
             value.setRoomId(batch.getRoomId());
@@ -641,6 +646,13 @@ public class AudienceRankServiceImpl implements IAudienceRankService
             values.add(value);
         }
         if (!values.isEmpty()) mapper.insertFollowups(values);
+        List<AudienceFollowup> persistedRows = secUids.isEmpty() ? List.of() : mapper.selectFollowupsByUids(secUids);
+        enrichFollowupStats(persistedRows);
+        Map<String, AudienceFollowup> persistedByUid = new LinkedHashMap<>();
+        if (persistedRows != null)
+        {
+            for (AudienceFollowup persisted : persistedRows) persistedByUid.put(persisted.getSecUid(), persisted);
+        }
         for (AudienceFollowup value : values)
         {
             AudienceFollowup previous = previousByUid.get(value.getSecUid());
@@ -650,11 +662,9 @@ public class AudienceRankServiceImpl implements IAudienceRankService
             {
                 mapper.markReactivationPending(previous.getFollowupId(), value.getLastSeenAt());
             }
-            mapper.refreshFollowupSource(value);
-            AudienceFollowup persisted = mapper.selectFollowupByUid(value.getSecUid());
+            AudienceFollowup persisted = persistedByUid.get(value.getSecUid());
             if (persisted != null)
             {
-                enrichFollowupStats(List.of(persisted));
                 if ("OBSERVING".equals(persisted.getStatus()))
                 {
                     String reason = qualificationReason(persisted, qualificationRule);
@@ -671,14 +681,16 @@ public class AudienceRankServiceImpl implements IAudienceRankService
                             insertLog(persisted.getFollowupId(), "QUALIFY", persisted, promoted, null,
                                     "命中进客规则：" + reason, null, persisted.getStatus(), promoted.getStatus(),
                                     null, null, "系统");
-                            persisted = mapper.selectFollowupByUid(value.getSecUid());
+                            promoted.setVersion(persisted.getVersion() == null ? null : persisted.getVersion() + 1);
+                            persisted = promoted;
                         }
                     }
                 }
-                ensureInitialOpportunity(persisted);
             }
             boolean roomChanged = previous != null && !Objects.equals(previous.getRoomId(), value.getRoomId());
-            if (persisted != null && (roomChanged || (persisted.getAnchorUserId() == null && persisted.getControllerUserId() == null)))
+            boolean hasDefaultAssignment = value.getAnchorUserId() != null || value.getControllerUserId() != null;
+            if (persisted != null && hasDefaultAssignment
+                    && (roomChanged || (persisted.getAnchorUserId() == null && persisted.getControllerUserId() == null)))
             {
                 AudienceFollowup assignment = copyFollowup(persisted);
                 assignment.setAnchorUserId(value.getAnchorUserId());
@@ -690,6 +702,7 @@ public class AudienceRankServiceImpl implements IAudienceRankService
                 mapper.updateFollowup(assignment);
             }
         }
+        if (!secUids.isEmpty()) mapper.insertMissingInitialOpportunities(secUids);
         if (batch.getRoomId() != null) autoAssignRoom(batch.getRoomId(), null, "系统");
     }
 

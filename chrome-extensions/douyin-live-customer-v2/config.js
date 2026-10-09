@@ -1,0 +1,16 @@
+// Online ERP endpoint. Employees do not need to enter any configuration.
+export const CONFIG = Object.freeze({
+  // 统一经过 Nginx 入口，不再让每台插件直接占用后端 8080 端口。
+  apiBase: 'http://47.116.62.234/prod-api',
+  versionUrl: 'http://47.116.62.234/prod-api/open-api/v2/live/plugin/version',
+  uploadKey: 'LIVE_CUSTOMER_V2_LOCAL_KEY',
+  edition: 'LIVE_CUSTOMER_V2',
+  protocolVersion: 2,
+  pluginVersion: '3.0.0',
+  // 仅内置服务端公钥；每次上传使用随机 AES-GCM 密钥，服务端私钥解密。
+  // 公钥为 SubjectPublicKeyInfo(DER) 的 Base64 文本，不是可用于登录的密钥。
+  encryptionPublicKey: 'MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA0ZS8gV2byO01Q5nAUfx/+vhPmRdKWq52l2UxrG6lZ8BEzdpaQXRMTn8fjXZAL8zll5GV7QGMjlcXsC42Nj4zH90R7mqUktrNBbHBowdMdpyTQlbXKZLeag6JNEnYnjP4sHEHyHT+OXmpCOkx6dMtfRP7Ad0sFbOZdR6q4VWUZkc09KyejSe8u38xnBj/cAF8MUJH/i7CqIZgOHVpzjFhhqbAs3qbeDszL4MBOvmwM94NX3Km/k/sUzmJWxFRLKiEJQJgYI2uReqpuwrWjtZokskTNQioOsZCdyHDldQqaObCS18/8rS7/oIHAxmTnbZL+LV4Fw/YVPmZCc/NMO3Gp/ar3oCRVIvZjaLWO7d/lUE7y7GGuxED0YIq4T27dXdadlLsfKvoB6s3m5WDcd9cH/lgWSS5AKPc4Gk+jRIFj9ZcpPXzPU639zjVVhmCZk6ojyoewgm6S5/Th+Zzw9SntomffwPAMexdUA8Jw6NskJL/gjXrQKkRku1XDjeUHps5AgMBAAE=',
+  encryptionPublicKeyV2: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxP/uxxHFZuM4a2tMCxvBT22DUPBxzMD0Cbci9zfCg8oN0Eu8GOjZusMQUjBv9K8O6mkSqabQ6pG5am6IO4B78h7ImszDQDGoZhxgUaqypqHA6Y5ZOeD+w0MbJaeY2QL4i3E/gPSOPd/lPWPUofcPiPsmnk7w47Pl1w0XAx2o/zkS4CkSLvQdinO52CAPNEeRRj7kg/yhctxxgdhEOPCPcOuwGLhMWX63/WpRX5k/v8+8JcAfuk15fgNeyHiSniCpJRlzFhUVs5xCRbUa+nnTZpSNzrUVRjBLRA+orN2syuknzMh6tJ+/UhimTDAj/ZabBB+5bVmhFJDGi85UG/6knQIDAQAB',
+  encryptionPublicKeyV3: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnjW/4+CL2sM/2uI7qO+SkHgRsvBRUhHhD0T94qAi1W36BOyJBfFkTE6mu+wkNdpjaZ8Dx1RU0cuiOIN6NUChlyI+T/kCDE7OlDHOu3EWEuEafSjrUltUdfr7ivcTuQ8j1DI+q0wC/vyBuRx67VHJL8LJbMIodNC+jgSK75NDGJ2O6pLP1PSVV5bpNqnqzHmkU2lpiCWQKxHTUhH5Q1eLooy6KkIsaKU1T58H3f+eWijVWsDuaXu+yaZDiyVqwY51ZDBVERDPkV0MzS958zDlFmSLzUTLx6h1WDNvrpxzlHmds0PU8S8iOG4iXW3ofI/m+AHHTr0dRrKzEPXEommH+QIDAQAB',
+  encryptionPublicKeyV4: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0PYmMO+D953oLdVNR7qayoh7RXTqmhcnyoh5umwFboTMgiXwSQ6p1+NsXo7XlDbDr7X9D90Msa2GJAmOwMzFZs+8JEyVU84p4J/X/pRrT5VrcWclIdEbU0fGNyFU5CVNpomIkSqKpszyWt/IWNQlDo6+inSTf4n9kvQfQNTEexV3zvNVzcIstR/IaQzoY4oCBQeFJmj96VGE4kZXPJ85nzgRvhzvzW625xmGtta0k08Zjdgz8XDaktCM6yX58GFxnP7s91xwPU6UN9/z4P7sBMZ10RINF1m/T/IZxDbyPhovUmw6RaU1vyw3kPPUU2AwjWLvFl0u4sl9EUfnmMAP7QIDAQAB'
+});

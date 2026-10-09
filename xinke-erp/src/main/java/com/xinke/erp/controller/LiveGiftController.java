@@ -18,38 +18,43 @@ import com.xinke.erp.domain.LiveGiftCostImportRow;
 import com.xinke.erp.domain.LiveGiftLedgerExport;
 import com.xinke.erp.domain.LiveGiftSaveRequest;
 import com.xinke.erp.service.ILiveGiftService;
+import com.xinke.erp.livecrm.service.LiveCrmService;
 
 @RestController
 @RequestMapping("/live/gift")
 public class LiveGiftController extends BaseController
 {
     @Autowired private ILiveGiftService service;
+    @Autowired private LiveCrmService liveCrmService;
 
-    @GetMapping("/staff") @PreAuthorize("@ss.hasAnyPermi('live:gift:room,live:gift:mapping,live:gift:admin,live:gift:template,live:gift:entry')")
+    @GetMapping("/staff") @PreAuthorize("isAuthenticated()")
     public AjaxResult staff(@RequestParam Map<String,Object> q){return success(service.listLiveUserOptions(q));}
     @PostMapping("/staff/sync") @PreAuthorize("@ss.hasPermi('system:user:add')")
     @Log(title="同步钉钉系统用户",businessType=BusinessType.IMPORT)
     public AjaxResult sync(){return success(service.syncDingTalk(getUsername()));}
-    @GetMapping("/shop-options") @PreAuthorize("@ss.hasAnyPermi('live:gift:room,live:gift:mapping,live:gift:entry')")
+    @GetMapping("/shop-options") @PreAuthorize("isAuthenticated()")
     public AjaxResult shopOptions(){return success(service.listShopOptions());}
 
-    @GetMapping("/shop") @PreAuthorize("@ss.hasAnyPermi('live:gift:room,live:gift:mapping')")
+    @GetMapping("/shop") @PreAuthorize("isAuthenticated()")
     public AjaxResult shops(@RequestParam Map<String,Object> q){return success(service.listShops(q));}
-    @GetMapping("/shop/{id}") @PreAuthorize("@ss.hasPermi('live:gift:room')")
+    @GetMapping("/shop/{id}") @PreAuthorize("isAuthenticated()")
     public AjaxResult shop(@PathVariable Long id){return success(service.getShop(id));}
-    @PostMapping("/shop") @PreAuthorize("@ss.hasPermi('live:gift:room')")
+    @PostMapping("/shop") @PreAuthorize("isAuthenticated()")
     public AjaxResult shopSave(@RequestBody Map<String,Object> value){service.saveShop(value,getUsername());return success(value);}
 
-    @GetMapping("/room") @PreAuthorize("@ss.hasAnyPermi('live:gift:room,live:gift:mapping')")
+    @GetMapping("/room") @PreAuthorize("isAuthenticated()")
     public AjaxResult rooms(@RequestParam Map<String,Object> q){return success(service.listRooms(q));}
-    @GetMapping("/room/{id}") @PreAuthorize("@ss.hasPermi('live:gift:room')")
+    @GetMapping("/room/{id}") @PreAuthorize("isAuthenticated()")
     public AjaxResult room(@PathVariable Long id){return success(service.getRoom(id));}
-    @PostMapping("/room") @PreAuthorize("@ss.hasPermi('live:gift:room')")
+    @PostMapping("/room") @PreAuthorize("isAuthenticated()")
     public AjaxResult roomSave(@RequestBody Map<String,Object> value){service.saveRoom(value,getUsername());return success(value);}
+    @DeleteMapping("/room/{id}") @PreAuthorize("isAuthenticated()")
+    @Log(title="删除直播间及客户记录",businessType=BusinessType.DELETE)
+    public AjaxResult roomDelete(@PathVariable Long id){liveCrmService.deleteRoom(id);return success();}
 
-    @GetMapping("/mapping") @PreAuthorize("@ss.hasAnyPermi('live:gift:room,live:gift:mapping,live:gift:template,live:gift:entry')")
+    @GetMapping("/mapping") @PreAuthorize("isAuthenticated()")
     public AjaxResult mappings(@RequestParam Map<String,Object> q){return success(service.listSubjectMappings(q));}
-    @PostMapping("/mapping") @PreAuthorize("@ss.hasPermi('live:gift:mapping')")
+    @PostMapping("/mapping") @PreAuthorize("isAuthenticated()")
     public AjaxResult mappingSave(@RequestBody Map<String,Object> value){service.saveSubjectMapping(value,getUsername());return success();}
 
     @GetMapping("/template") @PreAuthorize("@ss.hasAnyPermi('live:gift:template,live:gift:entry')")
@@ -115,6 +120,7 @@ public class LiveGiftController extends BaseController
     @Log(title="导出礼品记录",businessType=BusinessType.EXPORT)
     public void export(HttpServletResponse response,@RequestParam Map<String,Object> q)
     {
+        q.put("limit", 10000);
         List<LiveGiftLedgerExport> rows=service.ledger(q).stream().map(LiveGiftLedgerExport::from).toList();
         new ExcelUtil<>(LiveGiftLedgerExport.class).exportExcel(response,rows,"订单礼品记录");
     }
