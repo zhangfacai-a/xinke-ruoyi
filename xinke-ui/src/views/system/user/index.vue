@@ -216,7 +216,7 @@ const dingSyncing = ref(false)
 const personnelDrawer = ref(null)
 const reconciling = ref(false)
 async function reconcileAccess(){await proxy.$modal.confirm('按当前有效业务分配核对自动权限，保留人工角色与历史订单。确认执行？');reconciling.value=true;try{await reconcilePersonnel();proxy.$modal.msgSuccess('自动权限已核对');await getList()}finally{reconciling.value=false}}
-const businessRoleNames=value=>String(value||'').split(',').filter(Boolean).map(code=>({anchor:'主播',controller:'场控',operator:'运营',customer_service:'电话客服',customer_admin:'客服管理员'}[code]||code)).join('、')||'未配置' 
+const businessRoleNames=value=>String(value||'').split(',').filter(Boolean).map(code=>({anchor:'主播',controller:'场控',operator:'运营',customer_service:'电话客服',customer_admin:'客服管理员'}[code]||code)).join('、')||'未配置'
 const showSearch = ref(true)
 const ids = ref([])
 const single = ref(true)
