@@ -8,7 +8,7 @@
 
 代码生成器仅开发环境需要时用 Maven `-Pdev-tools` 引入。主站发布包含客户、挽单、运费、礼品、主播和 App 版本管理；桌面 App 的本地界面仍独立构建。
 
-真实配置放在被忽略的 `config/local/application-local.yml`；服务器使用 `/home/deploy/xinke-config/application-private.yml`，权限 0600，或通过 `XINKE_PRIVATE_CONFIG` 指定其他路径。系统环境变量继续生效。TOKEN_SECRET 必须提供，数据库/Redis/钉钉/COS 凭据不进入版本库。
+真实配置放在被忽略的 `config/local/application-local.yml`；服务器使用 `/home/deploy/xinke-config/application-private.yml`，权限 0600，或通过 `XINKE_PRIVATE_CONFIG` 指定其他路径。私有文件只在 `application-druid.yml` 导入一次，避免根配置先导入后被 profile 默认值覆盖。系统环境变量继续生效。TOKEN_SECRET 必须提供，数据库/Redis/钉钉/COS 凭据不进入版本库。
 
 本次在原值不变的情况下将线上内嵌配置外置。`prepare_website_runtime.py --current-jar <线上备份.jar>` 只在目标私有配置不存在时写入，不打印秘密，不覆盖已有配置。此步骤不是凭据轮换；如果历史提交曾公开包含真实凭据，需在独立维护窗口轮换并核对服务，不能因当前提交移除了秘密就认为历史已清除。
 

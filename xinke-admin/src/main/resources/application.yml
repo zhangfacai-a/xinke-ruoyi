@@ -55,9 +55,7 @@ user:
 
 # Spring配置
 spring:
-  config:
-    # Local private settings (COS credentials, etc.). Missing in production is allowed.
-    import: optional:file:./config/local/application-local.yml,optional:file:${XINKE_PRIVATE_CONFIG:/home/deploy/xinke-config/application-private.yml}
+  # Private settings are imported once by application-druid.yml, after profile defaults.
   # 资源信息
   messages:
     # 国际化资源文件路径
