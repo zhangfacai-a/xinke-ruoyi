@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.BiLiveAnchorMapper">
+  <sql id="factColumns">segment_id,session_id,platform_session_id,business_date,room_id,room_name,anchor_user_id,anchor_name,session_live_start_at,segment_start_at,segment_end_at,duration_seconds,watch_count,interaction_count,new_fan_count,deal_count,gmv_amount,ad_cost_amount,presale_order_count,exposure_count_est,exposure_watch_rate,watch_follow_rate,watch_interaction_rate,watch_deal_rate,source_type,precision_status,quality_status,quality_flags,source_version,source_created_at,source_updated_at,synced_at,is_deleted,row_hash</sql>
+  <sql id="factSelect">
+    select g.segment_id,g.session_id,s.platform_session_id,date(s.live_start_time),g.room_id,
+    coalesce(r.room_name,s.reported_room_name),g.anchor_user_id,coalesce(u.nick_name,concat('用户#',g.anchor_user_id)),
+    s.live_start_time,g.start_time,g.end_time,greatest(timestampdiff(second,g.start_time,g.end_time),0),
+    coalesce(g.watch_delta,0),coalesce(g.interaction_delta,0),coalesce(g.new_fan_delta,0),
+    coalesce(g.deal_delta,0),coalesce(g.gmv_delta,0),coalesce(g.ad_cost_delta,0),coalesce(g.presale_order_delta,0),
+    case when coalesce(g.watch_delta,0)=0 then 0 when coalesce(g.exposure_watch_rate,0)&gt;0 then round(g.watch_delta*100/g.exposure_watch_rate,4) else null end,
+    coalesce(g.exposure_watch_rate,0),coalesce(g.watch_follow_rate,0),coalesce(g.watch_interaction_rate,0),coalesce(g.watch_deal_rate,0),
+    g.source,g.precision_status,
+    case when g.end_time is null or g.end_time&lt;=g.start_time or g.room_id is null or g.anchor_user_id is null
+      or coalesce(g.watch_delta,0)&lt;0 or coalesce(g.interaction_delta,0)&lt;0 or coalesce(g.new_fan_delta,0)&lt;0
+      or coalesce(g.deal_delta,0)&lt;0 or coalesce(g.gmv_delta,0)&lt;0 or coalesce(g.ad_cost_delta,0)&lt;0
+      or coalesce(g.presale_order_delta,0)&lt;0 then 'INVALID'
+      when timestampdiff(hour,g.start_time,g.end_time)&gt;12 or g.precision_status&lt;&gt;'EXACT' or g.source='MANUAL'
+      or (coalesce(g.watch_delta,0)&gt;0 and coalesce(g.exposure_watch_rate,0)=0)
+      or (s.status='LIVE' and s.live_start_time&lt;now()-interval 36 hour) then 'WARNING' else 'VALID' end,
+    nullif(concat_ws(',',
+      if(g.end_time is null or g.end_time&lt;=g.start_time,'INVALID_TIME',null),if(g.room_id is null,'MISSING_ROOM',null),
+      if(g.anchor_user_id is null,'MISSING_ANCHOR',null),
+      if(coalesce(g.watch_delta,0)&lt;0 or coalesce(g.interaction_delta,0)&lt;0 or coalesce(g.new_fan_delta,0)&lt;0
+        or coalesce(g.deal_delta,0)&lt;0 or coalesce(g.gmv_delta,0)&lt;0 or coalesce(g.ad_cost_delta,0)&lt;0
+        or coalesce(g.presale_order_delta,0)&lt;0,'NEGATIVE_METRIC',null),
+      if(timestampdiff(hour,g.start_time,g.end_time)&gt;12,'LONGER_THAN_12H',null),
+      if(g.precision_status&lt;&gt;'EXACT','NON_EXACT',null),if(g.source='MANUAL','MANUAL_SOURCE',null),
+      if(coalesce(g.watch_delta,0)&gt;0 and coalesce(g.exposure_watch_rate,0)=0,'MISSING_EXPOSURE_RATE',null),
+      if(s.status='LIVE' and s.live_start_time&lt;now()-interval 36 hour,'SESSION_STALE',null)),''),
+    g.version,g.create_time,coalesce(g.update_time,g.create_time),now(),0,
+    sha2(concat_ws('|',g.segment_id,g.session_id,s.platform_session_id,g.room_id,g.anchor_user_id,
+      date_format(g.start_time,'%Y-%m-%d %H:%i:%s'),date_format(g.end_time,'%Y-%m-%d %H:%i:%s'),
+      coalesce(g.watch_delta,0),coalesce(g.interaction_delta,0),coalesce(g.new_fan_delta,0),coalesce(g.deal_delta,0),
+      coalesce(g.gmv_delta,0),coalesce(g.ad_cost_delta,0),coalesce(g.presale_order_delta,0),
+      coalesce(g.exposure_watch_rate,0),coalesce(g.watch_follow_rate,0),coalesce(g.watch_interaction_rate,0),
+      coalesce(g.watch_deal_rate,0),g.source,g.precision_status,g.version),256)
+    from live_metric_anchor_segment g join live_metric_session s on s.session_id=g.session_id
+    left join live_room r on r.room_id=g.room_id left join sys_user u on u.user_id=g.anchor_user_id
+    where g.status='CLOSED' and g.end_time is not null
+  </sql>
+  <sql id="upsertValues">
+    session_id=values(session_id),platform_session_id=values(platform_session_id),business_date=values(business_date),
+    room_id=values(room_id),room_name=values(room_name),anchor_user_id=values(anchor_user_id),anchor_name=values(anchor_name),
+    session_live_start_at=values(session_live_start_at),segment_start_at=values(segment_start_at),segment_end_at=values(segment_end_at),
+    duration_seconds=values(duration_seconds),watch_count=values(watch_count),interaction_count=values(interaction_count),
+    new_fan_count=values(new_fan_count),deal_count=values(deal_count),gmv_amount=values(gmv_amount),
+    ad_cost_amount=values(ad_cost_amount),presale_order_count=values(presale_order_count),exposure_count_est=values(exposure_count_est),
+    exposure_watch_rate=values(exposure_watch_rate),watch_follow_rate=values(watch_follow_rate),
+    watch_interaction_rate=values(watch_interaction_rate),watch_deal_rate=values(watch_deal_rate),source_type=values(source_type),
+    precision_status=values(precision_status),quality_status=values(quality_status),quality_flags=values(quality_flags),
+    source_version=values(source_version),source_created_at=values(source_created_at),source_updated_at=values(source_updated_at),
+    synced_at=now(),is_deleted=0,row_hash=values(row_hash)
+  </sql>
+  <insert id="upsertSegment">
+    insert into bi_live_anchor_segment_fact (<include refid="factColumns"/>)
+    <include refid="factSelect"/> and g.segment_id=#{segmentId}
+    on duplicate key update <include refid="upsertValues"/>
+  </insert>
+  <insert id="upsertRecentSegments">
+    insert into bi_live_anchor_segment_fact (<include refid="factColumns"/>)
+    <include refid="factSelect"/>
+    and (not exists(select 1 from bi_live_anchor_segment_fact bx where bx.segment_id=g.segment_id)
+      or exists(select 1 from bi_live_anchor_segment_fact bx where bx.segment_id=g.segment_id and (
+        bx.source_version&lt;&gt;g.version or bx.source_updated_at&lt;&gt;coalesce(g.update_time,g.create_time) or bx.is_deleted=1
+        or ((s.status='LIVE' and s.live_start_time&lt;now()-interval 36 hour) and find_in_set('SESSION_STALE',coalesce(bx.quality_flags,''))=0)
+        or ((s.status&lt;&gt;'LIVE' or s.live_start_time&gt;=now()-interval 36 hour) and find_in_set('SESSION_STALE',coalesce(bx.quality_flags,''))&gt;0)
+      )))
+    on duplicate key update <include refid="upsertValues"/>
+  </insert>
+  <update id="markDeleted">update bi_live_anchor_segment_fact set is_deleted=1,synced_at=now() where segment_id=#{segmentId} and is_deleted=0</update>
+  <update id="markMissingDeleted">
+    update bi_live_anchor_segment_fact b left join live_metric_anchor_segment g on g.segment_id=b.segment_id
+    set b.is_deleted=1,b.synced_at=now() where (g.segment_id is null or g.status&lt;&gt;'CLOSED') and b.is_deleted=0
+  </update>
+  <select id="reconcile" resultType="java.util.LinkedHashMap">
+    select source_count sourceCount,bi_count biCount,source_duration sourceDuration,bi_duration biDuration,
+      source_watch sourceWatch,bi_watch biWatch,source_interaction sourceInteraction,bi_interaction biInteraction,
+      source_new_fan sourceNewFan,bi_new_fan biNewFan,source_deal sourceDeal,bi_deal biDeal,
+      source_gmv sourceGmv,bi_gmv biGmv,source_cost sourceCost,bi_cost biCost,
+      source_presale sourcePresale,bi_presale biPresale,
+      (source_count=bi_count and source_duration=bi_duration and source_watch=bi_watch
+       and source_interaction=bi_interaction and source_new_fan=bi_new_fan and source_deal=bi_deal
+       and source_gmv=bi_gmv and source_cost=bi_cost and source_presale=bi_presale) matched
+    from (select count(*) source_count,
+      coalesce(sum(greatest(timestampdiff(second,start_time,end_time),0)),0) source_duration,
+      coalesce(sum(watch_delta),0) source_watch,coalesce(sum(interaction_delta),0) source_interaction,
+      coalesce(sum(new_fan_delta),0) source_new_fan,coalesce(sum(deal_delta),0) source_deal,
+      coalesce(sum(gmv_delta),0) source_gmv,coalesce(sum(ad_cost_delta),0) source_cost,
+      coalesce(sum(presale_order_delta),0) source_presale
+      from live_metric_anchor_segment where status='CLOSED' and end_time is not null) s
+    cross join (select count(*) bi_count,coalesce(sum(duration_seconds),0) bi_duration,
+      coalesce(sum(watch_count),0) bi_watch,coalesce(sum(interaction_count),0) bi_interaction,
+      coalesce(sum(new_fan_count),0) bi_new_fan,coalesce(sum(deal_count),0) bi_deal,
+      coalesce(sum(gmv_amount),0) bi_gmv,coalesce(sum(ad_cost_amount),0) bi_cost,
+      coalesce(sum(presale_order_count),0) bi_presale
+      from bi_live_anchor_segment_fact where is_deleted=0) b
+  </select>
+</mapper>

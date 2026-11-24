@@ -1,0 +1,16 @@
+[Unit]
+Description=XinKe blue-green backend (%i)
+After=network.target mysql.service redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/ruoyi
+EnvironmentFile=/etc/xinke-bluegreen/%i.env
+ExecStart=/usr/bin/java -Xms128m -Xmx512m -jar /ruoyi/bg-slots/%i/xinke-admin.jar --server.port=${XINKE_PORT} --live.scheduling.active-port-file=/ruoyi/active-port
+Restart=always
+RestartSec=5
+TimeoutStopSec=150
+
+[Install]
+WantedBy=multi-user.target

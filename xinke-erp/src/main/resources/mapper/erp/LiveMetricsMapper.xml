@@ -1,94 +1,87 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xinke.erp.mapper.LiveMetricsMapper">
-  <sql id="shiftCols">s.shift_id shiftId,s.live_date liveDate,s.room_id roomId,r.room_name roomName,s.anchor_user_id anchorUserId,u.nick_name anchorName,s.start_time startTime,s.end_time endTime,s.remind_at remindAt,s.status,s.ding_user_id dingUserId,s.remark</sql>
-
-  <select id="listShifts" resultType="java.util.LinkedHashMap">
-    select <include refid="shiftCols"/>,x.submission_id submissionId,x.submitted_at submittedAt,
-      x.exposure_delta exposureDelta,x.watch_delta watchDelta,x.interaction_delta interactionDelta,
-      x.new_fan_delta newFanDelta,x.deal_delta dealDelta
-    from live_metric_shift s
-    join live_room r on r.room_id=s.room_id
-    join sys_user u on u.user_id=s.anchor_user_id
-    left join live_metric_submission x on x.submission_id=(
-      select max(latest.submission_id) from live_metric_submission latest
-      where latest.shift_id=s.shift_id and latest.status='CONFIRMED' and latest.is_effective=1
-    )
-    <where><if test="beginDate!=null and beginDate!=''">and s.live_date&gt;=#{beginDate}</if><if test="endDate!=null and endDate!=''">and s.live_date&lt;=#{endDate}</if><if test="roomId!=null and roomId!=''">and s.room_id=#{roomId}</if></where>
-    order by s.start_time
-    limit 500
-  </select>
-  <select id="getShift" resultType="java.util.LinkedHashMap">select <include refid="shiftCols"/> from live_metric_shift s join live_room r on r.room_id=s.room_id join sys_user u on u.user_id=s.anchor_user_id where s.shift_id=#{shiftId}</select>
-  <insert id="insertShift" useGeneratedKeys="true" keyProperty="shiftId">insert into live_metric_shift(live_date,room_id,anchor_user_id,start_time,end_time,remind_at,ding_user_id,remark,create_by,create_time) values(#{liveDate},#{roomId},#{anchorUserId},#{startTime},#{endTime},#{remindAt},#{dingUserId},#{remark},#{createBy},now())</insert>
-  <update id="updateShift">update live_metric_shift set live_date=#{liveDate},room_id=#{roomId},anchor_user_id=#{anchorUserId},start_time=#{startTime},end_time=#{endTime},remind_at=#{remindAt},ding_user_id=#{dingUserId},remark=#{remark},update_by=#{updateBy},update_time=now() where shift_id=#{shiftId}</update>
-  <select id="countOverlappingShifts" resultType="int">select count(*) from live_metric_shift where room_id=#{roomId} and status&lt;&gt;'CANCELLED' and start_time&lt;#{endTime} and end_time&gt;#{startTime}<if test="shiftId!=null">and shift_id&lt;&gt;#{shiftId}</if></select>
-  <select id="countOverlappingAnchorShifts" resultType="int">select count(*) from live_metric_shift where anchor_user_id=#{anchorUserId} and status&lt;&gt;'CANCELLED' and start_time&lt;#{endTime} and end_time&gt;#{startTime}<if test="shiftId!=null">and shift_id&lt;&gt;#{shiftId}</if></select>
-  <select id="countAnchorShiftsOnDate" resultType="int">select count(*) from live_metric_shift where anchor_user_id=#{anchorUserId} and live_date=#{liveDate} and status&lt;&gt;'CANCELLED'<if test="shiftId!=null">and shift_id&lt;&gt;#{shiftId}</if></select>
-  <select id="countShiftSubmissions" resultType="int">select count(*) from live_metric_submission where shift_id=#{shiftId}</select>
-  <delete id="deleteShift">delete from live_metric_shift where shift_id=#{shiftId} and not exists(select 1 from live_metric_submission where shift_id=#{shiftId})</delete>
-
   <select id="listRoomOptions" resultType="java.util.LinkedHashMap">
-    select r.room_id roomId,r.room_name roomName,(select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id and u.status='0' and u.del_flag='0' where m.subject_type='ROOM' and m.subject_id=r.room_id and m.role_code='anchor') anchorIds from live_room r where r.status='0' order by r.room_name
+    select room_id roomId,room_name roomName from live_room where status='0' order by room_name
   </select>
-  <select id="listRoomOptionsForAnchor" resultType="java.util.LinkedHashMap">
-    select r.room_id roomId,r.room_name roomName,(select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id and u.status='0' and u.del_flag='0' where m.subject_type='ROOM' and m.subject_id=r.room_id and m.role_code='anchor') anchorIds from live_room r where r.status='0' and exists(select 1 from live_subject_user_map mine where mine.subject_type='ROOM' and mine.subject_id=r.room_id and mine.role_code='anchor' and mine.user_id=#{userId}) order by r.room_name
+  <select id="listRoomAnchors" resultType="java.util.LinkedHashMap">
+    select u.user_id userId,u.nick_name userName,b.ding_user_id dingUserId
+    from live_subject_user_map m join sys_user u on u.user_id=m.user_id and u.status='0' and u.del_flag='0'
+    left join live_ding_user_bind b on b.user_id=u.user_id
+    where m.subject_type='ROOM' and m.subject_id=#{roomId} and m.role_code='anchor' order by u.nick_name
   </select>
-  <select id="listStaffOptions" resultType="java.util.LinkedHashMap">select u.user_id userId,u.nick_name userName,b.ding_user_id dingUserId from sys_user u left join live_ding_user_bind b on b.user_id=u.user_id where u.status='0' and u.del_flag='0' order by u.nick_name</select>
-  <select id="listHiddenStaffUserIds" resultType="long">select hidden_user_id from live_metric_user_hidden_staff where viewer_user_id=#{viewerUserId}</select>
-  <delete id="deleteHiddenStaff">delete from live_metric_user_hidden_staff where viewer_user_id=#{viewerUserId}</delete>
-  <insert id="insertHiddenStaff">
-    insert into live_metric_user_hidden_staff(viewer_user_id,hidden_user_id,create_time) values
-    <foreach collection="hiddenUserIds" item="hiddenUserId" separator=",">(#{viewerUserId},#{hiddenUserId},now())</foreach>
-  </insert>
+  <select id="listStaffOptions" resultType="java.util.LinkedHashMap">
+    select u.user_id userId,u.nick_name userName,b.ding_user_id dingUserId from sys_user u
+    left join live_ding_user_bind b on b.user_id=u.user_id where u.status='0' and u.del_flag='0' order by u.nick_name
+  </select>
+  <select id="findRoomByAliasKey" resultType="java.util.LinkedHashMap">
+    select r.room_id roomId,r.room_name roomName from live_metric_room_alias a join live_room r on r.room_id=a.room_id and r.status='0'
+    where a.alias_key=#{aliasKey} limit 1
+  </select>
   <select id="countActiveUser" resultType="int">select count(*) from sys_user where user_id=#{userId} and status='0' and del_flag='0'</select>
   <select id="countRoomAnchor" resultType="int">select count(*) from live_subject_user_map where subject_type='ROOM' and subject_id=#{roomId} and user_id=#{userId} and role_code='anchor'</select>
-  <select id="getDingUserId" resultType="string">select ding_user_id from live_ding_user_bind where user_id=#{userId} order by last_sync_time desc limit 1</select>
+  <insert id="insertRoomAnchor">insert into live_subject_user_map(subject_type,subject_id,user_id,role_code,create_by,create_time) values('ROOM',#{roomId},#{userId},'anchor',#{createBy},now())</insert>
+  <delete id="deleteRoomAnchor">delete from live_subject_user_map where subject_type='ROOM' and subject_id=#{roomId} and user_id=#{userId} and role_code='anchor'</delete>
 
-  <select id="listShiftTemplates" resultType="java.util.LinkedHashMap">select template_id templateId,room_id roomId,template_name templateName,start_clock startClock,end_clock endClock from live_metric_shift_template where room_id=#{roomId} order by sort_order,template_id</select>
-  <select id="countShiftTemplateName" resultType="int">select count(*) from live_metric_shift_template where room_id=#{roomId} and template_name=#{templateName}<if test="templateId!=null">and template_id&lt;&gt;#{templateId}</if></select>
-  <insert id="insertShiftTemplate" useGeneratedKeys="true" keyProperty="templateId">insert into live_metric_shift_template(room_id,template_name,start_clock,end_clock,sort_order,create_by,create_time) values(#{roomId},#{templateName},#{startClock},#{endClock},coalesce((select max(x.sort_order)+1 from live_metric_shift_template x where x.room_id=#{roomId}),0),#{createBy},now())</insert>
-  <update id="updateShiftTemplate">update live_metric_shift_template set template_name=#{templateName},start_clock=#{startClock},end_clock=#{endClock} where template_id=#{templateId}</update>
-  <delete id="deleteShiftTemplate">delete from live_metric_shift_template where template_id=#{templateId}</delete>
+  <sql id="sessionColumns">session_id sessionId,room_id roomId,platform_session_id platformSessionId,reported_room_name reportedRoomName,live_start_time liveStartTime,status,version,last_snapshot_at lastSnapshotAt</sql>
+  <select id="findHandoverSessionByPlatformId" resultType="java.util.LinkedHashMap">select <include refid="sessionColumns"/> from live_metric_session where platform_session_id=#{platformSessionId}</select>
+  <select id="getHandoverSession" resultType="java.util.LinkedHashMap">select <include refid="sessionColumns"/> from live_metric_session where session_id=#{sessionId}</select>
+  <select id="lockHandoverSession" resultType="java.util.LinkedHashMap">select <include refid="sessionColumns"/> from live_metric_session where session_id=#{sessionId} for update</select>
+  <insert id="insertHandoverSession" useGeneratedKeys="true" keyProperty="sessionId">insert into live_metric_session(room_id,platform_session_id,reported_room_name,live_start_time,status,create_time) values(#{roomId},#{platformSessionId},#{reportedRoomName},#{liveStartTime},'LIVE',now())</insert>
+  <update id="updateHandoverSessionSnapshot">update live_metric_session set status='LIVE',last_snapshot_at=#{capturedAt},version=version+1,update_time=now() where session_id=#{sessionId}</update>
+  <update id="resetHandoverSessionSnapshot">update live_metric_session set last_snapshot_at=#{capturedAt},version=version+1,update_time=now() where session_id=#{sessionId}</update>
 
-  <select id="findRoomByAliasKey" resultType="java.util.LinkedHashMap">select r.room_id roomId,r.room_name roomName from live_metric_room_alias a join live_room r on r.room_id=a.room_id and r.status='0' where a.alias_key=#{aliasKey} limit 1</select>
-  <insert id="insertRoomAlias">insert into live_metric_room_alias(room_id,alias_name,alias_key,is_current,create_by,create_time) values(#{roomId},#{aliasName},#{aliasKey},#{isCurrent},#{createBy},now())</insert>
-  <select id="findLiveSession" resultType="java.util.LinkedHashMap">select session_id sessionId,room_id roomId,reported_room_name reportedRoomName,room_name_key roomNameKey,live_start_time liveStartTime,match_status matchStatus from live_metric_live_session where room_name_key=#{roomNameKey} and live_start_time=#{liveStartTime} limit 1 for update</select>
-  <select id="findLiveSessionByRoom" resultType="java.util.LinkedHashMap">select session_id sessionId,room_id roomId,reported_room_name reportedRoomName,room_name_key roomNameKey,live_start_time liveStartTime,match_status matchStatus from live_metric_live_session where room_id=#{roomId} and live_start_time=#{liveStartTime} limit 1 for update</select>
-  <select id="getLiveSession" resultType="java.util.LinkedHashMap">select session_id sessionId,room_id roomId,reported_room_name reportedRoomName,room_name_key roomNameKey,live_start_time liveStartTime,match_status matchStatus from live_metric_live_session where session_id=#{sessionId}</select>
-  <insert id="insertLiveSession" useGeneratedKeys="true" keyProperty="sessionId">insert into live_metric_live_session(room_id,reported_room_name,room_name_key,live_start_time,match_status,create_time) values(#{roomId},#{reportedRoomName},#{roomNameKey},#{liveStartTime},#{matchStatus},now())</insert>
-  <update id="bindLiveSessionRoom">update live_metric_live_session set room_id=#{roomId},match_status='MATCHED',update_time=now() where session_id=#{sessionId}</update>
-  <select id="findAutoMatchShifts" resultType="java.util.LinkedHashMap">
-    select <include refid="shiftCols"/>,
-      case when s.start_time&lt;=#{snapshotAt} and s.end_time&gt;=#{snapshotAt} then 1 else 0 end currentShift,
-      case when exists(select 1 from live_metric_submission existing where existing.session_id=#{sessionId} and existing.shift_id=s.shift_id and existing.status='CONFIRMED') then 1 else 0 end hasSubmission
-    from live_metric_shift s
-    join live_room r on r.room_id=s.room_id
-    join sys_user u on u.user_id=s.anchor_user_id
-    where s.room_id=#{roomId}
-      and s.status&lt;&gt;'CANCELLED'
-      and s.end_time&gt;#{liveStartTime}
-      and s.start_time&lt;=#{snapshotAt}
-      and s.end_time&gt;=date_sub(#{snapshotAt},interval 12 hour)
-    order by currentShift desc,hasSubmission asc,abs(timestampdiff(second,s.end_time,#{snapshotAt})),s.end_time desc
-    limit 20
+  <sql id="snapshotColumns">snapshot_id snapshotId,session_id sessionId,snapshot_kind snapshotKind,captured_at capturedAt,watch_total watchTotal,interaction_total interactionTotal,new_fan_total newFanTotal,deal_total dealTotal,gmv_total gmvTotal,ad_cost_total adCostTotal,presale_order_total presaleOrderTotal,exposure_watch_rate exposureWatchRate,watch_follow_rate watchFollowRate,watch_interaction_rate watchInteractionRate,watch_deal_rate watchDealRate</sql>
+  <select id="getHandoverSnapshotByKey" resultType="java.util.LinkedHashMap">select <include refid="snapshotColumns"/> from live_metric_snapshot where idempotency_key=#{idempotencyKey}</select>
+  <select id="getLatestHandoverSnapshot" resultType="java.util.LinkedHashMap">
+    select <include refid="snapshotColumns"/> from live_metric_snapshot
+    where snapshot_id=coalesce(
+      (select end_snapshot_id from live_metric_anchor_segment where session_id=#{sessionId} and status='CLOSED' and end_snapshot_id is not null order by end_time desc,segment_id desc limit 1),
+      (select snapshot_id from live_metric_snapshot where session_id=#{sessionId} and snapshot_kind='ZERO' order by captured_at,snapshot_id limit 1)
+    )
   </select>
+  <select id="getHandoverSnapshot" resultType="java.util.LinkedHashMap">select <include refid="snapshotColumns"/> from live_metric_snapshot where snapshot_id=#{snapshotId}</select>
+  <insert id="insertHandoverSnapshot" useGeneratedKeys="true" keyProperty="snapshotId">
+    insert into live_metric_snapshot(session_id,snapshot_kind,captured_at,watch_total,interaction_total,new_fan_total,deal_total,gmv_total,ad_cost_total,presale_order_total,exposure_watch_rate,watch_follow_rate,watch_interaction_rate,watch_deal_rate,idempotency_key,source,create_time)
+    values(#{sessionId},#{snapshotKind},#{capturedAt},#{watchTotal},#{interactionTotal},#{newFanTotal},#{dealTotal},#{gmvTotal},#{adCostTotal},#{presaleOrderTotal},#{exposureWatchRate},#{watchFollowRate},#{watchInteractionRate},#{watchDealRate},#{idempotencyKey},#{source},now())
+  </insert>
 
-  <select id="getSubmissionByKey" resultType="java.util.LinkedHashMap">select submission_id submissionId,session_id sessionId,shift_id shiftId,match_status matchStatus,exposure_delta exposureDelta,watch_delta watchDelta,interaction_delta interactionDelta,new_fan_delta newFanDelta,deal_delta dealDelta from live_metric_submission where idempotency_key=#{idempotencyKey}</select>
-  <select id="getSubmission" resultType="java.util.LinkedHashMap">select submission_id submissionId,session_id sessionId,shift_id shiftId,match_status matchStatus,remark from live_metric_submission where submission_id=#{submissionId}</select>
-  <insert id="insertRawSubmission" useGeneratedKeys="true" keyProperty="submissionId">insert into live_metric_submission(session_id,shift_id,reported_room_name,exposure_total,watch_total,deal_total,new_fan_total,interaction_total,value_source,status,match_status,is_effective,idempotency_key,submitted_by,submitted_name,submitted_at,snapshot_at,remark) values(#{sessionId},#{shiftId},#{reportedRoomName},#{exposureTotal},#{watchTotal},#{dealTotal},#{newFanTotal},#{interactionTotal},#{valueSource},'CONFIRMED',#{matchStatus},0,#{idempotencyKey},#{submittedBy},#{submittedName},now(),#{snapshotAt},#{remark})</insert>
-  <select id="countSessionSubmissions" resultType="int">select count(*) from live_metric_submission where session_id=#{sessionId}</select>
-  <update id="updateSubmissionShift">update live_metric_submission set shift_id=#{shiftId},match_status='MATCHED',remark=#{remark} where submission_id=#{submissionId}</update>
-  <select id="listSessionSubmissions" resultType="java.util.LinkedHashMap">select x.submission_id submissionId,x.session_id sessionId,x.shift_id shiftId,x.exposure_total exposureTotal,x.watch_total watchTotal,x.deal_total dealTotal,x.new_fan_total newFanTotal,x.interaction_total interactionTotal,x.snapshot_at snapshotAt,x.submitted_at submittedAt,x.value_source valueSource,s.start_time startTime,s.end_time endTime,s.anchor_user_id anchorUserId,u.nick_name anchorName,s.ding_user_id dingUserId,r.room_name roomName from live_metric_submission x join live_metric_shift s on s.shift_id=x.shift_id join live_room r on r.room_id=s.room_id join sys_user u on u.user_id=s.anchor_user_id where x.session_id=#{sessionId} and x.status='CONFIRMED' and x.shift_id is not null order by s.start_time,x.snapshot_at,x.submission_id</select>
-  <select id="listRawSessionSubmissions" resultType="java.util.LinkedHashMap">select submission_id submissionId,session_id sessionId,shift_id shiftId,snapshot_at snapshotAt from live_metric_submission where session_id=#{sessionId} and status='CONFIRMED' order by snapshot_at,submission_id</select>
-  <select id="listSessionShifts" resultType="java.util.LinkedHashMap">select <include refid="shiftCols"/> from live_metric_live_session ls join live_metric_shift s on s.room_id=ls.room_id join live_room r on r.room_id=s.room_id join sys_user u on u.user_id=s.anchor_user_id where ls.session_id=#{sessionId} and s.status&lt;&gt;'CANCELLED' and s.end_time&gt;ls.live_start_time and s.start_time&lt;=coalesce((select max(snapshot_at) from live_metric_submission where session_id=#{sessionId}),now()) order by s.start_time</select>
-  <update id="resetSessionCalculation">update live_metric_submission set is_effective=0,baseline_submission_id=null,exposure_delta=null,watch_delta=null,deal_delta=null,new_fan_delta=null,interaction_delta=null,recalculated_at=now() where session_id=#{sessionId}</update>
-  <update id="resetShiftSubmissionStatus">update live_metric_shift s set s.status='PENDING',s.update_time=now() where s.status='SUBMITTED' and exists(select 1 from live_metric_submission x where x.session_id=#{sessionId} and x.shift_id=s.shift_id)</update>
-  <update id="updateSubmissionCalculation">update live_metric_submission set is_effective=1,match_status=#{matchStatus},baseline_submission_id=#{baselineSubmissionId},exposure_delta=#{exposureDelta},watch_delta=#{watchDelta},deal_delta=#{dealDelta},new_fan_delta=#{newFanDelta},interaction_delta=#{interactionDelta},recalculated_at=now() where submission_id=#{submissionId}</update>
-  <update id="markShiftSubmitted">update live_metric_shift set status='SUBMITTED',update_time=now() where shift_id=#{shiftId}</update>
-  <update id="refreshShiftStatus">update live_metric_shift s set s.status=case when exists(select 1 from live_metric_submission x where x.shift_id=s.shift_id and x.status='CONFIRMED' and x.is_effective=1) then 'SUBMITTED' else 'PENDING' end,s.update_time=now() where s.shift_id=#{shiftId}</update>
-  <select id="listReportingRows" resultType="java.util.LinkedHashMap">select x.submission_id submissionId,x.session_id sessionId,x.shift_id shiftId,ls.room_id roomId,coalesce(r.room_name,ls.reported_room_name) roomName,ls.reported_room_name reportedRoomName,ls.live_start_time liveStartTime,ls.match_status roomMatchStatus,x.match_status matchStatus,x.is_effective isEffective,x.value_source valueSource,x.snapshot_at snapshotAt,x.submitted_at submittedAt,x.exposure_total exposureTotal,x.watch_total watchTotal,x.interaction_total interactionTotal,x.new_fan_total newFanTotal,x.deal_total dealTotal,x.exposure_delta exposureDelta,x.watch_delta watchDelta,x.interaction_delta interactionDelta,x.new_fan_delta newFanDelta,x.deal_delta dealDelta,s.anchor_user_id anchorUserId,u.nick_name anchorName,s.start_time startTime,s.end_time endTime,s.ding_user_id dingUserId,x.remark,(select l.send_status from live_metric_reminder_log l where l.shift_id=x.shift_id and l.reminder_type='SUBMITTED' order by l.sent_at desc limit 1) dingNotifyStatus,(select l.error_message from live_metric_reminder_log l where l.shift_id=x.shift_id and l.reminder_type='SUBMITTED' order by l.sent_at desc limit 1) dingNotifyError from live_metric_submission x join live_metric_live_session ls on ls.session_id=x.session_id left join live_room r on r.room_id=ls.room_id left join live_metric_shift s on s.shift_id=x.shift_id left join sys_user u on u.user_id=s.anchor_user_id <where><if test="beginDate!=null and beginDate!=''">and ls.live_start_time&gt;=concat(#{beginDate},' 00:00:00')</if><if test="endDate!=null and endDate!=''">and ls.live_start_time&lt;date_add(#{endDate},interval 1 day)</if><if test="matchStatus!=null and matchStatus!=''">and x.match_status=#{matchStatus}</if><if test="roomId!=null and roomId!=''">and ls.room_id=#{roomId}</if></where> order by x.submitted_at desc,x.submission_id desc limit 500</select>
-  <insert id="insertCorrection">insert into live_metric_correction(submission_id,session_id,action_type,old_value,new_value,reason,corrected_by,corrected_name,corrected_at) values(#{submissionId},#{sessionId},#{actionType},#{oldValue},#{newValue},#{reason},#{correctedBy},#{correctedName},now())</insert>
+  <select id="getHandoverSegment" resultType="java.util.LinkedHashMap">
+    select s.segment_id segmentId,s.session_id sessionId,s.room_id roomId,s.anchor_user_id anchorUserId,u.nick_name anchorName,s.start_snapshot_id startSnapshotId,s.end_snapshot_id endSnapshotId,s.start_time startTime,s.end_time endTime,s.status,s.precision_status precisionStatus,s.version,s.source,s.operator_user_id operatorUserId,s.client_version clientVersion,s.create_by operatorName,s.remark,s.watch_delta watchDelta,s.interaction_delta interactionDelta,s.new_fan_delta newFanDelta,s.deal_delta dealDelta,s.gmv_delta gmvDelta,s.ad_cost_delta adCostDelta,s.presale_order_delta presaleOrderDelta,s.exposure_watch_rate exposureWatchRate,s.watch_follow_rate watchFollowRate,s.watch_interaction_rate watchInteractionRate,s.watch_deal_rate watchDealRate,s.void_reason voidReason,s.void_name voidName,s.void_at voidAt
+    from live_metric_anchor_segment s join sys_user u on u.user_id=s.anchor_user_id where s.segment_id=#{segmentId}
+  </select>
+  <insert id="insertHandoverSegment" useGeneratedKeys="true" keyProperty="segmentId">
+    insert into live_metric_anchor_segment(session_id,room_id,anchor_user_id,start_snapshot_id,end_snapshot_id,start_time,end_time,status,precision_status,source,remark,watch_delta,interaction_delta,new_fan_delta,deal_delta,gmv_delta,ad_cost_delta,presale_order_delta,exposure_watch_rate,watch_follow_rate,watch_interaction_rate,watch_deal_rate,operator_user_id,client_version,create_by,create_time)
+    values(#{sessionId},#{roomId},#{anchorUserId},#{startSnapshotId},#{endSnapshotId},#{startTime},#{endTime},'CLOSED',#{precisionStatus},#{source},#{remark},#{watchDelta},#{interactionDelta},#{newFanDelta},#{dealDelta},#{gmvDelta},#{adCostDelta},#{presaleOrderDelta},#{exposureWatchRate},#{watchFollowRate},#{watchInteractionRate},#{watchDealRate},#{operatorUserId},#{clientVersion},#{createBy},now())
+  </insert>
+  <select id="countHandoverSegmentOverlap" resultType="int">select count(*) from live_metric_anchor_segment where session_id=#{sessionId} and status='CLOSED' and start_time&lt;#{endTime} and end_time&gt;#{startTime}<if test="excludeSegmentId!=null"> and segment_id&lt;&gt;#{excludeSegmentId}</if></select>
+  <update id="updateHandoverSegment">update live_metric_anchor_segment set anchor_user_id=#{anchorUserId},start_snapshot_id=#{startSnapshotId},end_snapshot_id=#{endSnapshotId},start_time=#{startTime},end_time=#{endTime},precision_status=#{precisionStatus},source=#{source},remark=#{remark},watch_delta=#{watchDelta},interaction_delta=#{interactionDelta},new_fan_delta=#{newFanDelta},deal_delta=#{dealDelta},gmv_delta=#{gmvDelta},ad_cost_delta=#{adCostDelta},presale_order_delta=#{presaleOrderDelta},exposure_watch_rate=#{exposureWatchRate},watch_follow_rate=#{watchFollowRate},watch_interaction_rate=#{watchInteractionRate},watch_deal_rate=#{watchDealRate},version=version+1,update_by=#{updateBy},update_time=now() where segment_id=#{segmentId} and version=#{version}</update>
+  <update id="voidHandoverSegment">update live_metric_anchor_segment set status='VOID',void_reason=#{reason},void_by=#{userId},void_name=#{userName},void_at=now(),version=version+1,update_by=#{userName},update_time=now() where segment_id=#{segmentId} and version=#{version} and status='CLOSED'</update>
 
-  <select id="findReminderCandidates" resultType="java.util.LinkedHashMap">select <include refid="shiftCols"/> from live_metric_shift s join live_room r on r.room_id=s.room_id join sys_user u on u.user_id=s.anchor_user_id where s.status='PENDING' and s.remind_at&lt;=now() and s.ding_user_id is not null and s.ding_user_id!='' and not exists(select 1 from live_metric_submission x where x.shift_id=s.shift_id and x.is_effective=1) and not exists(select 1 from live_metric_reminder_log l where l.shift_id=s.shift_id and l.reminder_type='FIRST' and l.send_status='SENT') limit 50</select>
-  <insert id="insertReminderLog">insert into live_metric_reminder_log(shift_id,reminder_type,ding_user_id,send_status,error_message,sent_at) values(#{shiftId},#{reminderType},#{dingUserId},#{sendStatus},#{errorMessage},now()) on duplicate key update send_status=values(send_status),error_message=values(error_message),sent_at=now()</insert>
+  <select id="listHandoverRooms" resultType="java.util.LinkedHashMap">
+    select r.room_id roomId,r.room_name roomName,group_concat(distinct u.nick_name order by u.nick_name separator '、') anchorNames,
+    (select s.platform_session_id from live_metric_session s where s.room_id=r.room_id order by s.live_start_time desc limit 1) platformSessionId,
+    (select s.live_start_time from live_metric_session s where s.room_id=r.room_id order by s.live_start_time desc limit 1) liveStartTime,
+    (select max(s.last_snapshot_at) from live_metric_session s where s.room_id=r.room_id) lastSnapshotAt,
+    (select u2.nick_name from live_metric_anchor_segment g2 join sys_user u2 on u2.user_id=g2.anchor_user_id where g2.room_id=r.room_id and g2.status='CLOSED' order by g2.end_time desc,g2.segment_id desc limit 1) lastAnchorName,
+    (select count(*) from live_metric_anchor_segment g3 where g3.status='CLOSED' and g3.session_id=(select s3.session_id from live_metric_session s3 where s3.room_id=r.room_id order by s3.live_start_time desc limit 1)) latestSegmentCount,
+    (select count(*) from live_metric_anchor_segment g where g.room_id=r.room_id and g.status='CLOSED' and g.precision_status&lt;&gt;'EXACT') exceptionCount
+    from live_room r left join live_subject_user_map m on m.subject_type='ROOM' and m.subject_id=r.room_id and m.role_code='anchor'
+    left join sys_user u on u.user_id=m.user_id and u.status='0' and u.del_flag='0' where r.status='0' group by r.room_id,r.room_name order by r.room_name
+  </select>
+  <select id="getHandoverRoom" resultType="java.util.LinkedHashMap">select room_id roomId,room_name roomName,live_account liveAccount from live_room where room_id=#{roomId} and status='0'</select>
+  <select id="listHandoverSessions" resultType="java.util.LinkedHashMap">
+    select s.session_id sessionId,s.room_id roomId,s.platform_session_id platformSessionId,s.reported_room_name reportedRoomName,s.live_start_time liveStartTime,s.status,s.last_snapshot_at lastSnapshotAt,count(g.segment_id) segmentCount,coalesce(sum(g.precision_status&lt;&gt;'EXACT'),0) exceptionCount
+    from live_metric_session s left join live_metric_anchor_segment g on g.session_id=s.session_id and g.status='CLOSED' where s.room_id=#{roomId}
+    <if test="beginDate!=null and beginDate!=''">and s.live_start_time&gt;=concat(#{beginDate},' 00:00:00')</if>
+    <if test="endDate!=null and endDate!=''">and s.live_start_time&lt;date_add(#{endDate},interval 1 day)</if>
+    group by s.session_id order by s.live_start_time desc limit 100
+  </select>
+  <select id="listHandoverSegments" resultType="java.util.LinkedHashMap">
+    select g.segment_id segmentId,g.session_id sessionId,g.anchor_user_id anchorUserId,u.nick_name anchorName,g.start_snapshot_id startSnapshotId,g.end_snapshot_id endSnapshotId,g.start_time startTime,g.end_time endTime,g.status,g.precision_status precisionStatus,g.version,g.source,g.operator_user_id operatorUserId,g.client_version clientVersion,g.create_by operatorName,g.remark,g.watch_delta watchDelta,g.interaction_delta interactionDelta,g.new_fan_delta newFanDelta,g.deal_delta dealDelta,g.gmv_delta gmvDelta,g.ad_cost_delta adCostDelta,g.presale_order_delta presaleOrderDelta,g.exposure_watch_rate exposureWatchRate,g.watch_follow_rate watchFollowRate,g.watch_interaction_rate watchInteractionRate,g.watch_deal_rate watchDealRate
+    from live_metric_anchor_segment g join sys_user u on u.user_id=g.anchor_user_id where g.session_id=#{sessionId} and g.status='CLOSED' order by g.start_time,g.segment_id
+  </select>
+  <select id="listHandoverSnapshots" resultType="java.util.LinkedHashMap">select <include refid="snapshotColumns"/> from live_metric_snapshot where session_id=#{sessionId} order by captured_at,snapshot_id</select>
+  <select id="listHandoverCorrections" resultType="java.util.LinkedHashMap">select correction_id correctionId,segment_id segmentId,action_type actionType,old_value oldValue,new_value newValue,reason,corrected_name correctedName,corrected_at correctedAt from live_metric_segment_correction where session_id=#{sessionId} order by corrected_at desc limit 200</select>
+  <insert id="insertHandoverCorrection">insert into live_metric_segment_correction(session_id,segment_id,action_type,old_value,new_value,reason,corrected_by,corrected_name,corrected_at) values(#{sessionId},#{segmentId},#{actionType},#{oldValue},#{newValue},#{reason},#{correctedBy},#{correctedName},now())</insert>
 </mapper>

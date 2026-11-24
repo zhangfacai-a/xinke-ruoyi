@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.RetentionMapper">
+ <select id="shops" resultType="map">select shop_id shopId,shop_name shopName from erp_shop where status='0' order by shop_code,shop_name limit 500</select>
+ <select id="staff" resultType="map">select m.subject_id shopId,u.user_id userId,u.nick_name userName from live_subject_user_map m join sys_user u on u.user_id=m.user_id join erp_shop s on s.shop_id=m.subject_id and s.status='0' where m.subject_type='SHOP' and m.role_code='customer_service' and u.status='0' and u.del_flag='0' order by u.nick_name,u.user_id</select>
+ <select id="validShop" resultType="int">select count(*) from erp_shop where shop_id=#{id} and status='0'</select>
+ <select id="adminShops" resultType="long">select m.subject_id from live_subject_user_map m join erp_shop s on s.shop_id=m.subject_id and s.status='0' where m.subject_type='SHOP' and m.role_code='customer_admin' and m.user_id=#{userId}</select>
+ <select id="isShopAdmin" resultType="int">select count(*) from live_subject_user_map m join erp_shop s on s.shop_id=m.subject_id and s.status='0' where m.subject_type='SHOP' and m.role_code='customer_admin' and m.subject_id=#{shopId} and m.user_id=#{userId}</select>
+ <select id="validAssignee" resultType="int">select count(*) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type='SHOP' and m.role_code='customer_service' and m.subject_id=#{shopId} and m.user_id=#{userId} and u.status='0' and u.del_flag='0'</select>
+ <select id="existingOrderNos" resultType="string">
+  select order_no from live_retention_order where shop_id=#{shopId} and order_no in
+  <foreach collection="orderNos" item="orderNo" open="(" separator="," close=")">#{orderNo}</foreach>
+ </select>
+ <select id="userName" resultType="string">select nick_name from sys_user where user_id=#{id}</select>
+ <sql id="cols">o.id,o.shop_id shopId,s.shop_name shopName,o.order_no orderNo,o.address,o.owner_id ownerId,u.nick_name ownerName,o.progress,o.retention_result retentionResult,o.retention_amount retentionAmount,o.referral_success referralSuccess,o.referral_shop_id referralShopId,rs.shop_name referralShopName,o.referral_order_no referralOrderNo,o.referral_amount referralAmount,o.freight_collected freightCollected,o.freight_amount freightAmount,o.first_followed_at firstFollowedAt,o.completed_at completedAt,o.latest_note latestNote,o.version,o.created_at createdAt,o.updated_at updatedAt</sql>
+ <sql id="joins">from live_retention_order o left join erp_shop s on s.shop_id=o.shop_id left join sys_user u on u.user_id=o.owner_id left join erp_shop rs on rs.shop_id=o.referral_shop_id</sql>
+ <sql id="filter"><where>
+  <if test="scopeUserId!=null">and (o.owner_id=#{scopeUserId} or exists(select 1 from live_subject_user_map m where m.subject_type='SHOP' and m.role_code='customer_admin' and m.subject_id=o.shop_id and m.user_id=#{scopeUserId}))</if>
+  <if test="beginDate!=null">and o.created_at&gt;=#{beginDate}</if>
+  <if test="endExclusive!=null">and o.created_at&lt;#{endExclusive}</if>
+  <if test="shopId!=null">and o.shop_id=#{shopId}</if>
+  <if test="ownerId!=null">and o.owner_id=#{ownerId}</if>
+  <if test="progress!=null">and o.progress=#{progress}</if>
+  <if test="resultType=='UNKNOWN'">and o.retention_result='UNKNOWN'</if>
+  <if test="resultType=='SUCCESS'">and o.retention_result='SUCCESS'</if>
+  <if test="resultType=='FAILED'">and o.retention_result='FAILED'</if>
+  <if test="resultType=='REFERRAL_SUCCESS'">and o.referral_success=1</if>
+  <if test="resultType=='FREIGHT_COLLECTED'">and o.freight_collected=1</if>
+  <if test="addressStatus=='MISSING'">and trim(coalesce(o.address,''))=''</if>
+  <if test="addressStatus=='FILLED'">and trim(coalesce(o.address,''))&lt;&gt;''</if>
+  <if test="keyword!=null">and (o.order_no=#{keyword} or o.address like concat('%',#{keyword},'%'))</if>
+ </where></sql>
+ <select id="list" resultType="map">select <include refid="cols"/> <include refid="joins"/> <include refid="filter"/> order by o.created_at desc,o.id desc limit #{limit} offset #{offset}</select>
+ <select id="count" resultType="long">select count(*) from live_retention_order o <include refid="filter"/></select>
+ <select id="dashboard" resultType="map">select count(*) total,
+  coalesce(sum(o.progress='PENDING'),0) pending,coalesce(sum(o.progress='FOLLOWING'),0) following,coalesce(sum(o.progress='COMPLETED'),0) completed,
+  coalesce(sum(o.retention_result='SUCCESS'),0) retentionCount,
+  coalesce(sum(o.retention_result='FAILED'),0) failedCount,coalesce(sum(o.freight_collected),0) freightCount,
+  coalesce(sum(case when o.retention_result='SUCCESS' then o.retention_amount else 0 end),0) retentionAmount,
+  coalesce(sum(o.referral_success),0) referralCount,coalesce(sum(o.referral_amount),0) referralAmount,
+  coalesce(sum(o.freight_amount),0) freightAmount,
+  round(avg(case when o.progress='COMPLETED' and o.completed_at&gt;=o.created_at then timestampdiff(second,o.created_at,o.completed_at) end)) avgCompletionSeconds
+  from live_retention_order o <include refid="filter"/></select>
+ <select id="get" resultType="map">select <include refid="cols"/> <include refid="joins"/> where o.id=#{id}</select>
+ <select id="history" resultType="map">select id,action,note,old_value oldValue,new_value newValue,operator_id operatorId,operator_name operatorName,created_at createdAt from live_retention_history where order_id=#{id} order by id desc limit 500</select>
+ <select id="attachments" resultType="map">select id,order_id orderId,object_key objectKey,original_name originalName,content_type contentType,file_size fileSize,uploaded_by uploadedBy,created_at createdAt from live_retention_attachment where order_id=#{id} order by id desc limit 20</select>
+ <select id="attachment" resultType="map">select id,order_id orderId,object_key objectKey,original_name originalName,content_type contentType,file_size fileSize,uploaded_by uploadedBy,created_at createdAt from live_retention_attachment where id=#{id}</select>
+ <insert id="insertAttachment" useGeneratedKeys="true" keyProperty="id">insert into live_retention_attachment(order_id,object_key,original_name,content_type,file_size,uploaded_by) values(#{orderId},#{objectKey},#{originalName},#{contentType},#{fileSize},#{uploadedBy})</insert>
+ <delete id="deleteAttachment">delete from live_retention_attachment where id=#{id}</delete>
+ <delete id="deleteAttachments">delete from live_retention_attachment where order_id=#{orderId}</delete>
+ <insert id="insert" useGeneratedKeys="true" keyProperty="id">insert into live_retention_order(shop_id,order_no,address,owner_id,created_by) values(#{shopId},#{orderNo},#{address},#{ownerId},#{userId})</insert>
+ <update id="update">update live_retention_order set shop_id=#{shopId},order_no=#{orderNo},address=#{address},owner_id=#{ownerId},progress=#{progress},retention_result=#{retentionResult},retention_amount=#{retentionAmount},referral_success=#{referralSuccess},referral_shop_id=#{referralShopId},referral_order_no=#{referralOrderNo},referral_amount=#{referralAmount},freight_collected=#{freightCollected},freight_amount=#{freightAmount},latest_note=#{note},first_followed_at=case when #{startsFollowup}=1 then coalesce(first_followed_at,now()) else first_followed_at end,completed_at=case when #{progress}='COMPLETED' then coalesce(completed_at,now()) else null end,version=version+1,updated_at=now() where id=#{id} and version=#{version}</update>
+ <update id="updateOwner">update live_retention_order set owner_id=#{ownerId},version=version+1,updated_at=now() where id=#{id} and version=#{version} and progress&lt;&gt;'COMPLETED'</update>
+ <insert id="historyInsert">insert into live_retention_history(order_id,action,note,old_value,new_value,operator_id,operator_name) values(#{id},#{action},#{note},#{oldValue},#{newValue},#{userId},#{userName})</insert>
+ <delete id="deleteOrder">delete from live_retention_order where id=#{id} and version=#{version}</delete>
+ <delete id="deleteHistory">delete from live_retention_history where order_id=#{id}</delete>
+</mapper>

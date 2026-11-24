@@ -1,13 +1,13 @@
 <template>
   <div class="register">
     <div class="register-visual">
-      <div class="brand-pill">XINKE ERP</div>
-      <h1>建立统一的数据工作台</h1>
-      <p>为运营、财务、仓储和管理者提供一致的业务口径与清晰的分析界面。</p>
+      <div class="brand-pill">XINKE LIVE</div>
+      <h1>建立直播运营工作台</h1>
+      <p>集中管理客户跟进、主播交接、经营数据和礼品记录。</p>
     </div>
     <el-form ref="registerRef" :model="registerForm" :rules="registerRules" class="register-form">
       <h3 class="title">{{ title }}</h3>
-      <p class="subtitle">创建账户后进入企业级数据后台</p>
+      <p class="subtitle">创建账户后进入直播运营平台</p>
       <el-form-item prop="username">
         <el-input 
           v-model="registerForm.username" 

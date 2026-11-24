@@ -1,9 +1,12 @@
 package com.xinke.erp.mapper;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.session.Configuration;
@@ -12,42 +15,51 @@ import org.junit.jupiter.api.Test;
 class LiveMetricsMapperXmlTest
 {
     @Test
-    void registersV2ReportingStatementsInMyBatis()
+    void registersHandoverStatementsWithoutLegacySchedulingTables()
     {
-        String resource = "mapper/erp/LiveMetricsMapper.xml";
-        Configuration configuration = new Configuration();
-        try (InputStream input = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource))
+        String resource="mapper/erp/LiveMetricsMapper.xml";
+        Configuration configuration=new Configuration();
+        try(InputStream input=Thread.currentThread().getContextClassLoader().getResourceAsStream(resource))
         {
-            assertNotNull(input, "LiveMetricsMapper.xml should be available on the runtime classpath");
-            new XMLMapperBuilder(input, configuration, resource, configuration.getSqlFragments()).parse();
+            assertNotNull(input);
+            new XMLMapperBuilder(input,configuration,resource,configuration.getSqlFragments()).parse();
         }
-        catch (Exception exception)
-        {
-            throw new AssertionError("MyBatis could not load LiveMetricsMapper.xml", exception);
-        }
+        catch(Exception exception){throw new AssertionError("LiveMetricsMapper.xml could not load",exception);}
+        String namespace=LiveMetricsMapper.class.getName()+".";
+        assertTrue(configuration.hasStatement(namespace+"findHandoverSessionByPlatformId"));
+        assertTrue(configuration.hasStatement(namespace+"insertHandoverSnapshot"));
+        assertTrue(configuration.hasStatement(namespace+"insertHandoverSegment"));
+        assertTrue(configuration.hasStatement(namespace+"countHandoverSegmentOverlap"));
+        assertFalse(configuration.hasStatement(namespace+"closeHandoverSegment"));
+        assertTrue(configuration.hasStatement(namespace+"insertHandoverCorrection"));
+        String sql=configuration.getMappedStatement(namespace+"listHandoverRooms").getBoundSql(null).getSql();
+        assertTrue(sql.contains("live_metric_anchor_segment"));
+        assertFalse(sql.contains("live_metric_shift "));
+        String segmentSql=configuration.getMappedStatement(namespace+"listHandoverSegments").getBoundSql(Map.of("sessionId",1L)).getSql();
+        assertTrue(segmentSql.contains("g.exposure_watch_rate"));
+        assertTrue(migrationContains("exposure_watch_rate"),"数据库升级脚本必须包含详情查询使用的区间进房率字段");
+        assertTrue(manualMigrationContains("start_snapshot_id BIGINT NULL"),"手工记录必须允许不绑定快照");
+    }
 
-        String namespace = LiveMetricsMapper.class.getName() + ".";
-        assertTrue(configuration.hasStatement(namespace + "findLiveSessionByRoom"));
-        assertTrue(configuration.hasStatement(namespace + "insertRawSubmission"));
-        assertTrue(configuration.hasStatement(namespace + "listSessionSubmissions"));
-        assertTrue(configuration.hasStatement(namespace + "listReportingRows"));
-        String shiftSql = configuration.getMappedStatement(namespace + "listShifts")
-                .getBoundSql(Map.of()).getSql();
-        assertTrue(shiftSql.contains("live_metric_submission"));
-        assertTrue(shiftSql.contains("exposure_delta"));
-        String matchSql = configuration.getMappedStatement(namespace + "findAutoMatchShifts")
-                .getBoundSql(Map.of("roomId", 1L, "sessionId", 2L,
-                        "liveStartTime", "2026-09-29 08:00:00",
-                        "snapshotAt", "2026-09-29 12:05:00")).getSql();
-        assertTrue(matchSql.contains("s.start_time<="));
-        assertTrue(matchSql.contains("s.end_time>=date_sub"));
-        assertTrue(matchSql.contains("currentShift"));
-        assertTrue(matchSql.contains("hasSubmission"));
-        assertTrue(matchSql.contains("abs(timestampdiff(second,s.end_time,"));
-        assertTrue(configuration.hasStatement(namespace + "refreshShiftStatus"));
-        String sql = configuration.getMappedStatement(namespace + "listReportingRows")
-                .getBoundSql(Map.of()).getSql();
-        assertTrue(sql.contains("live_metric_live_session"));
-        assertTrue(sql.contains("live_metric_submission"));
+    private boolean migrationContains(String value)
+    {
+        try
+        {
+            Path root=Path.of(System.getProperty("user.dir")).toAbsolutePath();
+            if(root.getFileName().toString().equals("xinke-erp"))root=root.getParent();
+            return Files.readString(root.resolve("config/database/upgrade-live-metrics-website-v6.sql")).contains(value);
+        }
+        catch(Exception exception){throw new AssertionError("无法读取主播数据升级脚本",exception);}
+    }
+
+    private boolean manualMigrationContains(String value)
+    {
+        try
+        {
+            Path root=Path.of(System.getProperty("user.dir")).toAbsolutePath();
+            if(root.getFileName().toString().equals("xinke-erp"))root=root.getParent();
+            return Files.readString(root.resolve("config/database/upgrade-live-metrics-manual-v7.sql")).contains(value);
+        }
+        catch(Exception exception){throw new AssertionError("无法读取主播手工数据升级脚本",exception);}
     }
 }

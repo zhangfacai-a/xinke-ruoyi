@@ -8,6 +8,13 @@
 target/
 !.mvn/wrapper/maven-wrapper.jar
 
+# Desktop launcher build caches and temporary diagnostic artifacts
+/clients/**/bin/
+/clients/**/obj/
+/clients/build/
+/.codex-deploy/*.tar.gz
+/*.jfr
+
 ######################################################################
 # IDE
 
@@ -46,11 +53,15 @@ nbdist/
 !xinke-ui/.env.development
 !xinke-ui/.env.production
 !xinke-ui/.env.staging
-/config/application-local.yml
+/config/local/application-local.yml
+/config/local/*.yml
+!/config/local/application-local.example.yml
 /config/live-metrics.local.yml
-/chrome-extensions/jinritemai-live-metrics/.env*
-/chrome-extensions/jinritemai-live-metrics/dist/
-.codex-tmp/live-crm-v2-private.key
+/clients/extensions/**/.env*
+/clients/extensions/**/dist/
+/.codex-tmp/
+/logs/
+/runtime-logs/
 
 ######################################################################
 # Frontend
@@ -63,7 +74,19 @@ xinke-ui/node_modules/
 xinke-ui/.vite/
 xinke-ui/.yarn/cache/
 xinke-ui/.yarn/install-state.gz
+xinke-ui/yarn.lock
 
 !*/build/*.java
 !*/build/*.html
 !*/build/*.xml
+
+# Native client build output and deployment TLS private material.
+/clients/anchor-metrics-probe/ui/
+/.codex-deploy/anchor-tls/
+
+# Local deployment snapshots, database backups and browser profiles.
+/.codex-deploy/
+/clients/releases/
+/*.tar.gz
+__pycache__/
+*.py[cod]

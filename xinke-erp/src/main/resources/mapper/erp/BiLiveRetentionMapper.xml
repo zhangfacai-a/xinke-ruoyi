@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.BiLiveRetentionMapper">
+  <insert id="upsertChanged">
+    INSERT INTO bi_live_retention_order_fact (
+      retention_id,business_date,shop_id,shop_name,order_no,owner_id,owner_name,
+      progress,retention_result,retention_amount,referral_success,referral_shop_id,
+      referral_shop_name,referral_order_no,referral_amount,freight_collected,freight_amount,
+      first_followed_at,completed_at,completion_seconds,source_version,
+      source_created_at,source_updated_at,synced_at,is_deleted
+    )
+    SELECT o.id,DATE(o.created_at),o.shop_id,COALESCE(s.shop_name,''),o.order_no,
+      o.owner_id,COALESCE(u.nick_name,''),o.progress,o.retention_result,o.retention_amount,
+      o.referral_success,o.referral_shop_id,COALESCE(rs.shop_name,''),o.referral_order_no,
+      o.referral_amount,o.freight_collected,o.freight_amount,o.first_followed_at,o.completed_at,
+      CASE WHEN o.progress='COMPLETED' AND o.completed_at&gt;=o.created_at
+        THEN TIMESTAMPDIFF(SECOND,o.created_at,o.completed_at) ELSE NULL END,
+      o.version,o.created_at,o.updated_at,NOW(),0
+    FROM live_retention_order o
+    LEFT JOIN erp_shop s ON s.shop_id=o.shop_id
+    LEFT JOIN sys_user u ON u.user_id=o.owner_id
+    LEFT JOIN erp_shop rs ON rs.shop_id=o.referral_shop_id
+    LEFT JOIN bi_live_retention_order_fact b ON b.retention_id=o.id
+    WHERE b.retention_id IS NULL OR b.is_deleted=1 OR b.source_version&lt;&gt;o.version
+      OR b.source_updated_at&lt;&gt;o.updated_at
+    ON DUPLICATE KEY UPDATE
+      business_date=VALUES(business_date),shop_id=VALUES(shop_id),shop_name=VALUES(shop_name),
+      order_no=VALUES(order_no),owner_id=VALUES(owner_id),owner_name=VALUES(owner_name),
+      progress=VALUES(progress),retention_result=VALUES(retention_result),
+      retention_amount=VALUES(retention_amount),referral_success=VALUES(referral_success),
+      referral_shop_id=VALUES(referral_shop_id),referral_shop_name=VALUES(referral_shop_name),
+      referral_order_no=VALUES(referral_order_no),referral_amount=VALUES(referral_amount),
+      freight_collected=VALUES(freight_collected),freight_amount=VALUES(freight_amount),
+      first_followed_at=VALUES(first_followed_at),completed_at=VALUES(completed_at),
+      completion_seconds=VALUES(completion_seconds),source_version=VALUES(source_version),
+      source_created_at=VALUES(source_created_at),source_updated_at=VALUES(source_updated_at),
+      synced_at=NOW(),is_deleted=0
+  </insert>
+  <update id="markMissingDeleted">
+    UPDATE bi_live_retention_order_fact b
+    LEFT JOIN live_retention_order o ON o.id=b.retention_id
+    SET b.is_deleted=1,b.synced_at=NOW()
+    WHERE o.id IS NULL AND b.is_deleted=0
+  </update>
+  <select id="reconcile" resultType="map">
+    SELECT s.source_count sourceCount,b.bi_count biCount,
+      s.retention_amount sourceRetentionAmount,b.retention_amount biRetentionAmount,
+      s.referral_amount sourceReferralAmount,b.referral_amount biReferralAmount,
+      s.freight_amount sourceFreightAmount,b.freight_amount biFreightAmount,
+      (s.source_count=b.bi_count AND s.retention_amount=b.retention_amount
+       AND s.referral_amount=b.referral_amount AND s.freight_amount=b.freight_amount) matched
+    FROM (SELECT COUNT(*) source_count,COALESCE(SUM(retention_amount),0) retention_amount,
+      COALESCE(SUM(referral_amount),0) referral_amount,COALESCE(SUM(freight_amount),0) freight_amount
+      FROM live_retention_order) s
+    CROSS JOIN (SELECT COUNT(*) bi_count,COALESCE(SUM(retention_amount),0) retention_amount,
+      COALESCE(SUM(referral_amount),0) referral_amount,COALESCE(SUM(freight_amount),0) freight_amount
+      FROM bi_live_retention_order_fact WHERE is_deleted=0) b
+  </select>
+</mapper>

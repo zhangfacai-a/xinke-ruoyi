@@ -13,6 +13,7 @@ public class LiveCosProperties {
     @Value("${live.cos.secret-key:}") private String secretKey;
     @Value("${live.cos.presign-seconds:300}") private long presignSeconds;
     @Value("${live.cos.download-seconds:300}") private long downloadSeconds;
+    @Value("${live.cos.export-download-seconds:86400}") private long exportDownloadSeconds;
     @Value("${live.cos.max-file-size:10485760}") private long maxFileSize;
 
     public boolean isConfigured() { return enabled && hasText(region) && hasText(bucket) && hasText(secretId) && hasText(secretKey); }
@@ -23,6 +24,7 @@ public class LiveCosProperties {
     public String getSecretKey() { return secretKey; }
     public long getPresignSeconds() { return Math.max(60, Math.min(presignSeconds, 900)); }
     public long getDownloadSeconds() { return Math.max(60, Math.min(downloadSeconds, 900)); }
+    public long getExportDownloadSeconds() { return Math.max(300, Math.min(exportDownloadSeconds, 604800)); }
     public long getMaxFileSize() { return maxFileSize > 0 ? Math.min(maxFileSize, 50L * 1024 * 1024) : 10L * 1024 * 1024; }
     private static boolean hasText(String value) { return value != null && !value.trim().isEmpty(); }
 }

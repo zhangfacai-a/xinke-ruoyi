@@ -15,6 +15,7 @@ import com.xinke.erp.livecrm.domain.LiveCrmRegistrationRequest;
 import com.xinke.erp.livecrm.domain.LiveCrmSessionRequest;
 import com.xinke.erp.livecrm.domain.LiveCrmTaskActionRequest;
 import com.xinke.erp.livecrm.domain.LiveCrmOrderUpdateRequest;
+import com.xinke.erp.livecrm.domain.LiveCrmOwnerChangeRequest;
 import com.xinke.erp.livecrm.mapper.LiveCrmMapper;
 
 @Service
@@ -179,6 +180,7 @@ public class LiveCrmService {
 
     @Transactional
     public Map<String,Object> register(LiveCrmRegistrationRequest req, Long userId, String username){
+        String operatorName=resolveUserName(userId,username);
         String stage = normalizeStage(req.getStage());
         String interactionType = normalizeInteractionType(req.getInteractionType());
         String addFanStatus = normalizeFanStatus(req.getAddFanStatus());
@@ -198,20 +200,36 @@ public class LiveCrmService {
             if(sessionValue==null) sessionValue=session.get("id");
             if(sessionValue!=null) req.setSessionId(((Number)sessionValue).longValue());
         }
-        Map<String,Object> customer=resolveCustomer(req.getNickname(),req.getSecUid(),"MANUAL_ROOM");
+        Map<String,Object> customer;
+        if(req.getCustomerId()!=null){
+            Map<String,Object> existing=mapper.getCustomer(req.getCustomerId());
+            if(existing==null) throw new ServiceException("客户不存在或已删除，请刷新后重试");
+            customer=new HashMap<>(existing);
+            customer.put("id",req.getCustomerId());
+        }else{
+            customer=resolveCustomer(req.getNickname(),req.getSecUid(),"MANUAL_ROOM");
+        }
         Long customerId=((Number)customer.get("id")).longValue();
-        Map<String,Object> owner=req.getOwnerUserId()==null?null:mapper.findEnabledUser(req.getOwnerUserId());
-        Long ownerUserId=owner==null?userId:((Number)owner.get("userId")).longValue();
-        String ownerName=owner==null?username:String.valueOf(owner.get("userName"));
+        boolean newCustomer=Boolean.TRUE.equals(customer.get("_created"));
+        Map<String,Object> lockedCustomer=mapper.lockCustomerForUpdate(customerId);
+        Long ownerUserId=nullableLong(lockedCustomer==null?null:lockedCustomer.get("ownerUserId"));
+        String ownerName=lockedCustomer==null?null:stringOrNull(lockedCustomer.get("ownerName"));
+        Long oldOwnerUserId=ownerUserId;
+        String oldOwnerName=ownerName;
+        Long requestedOwnerUserId=req.getOwnerUserId()!=null?req.getOwnerUserId():(ownerUserId!=null?ownerUserId:userId);
+        Map<String,Object> requestedOwner=mapper.findEnabledUser(requestedOwnerUserId);
+        if(requestedOwner==null) throw new ServiceException("所选负责人不存在或已停用");
+        ownerUserId=((Number)requestedOwner.get("userId")).longValue();
+        ownerName=String.valueOf(requestedOwner.get("userName"));
         Map<String,Object> staff=resolveStaff(req.getSessionId(),req.getAnchorUserId(),req.getControllerUserId());
-        Map<String,Object> row=new HashMap<>(); row.put("sessionId",req.getSessionId());row.put("customerId",customerId);row.put("interactionType",interactionType);row.put("stage",stage);row.put("consultModel",blankToNull(req.getConsultModel()));row.put("concern",blankToNull(req.getConcern()));row.put("specialMark",blankToNull(req.getSpecialMark()));row.put("addFanStatus",addFanStatus);row.put("note",blankToNull(req.getNote()));row.put("orderNo",blankToNull(req.getOrderNo()));row.put("registeredBy",userId);row.put("registeredName",username);mapper.insertRegistration(row);
+        Map<String,Object> row=new HashMap<>(); row.put("sessionId",req.getSessionId());row.put("customerId",customerId);row.put("interactionType",interactionType);row.put("stage",stage);row.put("consultModel",blankToNull(req.getConsultModel()));row.put("concern",blankToNull(req.getConcern()));row.put("specialMark",blankToNull(req.getSpecialMark()));row.put("addFanStatus",addFanStatus);row.put("note",blankToNull(req.getNote()));row.put("orderNo",blankToNull(req.getOrderNo()));row.put("registeredBy",userId);row.put("registeredName",operatorName);mapper.insertRegistration(row);
         Map<String,Object> customerUpdate=new HashMap<>();customerUpdate.put("id",customerId);customerUpdate.put("douyinAccount",blankToNull(req.getDouyinAccount()));customerUpdate.put("phone",blankToNull(req.getPhone()));customerUpdate.put("wechat",blankToNull(req.getWechat()));customerUpdate.put("stage",stage);customerUpdate.put("interactionStatus","BUY_INTENT".equals(interactionType)?"BUY_INTENT":"HAS_COMMENT");customerUpdate.put("fanStatus","UNKNOWN".equals(addFanStatus)?null:addFanStatus);customerUpdate.put("ownerUserId",ownerUserId);customerUpdate.put("ownerName",ownerName);mapper.updateCustomer(customerUpdate);
         Map<String,Object> opportunity=mapper.findOpenOpportunity(customerId,req.getSessionId());
         Map<String,Object> opportunityValue=new HashMap<>();opportunityValue.put("customerId",customerId);opportunityValue.put("sessionId",req.getSessionId());opportunityValue.put("interactionStatus",customerUpdate.get("interactionStatus"));opportunityValue.put("fanStatus",addFanStatus);opportunityValue.put("stage",stage);opportunityValue.put("consultModel",blankToNull(req.getConsultModel()));opportunityValue.put("concern",blankToNull(req.getConcern()));opportunityValue.put("specialMark",blankToNull(req.getSpecialMark()));opportunityValue.put("ownerUserId",ownerUserId);opportunityValue.put("ownerName",ownerName);opportunityValue.putAll(staff);
         // The first follow-up belongs to the account that actually saved it.
         // Room staffing remains separate attribution data.
         opportunityValue.put("controllerFirstFollowupUserId",userId);
-        opportunityValue.put("controllerFirstFollowupName",username);
+        opportunityValue.put("controllerFirstFollowupName",operatorName);
         if(opportunity==null){
             mapper.insertOpportunity(opportunityValue);
             opportunity=opportunityValue;
@@ -226,6 +244,14 @@ public class LiveCrmService {
             mapper.updateOpportunity(opportunityValue);
             opportunity=opportunityValue;
         }
+        // Registration is also the explicit ownership decision made in the
+        // form. Keep every active opportunity/task aligned with the customer,
+        // and record actual transfers (including first assignment from unclaimed).
+        mapper.synchronizeActiveOpportunityOwners(customerId,ownerUserId,ownerName);
+        mapper.synchronizeOpenTaskAssignees(customerId,ownerUserId,ownerName);
+        if(!newCustomer && !Objects.equals(oldOwnerUserId,ownerUserId)){
+            insertOwnerChangeRecord(customerId,oldOwnerName,ownerName,null,userId,stage);
+        }
         Long opportunityId=((Number)opportunity.get("id")).longValue();
         boolean terminalRegistration="ORDERED".equalsIgnoreCase(stage)
                 || "INVALID".equalsIgnoreCase(stage)
@@ -238,8 +264,8 @@ public class LiveCrmService {
             if(openTask!=null && !"PHONE_SERVICE".equals(openTask.get("taskType"))){
                 Map<String,Object> closeTask=new HashMap<>();
                 closeTask.put("id",openTask.get("id")); closeTask.put("status","DONE");
-                 closeTask.put("result","ORDERED".equalsIgnoreCase(stage) || blankToNull(req.getOrderNo())!=null ? "已下单" : "已标记无效");
-                closeTask.put("completedAt",new Date()); closeTask.put("completedBy",userId); closeTask.put("completedName",username);
+                closeTask.put("result","ORDERED".equalsIgnoreCase(stage) || blankToNull(req.getOrderNo())!=null ? "已下单" : "已标记无效");
+                closeTask.put("completedAt",new Date()); closeTask.put("completedBy",userId); closeTask.put("completedName",operatorName);
                 mapper.updateTask(closeTask);
             }
         } else {
@@ -255,6 +281,16 @@ public class LiveCrmService {
         if("ORDERED".equals(stage) || blankToNull(req.getOrderNo())!=null){
             Map<String,Object> order=mapper.findOrderByOpportunity(opportunityId);
             String orderNo=blankToNull(req.getOrderNo());
+            Map<String,Object> orderByNumber=orderNo==null?null:mapper.findOrderByOrderNo(orderNo);
+            if(orderByNumber!=null){
+                Long orderCustomerId=nullableLong(orderByNumber.get("customerId"));
+                if(!Objects.equals(orderCustomerId,customerId)){
+                    throw new ServiceException("该订单号已登记到其他客户，请核对客户或订单号");
+                }
+                // Repeated submissions for the same customer update the
+                // existing order instead of violating the global unique key.
+                order=orderByNumber;
+            }
             String orderStatus=orderNo==null?"ORDERED_PENDING_NO":"ENTERED_PENDING_SYNC";
             // Do not downgrade an order that already has a number/status when
             // a later registration only updates the customer stage.
@@ -265,28 +301,64 @@ public class LiveCrmService {
             orderValue.put("opportunityId",opportunityId);orderValue.put("customerId",customerId);
             orderValue.put("orderNo",orderNo);orderValue.put("orderStatus",orderStatus);
             orderValue.put("productModel",blankToNull(req.getConsultModel()));
-            if(order==null) mapper.insertOrder(orderValue);
-            else {orderValue.put("id",order.get("id"));mapper.updateOrder(orderValue);}
+            if(order==null){
+                try {
+                    mapper.insertOrder(orderValue);
+                } catch(RuntimeException ex) {
+                    if(!isDuplicateKey(ex)) throw ex;
+                    Map<String,Object> concurrent=mapper.findOrderByOrderNo(orderNo);
+                    if(concurrent!=null && Objects.equals(nullableLong(concurrent.get("customerId")),customerId)){
+                        orderValue.put("id",concurrent.get("id"));
+                        mapper.updateOrder(orderValue);
+                    } else {
+                        throw new ServiceException("该订单号已登记到其他客户，请核对客户或订单号");
+                    }
+                }
+            } else {
+                orderValue.put("id",order.get("id"));mapper.updateOrder(orderValue);
+            }
         }
-        Map<String,Object> result=new HashMap<>(customer);result.put("registrationId",row.get("id"));result.put("opportunityId",opportunityId); return result;
+        Map<String,Object> result=new HashMap<>(customer);
+        result.put("customerId",customerId);
+        result.put("registrationId",row.get("id"));
+        result.put("opportunityId",opportunityId);
+        return result;
     }
 
     @Transactional
     public Map<String,Object> actOnTask(Long id, LiveCrmTaskActionRequest req, Long userId, String username){
         Map<String,Object> task=mapper.getTask(id); if(task==null) throw new ServiceException("跟进任务不存在");
+        String operatorName=resolveUserName(userId,username);
         String action=req.getAction().trim().toUpperCase(Locale.ROOT);
         if(!Set.of("CLAIM","COMPLETE","NEXT","RELEASE").contains(action)) throw new ServiceException("不支持的任务操作");
+        Long opportunityId=((Number)task.get("opportunityId")).longValue();
+        Long customerId=((Number)task.get("customerId")).longValue();
+        boolean phoneTask="PHONE_SERVICE".equals(task.get("taskType"));
         Map<String,Object> update=new HashMap<>();update.put("id",id);update.put("result",blankToNull(req.getResult()));
         update.put("status","CLAIM".equals(action)?"IN_PROGRESS":"RELEASE".equals(action)?"RELEASED":"DONE");
-        if(!"CLAIM".equals(action)){update.put("completedAt",new Date());update.put("completedBy",userId);update.put("completedName",username);}
-        mapper.updateTask(update);
-        Long opportunityId=((Number)task.get("opportunityId")).longValue();
-        boolean phoneTask="PHONE_SERVICE".equals(task.get("taskType"));
+        if(!"CLAIM".equals(action)){update.put("completedAt",new Date());update.put("completedBy",userId);update.put("completedName",operatorName);}
         Map<String,Object> opportunity=new HashMap<>();opportunity.put("id",opportunityId);
         if("CLAIM".equals(action)){
-            if(phoneTask){ update.put("assigneeUserId",userId); update.put("assigneeName",username); mapper.updateTask(update); }
-            else { opportunity.put("ownerUserId",userId);opportunity.put("ownerName",username);opportunity.put("status","IN_PROGRESS");mapper.updateOpportunity(opportunity);mapper.updateCustomerOwnerByOpportunity(opportunityId,userId,username); }
+            if(phoneTask){
+                Object assignee=task.get("assigneeUserId");
+                if(assignee!=null && ((Number)assignee).longValue()!=userId) throw new ServiceException("该任务已由其他人员领取");
+                update.put("assigneeUserId",userId); update.put("assigneeName",operatorName);
+            } else {
+                Map<String,Object> customer=mapper.lockCustomerForUpdate(customerId);
+                if(customer==null) throw new ServiceException("客户不存在或已删除");
+                Long currentOwner=nullableLong(customer.get("ownerUserId"));
+                if(currentOwner!=null && currentOwner.longValue()!=userId.longValue()){
+                    String currentName=stringOrNull(customer.get("ownerName"));
+                    throw new ServiceException("该客户已由"+(currentName==null?"其他人员":currentName)+"领取");
+                }
+                if(currentOwner==null && mapper.claimCustomerIfUnassigned(customerId,userId,operatorName)!=1){
+                    throw new ServiceException("该客户刚刚已被其他人员领取，请刷新列表");
+                }
+                mapper.synchronizeActiveOpportunityOwners(customerId,userId,operatorName);
+                update.put("assigneeUserId",userId); update.put("assigneeName",operatorName);
+            }
         }
+        mapper.updateTask(update);
         if("RELEASE".equals(action) && !phoneTask){opportunity.put("status","RELEASED");mapper.updateOpportunity(opportunity);}
         if("NEXT".equals(action)){
             String date=blankToNull(req.getNextTaskDate()); if(date==null) throw new ServiceException("请选择下次跟进日期");
@@ -297,6 +369,74 @@ public class LiveCrmService {
             task.put("nextTaskId",next.get("id"));
         }
         task.put("action",action);return task;
+    }
+
+    @Transactional
+    public Map<String,Object> changeOwner(Long customerId, LiveCrmOwnerChangeRequest req, Long operatorUserId){
+        Map<String,Object> customer=mapper.lockCustomerForUpdate(customerId);
+        if(customer==null) throw new ServiceException("客户不存在或已删除");
+        Map<String,Object> newOwner=mapper.findEnabledUser(req.getOwnerUserId());
+        if(newOwner==null) throw new ServiceException("所选负责人不存在或已停用");
+        Long newOwnerUserId=((Number)newOwner.get("userId")).longValue();
+        String newOwnerName=String.valueOf(newOwner.get("userName"));
+        Long oldOwnerUserId=nullableLong(customer.get("ownerUserId"));
+        String oldOwnerName=stringOrNull(customer.get("ownerName"));
+        if(oldOwnerUserId!=null){
+            Map<String,Object> oldOwner=mapper.findEnabledUser(oldOwnerUserId);
+            if(oldOwner!=null && oldOwner.get("userName")!=null) oldOwnerName=stringOrNull(oldOwner.get("userName"));
+        }
+        if(Objects.equals(oldOwnerUserId,newOwnerUserId)){
+            mapper.transferCustomerOwner(customerId,newOwnerUserId,newOwnerName);
+            mapper.synchronizeActiveOpportunityOwners(customerId,newOwnerUserId,newOwnerName);
+            mapper.synchronizeOpenTaskAssignees(customerId,newOwnerUserId,newOwnerName);
+            return Map.of("customerId",customerId,"ownerUserId",newOwnerUserId,"ownerName",newOwnerName,"changed",false);
+        }
+
+        mapper.transferCustomerOwner(customerId,newOwnerUserId,newOwnerName);
+        mapper.synchronizeActiveOpportunityOwners(customerId,newOwnerUserId,newOwnerName);
+        mapper.synchronizeOpenTaskAssignees(customerId,newOwnerUserId,newOwnerName);
+
+        insertOwnerChangeRecord(customerId,oldOwnerName,newOwnerName,req.getReason(),operatorUserId,currentStage(customerId));
+        return Map.of("customerId",customerId,"ownerUserId",newOwnerUserId,"ownerName",newOwnerName,"changed",true);
+    }
+
+    private void insertOwnerChangeRecord(Long customerId,String oldOwnerName,String newOwnerName,String reason,
+                                         Long operatorUserId,String stage){
+        String note="负责人由“"+(oldOwnerName==null?"待领取":oldOwnerName)+"”修改为“"+newOwnerName+"”";
+        String normalizedReason=blankToNull(reason);
+        if(normalizedReason!=null) note+="；原因："+normalizedReason;
+        Map<String,Object> record=new HashMap<>();
+        record.put("customerId",customerId);
+        record.put("interactionType","OWNER_CHANGE");
+        record.put("stage",stage);
+        record.put("addFanStatus","UNKNOWN");
+        record.put("note",note);
+        record.put("registeredBy",operatorUserId);
+        record.put("registeredName",resolveUserName(operatorUserId,null));
+        mapper.insertRegistration(record);
+    }
+
+    private String currentStage(Long customerId){
+        Map<String,Object> customer=mapper.getCustomer(customerId);
+        String stage=customer==null?null:stringOrNull(customer.get("stage"));
+        return stage==null?"NOT_CONSULTED":stage;
+    }
+
+    private String resolveUserName(Long userId,String fallback){
+        if(userId!=null){
+            Map<String,Object> user=mapper.findEnabledUser(userId);
+            Object value=user==null?null:user.get("userName");
+            if(value!=null && blankToNull(String.valueOf(value))!=null) return String.valueOf(value);
+        }
+        return blankToNull(fallback)==null?"系统用户":fallback;
+    }
+
+    private Long nullableLong(Object value){
+        return value instanceof Number number ? number.longValue() : null;
+    }
+
+    private String stringOrNull(Object value){
+        return value==null?null:blankToNull(String.valueOf(value));
     }
 
     @Transactional
@@ -312,6 +452,12 @@ public class LiveCrmService {
     public Map<String,Object> customerDetail(Long id){
         Map<String,Object> customer=mapper.getCustomer(id);if(customer==null)throw new ServiceException("客户不存在");
         customer.put("identities",mapper.listCustomerIdentities(id));customer.put("interactions",mapper.listCustomerInteractions(id));customer.put("registrations",mapper.listCustomerRegistrations(id));customer.put("opportunities",mapper.listCustomerOpportunities(id));customer.put("orders",mapper.listCustomerOrders(id));customer.put("attachments",mapper.listCustomerAttachments(id));customer.put("tasks",mapper.listCustomerTasks(id));return customer;
+    }
+
+    public List<Map<String,Object>> searchCustomerSuggestions(String keyword,int limit){
+        String normalized=blankToNull(keyword);
+        if(normalized==null)return List.of();
+        return mapper.searchCustomerSuggestions(normalized,Math.min(Math.max(limit,1),8));
     }
 
     public Map<String,Object> batchDetail(Long id){Map<String,Object> batch=mapper.getBatch(id);if(batch==null)throw new ServiceException("上传批次不存在");batch.put("events",mapper.listBatchEvents(id));return batch;}

@@ -1,6 +1,6 @@
 <template>
   <div class="sidebar-logo-container" :class="{ collapse }">
-    <router-link class="sidebar-logo-link" to="/" :title="collapse ? 'Xinke ERP' : ''">
+    <router-link class="sidebar-logo-link" to="/" :title="collapse ? '鑫客直播运营' : ''">
 
       <!-- LOGO -->
       <span class="brand-mark" aria-hidden="true">
@@ -9,8 +9,8 @@
 
       <!-- 文字 -->
       <span v-if="!collapse" class="brand-copy">
-        <strong>Xinke ERP</strong>
-        <small>经营管理平台</small>
+        <strong>鑫客直播运营</strong>
+        <small>直播运营平台</small>
       </span>
 
     </router-link>

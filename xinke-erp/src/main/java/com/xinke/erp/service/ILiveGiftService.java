@@ -3,7 +3,7 @@ import java.util.List;import java.util.Map;import com.xinke.erp.domain.LiveGiftB
 public interface ILiveGiftService {
  List<Map<String,Object>> listLiveUserOptions(Map<String,Object> q);
  List<Map<String,Object>> listShopOptions();
- List<Map<String,Object>> listShops(Map<String,Object> q); Map<String,Object> getShop(Long id); void saveShop(Map<String,Object> v,String u);
+ List<Map<String,Object>> listShops(Map<String,Object> q); Map<String,Object> getShop(Long id); void saveShop(Map<String,Object> v,String u); void deleteShop(Long id);
  List<Map<String,Object>> listRooms(Map<String,Object> q); Map<String,Object> getRoom(Long id); void saveRoom(Map<String,Object> v,String u);
  List<Map<String,Object>> listSubjectMappings(Map<String,Object> q); void saveSubjectMapping(Map<String,Object> v,String u);
  List<Map<String,Object>> listDaily(Map<String,Object> q); Map<String,Object> getDaily(Long id); void saveDaily(Map<String,Object> v,String u);

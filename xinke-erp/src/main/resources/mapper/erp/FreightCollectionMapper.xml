@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xinke.erp.mapper.FreightCollectionMapper">
+  <sql id="scope">
+    <if test="scopeUserId!=null">and (f.created_by_user_id=#{scopeUserId} or exists (
+      select 1 from live_subject_user_map m where m.subject_type='SHOP' and m.subject_id=f.shop_id
+      and m.role_code='customer_admin' and m.user_id=#{scopeUserId}))</if>
+  </sql>
+  <sql id="filters"><where>
+    <include refid="scope"/>
+    <if test="beginDate!=null">and f.created_at&gt;=#{beginDate}</if>
+    <if test="endExclusive!=null">and f.created_at&lt;#{endExclusive}</if>
+    <if test="shopId!=null">and f.shop_id=#{shopId}</if>
+    <if test="orderNo!=null">and f.order_no like concat('%',#{orderNo},'%')</if>
+    <if test="creatorName!=null">and f.created_by_name_snapshot like concat('%',#{creatorName},'%')</if>
+    <if test="deliveryStatus!=null">and f.delivery_status=#{deliveryStatus}</if>
+    <if test="deductionMethod!=null">and f.deduction_method=#{deductionMethod}</if>
+  </where></sql>
+  <sql id="columns">f.id,f.shop_id shopId,f.shop_name_snapshot shopName,f.order_no orderNo,
+    f.delivery_status deliveryStatus,f.freight_amount freightAmount,f.deduction_method deductionMethod,
+    f.deduction_rate deductionRate,f.collected_at collectedAt,f.created_by_user_id createdByUserId,
+    f.created_by_name_snapshot createdByName,f.created_at createdAt,f.updated_by_user_id updatedByUserId,
+    f.updated_at updatedAt,f.remark,f.version</sql>
+  <select id="shops" resultType="map">
+    select s.shop_id shopId,s.shop_name shopName from erp_shop s where s.status='0'
+    <if test="!admin">and exists (select 1 from live_subject_user_map m where m.subject_type='SHOP'
+      and m.subject_id=s.shop_id and m.user_id=#{userId} and m.role_code in ('customer_service','customer_admin'))</if>
+    order by s.shop_code,s.shop_name limit 500
+  </select>
+  <select id="shop" resultType="map">
+    select s.shop_id shopId,s.shop_name shopName from erp_shop s where s.shop_id=#{shopId} and s.status='0'
+    <if test="!admin">and exists (select 1 from live_subject_user_map m where m.subject_type='SHOP'
+      and m.subject_id=s.shop_id and m.user_id=#{userId} and m.role_code in ('customer_service','customer_admin'))</if>
+  </select>
+  <select id="isManager" resultType="int">select count(*) from live_subject_user_map
+    where subject_type='SHOP' and subject_id=#{shopId} and user_id=#{userId} and role_code='customer_admin'</select>
+  <select id="list" resultType="map">select <include refid="columns"/> from live_freight_collection f
+    <include refid="filters"/> order by f.created_at desc,f.id desc limit #{limit} offset #{offset}</select>
+  <select id="summary" resultType="map">select count(*) total,coalesce(sum(f.freight_amount),0) freightAmount
+    ,coalesce(sum(case when f.delivery_status='SIGNED' then 1 else 0 end),0) signedCount
+    ,coalesce(sum(case when f.delivery_status='SHIPPED_UNSIGNED' then 1 else 0 end),0) unsignedCount
+    ,coalesce(sum(case when f.deduction_method='ALIPAY_PERSONAL' then 1 else 0 end),0) alipayCount
+    ,coalesce(sum(case when f.deduction_method='ALIPAY_PERSONAL' then f.freight_amount else 0 end),0) alipayAmount
+    ,coalesce(sum(case when f.deduction_method='ORDER_PAYMENT' then 1 else 0 end),0) orderPaymentCount
+    ,coalesce(sum(case when f.deduction_method='ORDER_PAYMENT' then f.freight_amount else 0 end),0) orderPaymentAmount
+    from live_freight_collection f <include refid="filters"/></select>
+  <select id="daily" resultType="map">select date(f.created_at) day,count(*) orderCount,
+    coalesce(sum(f.freight_amount),0) freightAmount from live_freight_collection f
+    <include refid="filters"/> group by date(f.created_at) order by day</select>
+  <select id="get" resultType="map">select <include refid="columns"/> from live_freight_collection f where f.id=#{id}</select>
+  <insert id="insert" parameterType="map" useGeneratedKeys="true" keyProperty="id">
+    insert into live_freight_collection(shop_id,shop_name_snapshot,order_no,delivery_status,freight_amount,
+      deduction_method,deduction_rate,collected_at,created_by_user_id,created_by_name_snapshot,remark)
+    values(#{shopId},#{shopName},#{orderNo},#{deliveryStatus},#{freightAmount},
+      #{deductionMethod},#{deductionRate},#{collectedAt},#{actorId},#{actorName},#{remark})
+  </insert>
+  <update id="update" parameterType="map">
+    update live_freight_collection set shop_id=#{shopId},shop_name_snapshot=#{shopName},order_no=#{orderNo},
+      delivery_status=#{deliveryStatus},freight_amount=#{freightAmount},deduction_method=#{deductionMethod},
+      deduction_rate=#{deductionRate},collected_at=#{collectedAt},updated_by_user_id=#{actorId},
+      remark=#{remark},version=version+1,updated_at=now()
+    where id=#{id} and version=#{version}
+  </update>
+</mapper>

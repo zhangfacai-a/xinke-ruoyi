@@ -1,7 +1,6 @@
 package com.xinke.framework.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -61,9 +60,6 @@ public class SecurityConfig
     @Autowired
     private PermitAllUrlProperties permitAllUrl;
 
-    @Value("${security.frame-ancestors:}")
-    private String frameAncestors;
-
 	/**
 	 * 身份验证实现
 	 */
@@ -94,13 +90,12 @@ public class SecurityConfig
         return httpSecurity
             // CSRF禁用，因为不使用session
             .csrf(csrf -> csrf.disable())
-            // 安全响应标头；外部 BI iframe 来源通过配置显式放行
+            // 安全响应标头；管理系统只允许同源页面嵌入。
             .headers((headersCustomizer) -> {
-                String allowedFrames = frameAncestors == null ? "" : frameAncestors.trim();
                 headersCustomizer.frameOptions(options -> options.disable())
                     .referrerPolicy(policy -> policy.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                     .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "camera=(), microphone=(), geolocation=()"))
-                    .contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'self' " + allowedFrames));
+                    .contentSecurityPolicy(csp -> csp.policyDirectives("frame-ancestors 'self'"));
             })
             // 认证失败处理类
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))

@@ -18,6 +18,8 @@ import com.xinke.erp.livecrm.mapper.LiveCrmMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.annotation.PreDestroy;
 
 import java.io.InputStream;
@@ -146,6 +148,38 @@ public class LiveCrmAttachmentService {
         URL url = getClient().generatePresignedUrl(signed);
         Map<String, Object> result = new LinkedHashMap<>(); result.put("attachmentId", attachmentId); result.put("url", url.toExternalForm()); result.put("expiresAt", signed.getExpiration().toInstant().toString());
         return result;
+    }
+
+    /** Builds a download link for an already loaded attachment without another database query. */
+    public String exportViewUrl(Map<String, Object> attachment) {
+        String objectKey = String.valueOf(attachment.get("objectKey"));
+        if (objectKey.startsWith("local:")) {
+            String relative = objectKey.substring("local:".length()).replace('\\', '/');
+            return currentBaseUrl() + "/profile/" + relative;
+        }
+        ensureConfigured();
+        GeneratePresignedUrlRequest signed = new GeneratePresignedUrlRequest(
+                properties.getBucket(), objectKey, HttpMethodName.GET);
+        signed.setExpiration(java.util.Date.from(
+                Instant.now().plusSeconds(properties.getExportDownloadSeconds())));
+        return getClient().generatePresignedUrl(signed).toExternalForm();
+    }
+
+    private String currentBaseUrl() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) return "";
+        var request = attributes.getRequest();
+        String proto = blankToNull(request.getHeader("X-Forwarded-Proto"));
+        String host = blankToNull(request.getHeader("X-Forwarded-Host"));
+        if (proto == null) proto = request.getScheme();
+        if (host == null) host = blankToNull(request.getHeader("Host"));
+        if (host == null) {
+            host = request.getServerName();
+            if (!("http".equals(proto) && request.getServerPort() == 80)
+                    && !("https".equals(proto) && request.getServerPort() == 443)) {
+                host += ":" + request.getServerPort();
+            }
+        }
+        return proto + "://" + host + request.getContextPath();
     }
 
     private COSClient getClient() {

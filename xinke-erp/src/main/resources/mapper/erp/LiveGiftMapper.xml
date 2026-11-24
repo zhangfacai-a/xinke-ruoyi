@@ -89,12 +89,13 @@
       and not exists(select 1 from live_ding_user_bind current_bind
         where current_bind.user_id=u.user_id and current_bind.sync_batch=#{syncBatch})
   </update>
-  <select id="selectShopOptions" resultType="java.util.LinkedHashMap">select shop_id shopId,shop_code shopCode,shop_name shopName,platform_name platformName,status from erp_shop where status='0' order by shop_name limit 500</select>
+  <select id="selectShopOptions" resultType="java.util.LinkedHashMap">select shop_id shopId,shop_code shopCode,shop_name shopName,platform_name platformName,status from erp_shop where status='0' order by shop_code,shop_name limit 500</select>
   <select id="selectShops" resultType="java.util.LinkedHashMap">
     select shop_id shopId,shop_code shopCode,shop_name shopName,platform_code platformCode,
       platform_name platformName,owner_name ownerName,status,remark
     from erp_shop
     <where>
+      and status&lt;&gt;'2'
       <if test="keyword!=null and keyword!=''">and (shop_code like concat('%',#{keyword},'%') or shop_name like concat('%',#{keyword},'%') or platform_name like concat('%',#{keyword},'%'))</if>
       <if test="status!=null and status!=''">and status=#{status}</if>
     </where>
@@ -102,7 +103,7 @@
   </select>
   <select id="selectShopById" resultType="java.util.LinkedHashMap">
     select shop_id shopId,shop_code shopCode,shop_name shopName,platform_code platformCode,
-      platform_name platformName,owner_name ownerName,status,remark from erp_shop where shop_id=#{shopId}
+      platform_name platformName,owner_name ownerName,status,remark from erp_shop where shop_id=#{shopId} and status&lt;&gt;'2'
   </select>
   <insert id="insertShop" parameterType="map" useGeneratedKeys="true" keyProperty="shopId">
     insert into erp_shop(shop_code,shop_name,platform_code,platform_name,owner_name,status,remark,create_by,create_time)
@@ -138,17 +139,23 @@
       (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='anchor') anchorIds,
       (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='anchor') anchorNames,
       (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='controller') controllerIds,
-      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='controller') controllerNames
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='controller') controllerNames,
+      (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='operator') operatorIds,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='operator') operatorNames,
+      (select group_concat(m.user_id order by u.nick_name) from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='customer_service') customerServiceIds,
+      (select group_concat(u.nick_name order by u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='customer_service') customerServiceNames,
+      (select group_concat(m.user_id) from live_subject_user_map m where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='customer_admin') customerAdminIds,
+      (select group_concat(u.nick_name separator '、') from live_subject_user_map m join sys_user u on u.user_id=m.user_id where m.subject_type=x.subjectType and m.subject_id=x.subjectId and m.role_code='customer_admin') customerAdminNames
     from (
       select 'ROOM' subjectType,room_id subjectId,room_code subjectCode,room_name subjectName,status from live_room
       union all
-      select 'SHOP' subjectType,shop_id subjectId,shop_code subjectCode,shop_name subjectName,status from erp_shop
+      select 'SHOP' subjectType,shop_id subjectId,shop_code subjectCode,shop_name subjectName,status from erp_shop where status&lt;&gt;'2'
     ) x
     <where>
       <if test="subjectType!=null and subjectType!=''">and x.subjectType=#{subjectType}</if>
       <if test="keyword!=null and keyword!=''">and (x.subjectCode like concat('%',#{keyword},'%') or x.subjectName like concat('%',#{keyword},'%'))</if>
     </where>
-    order by x.subjectType,x.status,x.subjectName limit #{limit}
+    order by x.subjectType,x.status,x.subjectCode,x.subjectName limit #{limit}
   </select>
   <delete id="deleteSubjectMappings">delete from live_subject_user_map where subject_type=#{subjectType} and subject_id=#{subjectId}</delete>
   <insert id="insertSubjectMapping">
@@ -274,4 +281,5 @@
   <select id="selectGiftSummary" resultType="java.util.LinkedHashMap">select count(*) handledOrders,sum(if(x.process_status='selected',1,0)) giftOrders,ifnull(sum(x.gift_quantity),0) giftQuantity,ifnull(sum(x.gift_cost),0) giftCost,ifnull(sum(x.pay_amount),0) orderAmount from (select s.order_no,s.process_status,max(o.pay_amount) pay_amount,ifnull(sum(g.quantity),0) gift_quantity,ifnull(sum(if(g.cost_status='included',g.total_cost,0)),0) gift_cost from erp_order_gift_status s left join erp_sales_order o on o.main_order_no=s.order_no left join erp_order_gift g on g.order_no=s.order_no <where><if test="beginDate!=null and beginDate!=''">and (o.pay_time&gt;=concat(#{beginDate},' 00:00:00') or (o.pay_time is null and s.update_time&gt;=concat(#{beginDate},' 00:00:00')) or (o.pay_time is null and s.update_time is null and s.create_time&gt;=concat(#{beginDate},' 00:00:00')))</if><if test="endDate!=null and endDate!=''">and (o.pay_time&lt;date_add(#{endDate},interval 1 day) or (o.pay_time is null and s.update_time&lt;date_add(#{endDate},interval 1 day)) or (o.pay_time is null and s.update_time is null and s.create_time&lt;date_add(#{endDate},interval 1 day)))</if><if test="shopName!=null and shopName!=''">and coalesce(o.shop_name,'未同步')=#{shopName}</if></where> group by s.order_no,s.process_status) x</select>
   <select id="selectGiftSummaryGroups" resultType="java.util.LinkedHashMap">select <choose><when test="groupBy==&quot;gift&quot;">g.gift_name_snapshot</when><when test="groupBy==&quot;date&quot;">date(coalesce(o.pay_time,s.update_time,s.create_time))</when><otherwise>coalesce(o.shop_name,'未同步')</otherwise></choose> groupName,count(distinct s.order_no) orderCount,ifnull(sum(g.quantity),0) giftQuantity,ifnull(sum(if(g.cost_status='included',g.total_cost,0)),0) giftCost from erp_order_gift_status s left join erp_sales_order o on o.main_order_no=s.order_no left join erp_order_gift g on g.order_no=s.order_no <where><if test="beginDate!=null and beginDate!=''">and (o.pay_time&gt;=concat(#{beginDate},' 00:00:00') or (o.pay_time is null and s.update_time&gt;=concat(#{beginDate},' 00:00:00')) or (o.pay_time is null and s.update_time is null and s.create_time&gt;=concat(#{beginDate},' 00:00:00')))</if><if test="endDate!=null and endDate!=''">and (o.pay_time&lt;date_add(#{endDate},interval 1 day) or (o.pay_time is null and s.update_time&lt;date_add(#{endDate},interval 1 day)) or (o.pay_time is null and s.update_time is null and s.create_time&lt;date_add(#{endDate},interval 1 day)))</if><if test="shopName!=null and shopName!=''">and coalesce(o.shop_name,'未同步')=#{shopName}</if></where> group by groupName order by giftCost desc limit 500</select>
   <insert id="insertDingSyncLog" parameterType="map">insert into live_ding_sync_log(sync_status,total_count,success_count,failure_count,error_message,create_by,create_time) values(#{syncStatus},#{totalCount},#{successCount},#{failureCount},#{errorMessage},#{username},sysdate())</insert>
+<update id="deleteShop">update erp_shop set status='2' where shop_id=#{shopId}</update>
 </mapper>

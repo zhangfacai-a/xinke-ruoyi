@@ -28,7 +28,7 @@ const router = useRouter()
 const sections = [
   { label: '礼品记录', value: 'ledger', permission: 'live:gift:ledger' },
   { label: '我的礼品设置', value: 'preference', permission: 'live:gift:preference' },
-  { label: '礼品经营 BI', value: 'bi', permission: 'live:gift:summary' },
+  { label: '礼品汇总', value: 'bi', permission: 'live:gift:summary' },
   { label: '快捷模板', value: 'template', permission: 'live:gift:template' }
 ]
 const availableSections = sections.filter(item => checkPermi([item.permission]))

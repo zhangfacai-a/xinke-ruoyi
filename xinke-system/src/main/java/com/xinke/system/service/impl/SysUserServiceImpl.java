@@ -440,12 +440,18 @@ public class SysUserServiceImpl implements ISysUserService
             List<SysUserRole> list = new ArrayList<SysUserRole>(roleIds.length);
             for (Long roleId : roleIds)
             {
+                SysRole role = roleMapper.selectRoleById(roleId);
+                if (role == null) throw new ServiceException("角色不存在");
+                if (role.getRoleKey() != null && role.getRoleKey().startsWith("auto_live_"))
+                {
+                    continue;
+                }
                 SysUserRole ur = new SysUserRole();
                 ur.setUserId(userId);
                 ur.setRoleId(roleId);
                 list.add(ur);
             }
-            userRoleMapper.batchUserRole(list);
+            if (!list.isEmpty()) userRoleMapper.batchUserRole(list);
         }
     }
 
@@ -460,7 +466,7 @@ public class SysUserServiceImpl implements ISysUserService
     public int deleteUserById(Long userId)
     {
         // 删除用户与角色关联
-        userRoleMapper.deleteUserRoleByUserId(userId);
+        userRoleMapper.deleteAllUserRoleByUserId(userId);
         // 删除用户与岗位表
         userPostMapper.deleteUserPostByUserId(userId);
         return userMapper.deleteUserById(userId);

@@ -57,7 +57,7 @@ user:
 spring:
   config:
     # Local private settings (COS credentials, etc.). Missing in production is allowed.
-    import: optional:file:./config/application-local.yml
+    import: optional:file:./config/local/application-local.yml
   # 资源信息
   messages:
     # 国际化资源文件路径
@@ -76,24 +76,18 @@ spring:
     restart:
       # 热部署开关
       enabled: false
-  quartz:
-    # Quartz has its own pool in addition to the application scheduler.
-    # Three workers are sufficient for the small number of reminder jobs.
-    properties:
-      org.quartz.threadPool.threadCount: ${XINKE_QUARTZ_POOL_SIZE:3}
   data:
     # redis 配置
     redis:
       # 生产服务器使用本机 Redis，开发环境可用 REDIS_HOST 覆盖。
       # 不再让服务器绕公网 IP 访问自身，避免重启期间连接失败。
-      host: ${REDIS_HOST:47.116.62.234}
-#      host: ${REDIS_HOST:127.0.0.1}
+      host: ${REDIS_HOST:127.0.0.1}
       # 端口，默认为6379
       port: 6379
       # 数据库索引
       database: 0
       # 密码
-      password: ${REDIS_PASSWORD:Xinke123.}
+      password: ${REDIS_PASSWORD:}
       # 连接超时时间
       timeout: 10s
       lettuce:
@@ -112,7 +106,7 @@ token:
   # 令牌自定义标识
   header: Authorization
   # 固定令牌密钥。修改后现有登录令牌会全部失效。
-  secret: xinke-jwt-2026-8f4c1a96-5e2d-4b79-a03c-9d7f6e18b4c2
+  secret: ${TOKEN_SECRET}
   # 令牌有效期（默认30分钟）
   expireTime: 43200
 
@@ -130,26 +124,6 @@ pagehelper:
   helperDialect: mysql
   supportMethodsArguments: true
   params: count=countSql
-
-# 动态数据集配置
-datahub:
-  # DataHub 数据表所在 Schema
-  schema: xinkeerp
-  # 必须是私有目录，代码会拒绝 xinke.profile 及其子目录
-  storage-path: D:/xinke/datahub-storage
-  table-prefix: dh_data_
-  max-file-size: 30MB
-  max-rows: 50000
-  max-dataset-rows: 200000
-  max-columns: 200
-  max-cell-length: 10000
-  preview-rows: 20
-  preview-expire-hours: 24
-  insert-batch-size: 500
-  recovery-stale-minutes: 30
-  dispatch-batch-size: 20
-  max-edit-mutations: 1000
-  version-retention-days: 30
 
 # Springdoc配置
 springdoc:
@@ -171,13 +145,11 @@ cors:
   # 前端页面允许访问后端的来源。端口通配用于本地开发和服务器反向代理端口变化。
   allowed-origin-patterns: http://localhost,http://localhost:*,http://127.0.0.1,http://127.0.0.1:*,chrome-extension://*
 
-# 外部 iframe 白名单，多个来源用空格分隔。
-security:
-  frame-ancestors: http://39.96.157.230
-
 live:
   metrics:
     reminder-cron: 0 */5 * * * ?
+    # 3.0 起仅接受直播大屏按 live_room_id 上报的新协议。
+    minimum-plugin-version: ${LIVE_METRICS_MINIMUM_PLUGIN_VERSION:3.0.0}
   crm:
     v2:
       # 插件上传正文使用 RSA-OAEP + AES-GCM。私钥应在生产环境通过 LIVE_CRM_V2_RSA_PRIVATE_KEY_V3 注入。
@@ -192,7 +164,7 @@ live:
       update-sha256: ${LIVE_CRM_V2_UPDATE_SHA256:}
   audience-rank:
     # 观众榜单扩展固定上传密钥，与插件 config.js 保持一致。
-    upload-key: 26fac28f8fd697cf7a2701f3e6401947d8fe22eb26028a6f925f6effbf9dfe98
+    upload-key: ${LIVE_AUDIENCE_UPLOAD_KEY:}
   gift:
     inventory:
       enabled: true
@@ -205,15 +177,16 @@ live:
     secret-key: ${LIVE_COS_SECRET_KEY:}
     presign-seconds: ${LIVE_COS_PRESIGN_SECONDS:300}
     download-seconds: ${LIVE_COS_DOWNLOAD_SECONDS:300}
+    export-download-seconds: ${LIVE_COS_EXPORT_DOWNLOAD_SECONDS:86400}
     max-file-size: ${LIVE_COS_MAX_FILE_SIZE:10485760}
   dingtalk:
     # 钉钉企业内部应用凭证，生产环境请通过环境变量注入。
-    app-key: dingsl2actbbkulcqquf
-    app-secret: tEefFZT8IfHby1YNslE8U8FJBBBywk-WIFkaJPPTE9hjkCWeNOeB4Jxhpn-Lz1AH
-    robot-code: dingsl2actbbkulcqquf
-    test-user-id: 101387942
+    app-key: ${DINGTALK_APP_KEY:}
+    app-secret: ${DINGTALK_APP_SECRET:}
+    robot-code: ${DINGTALK_ROBOT_CODE:}
+    test-user-id: ${DINGTALK_TEST_USER_ID:}
     # 新同步用户的初始密码；已有用户密码不会被覆盖。每天 02:30 自动同步。
-    default-password: ${DINGTALK_DEFAULT_PASSWORD:xk123456}
+    default-password: ${DINGTALK_DEFAULT_PASSWORD:}
     sync-cron: ${DINGTALK_SYNC_CRON:0 30 2 * * ?}
 
 # 防盗链配置

@@ -1,0 +1,50 @@
+﻿<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>鑫客主播工作台 · 使用说明</title><style>
+*{box-sizing:border-box}body{font:15px/1.9 'Microsoft YaHei UI','Microsoft YaHei',sans-serif;color:#283547;background:#f4f6f8;margin:0;padding:32px 18px}main{max-width:920px;margin:auto;background:white;padding:38px 48px;border:1px solid #e4e9ef;border-radius:10px}h1{font-size:27px;margin:0 0 8px}h2{font-size:20px;border-top:1px solid #e5e9ef;padding-top:25px;margin-top:30px}h3{font-size:17px}p{margin:12px 0;color:#536174}li{margin:9px 0}h1:before{content:'鑫';display:inline-grid;place-items:center;background:#e86023;color:white;border-radius:8px;width:38px;height:38px;margin-right:12px;font-size:25px}footer{font-size:12px;color:#758294;border-top:1px solid #e5e9ef;margin-top:30px;padding-top:15px}@media(max-width:600px){main{padding:24px 20px}h1{font-size:23px}}@media print{body{background:white;padding:0}main{border:0;padding:0}h2{break-after:avoid}li,p{orphans:3;widows:3}}
+</style></head><body><main><h1>鑫客主播工作台使用说明</h1>
+<p>适用版本：0.3.4 · Windows 10/11 64位 · 更新日期：2026年11月24日。</p>
+<h2>安装与打开</h2>
+<p>运行鑫客主播工作台安装包，按提示完成安装。首次安装默认勾选“创建桌面快捷方式”和“登录 Windows 后自动启动”，可按需要取消。</p>
+<p>需要 Windows 10/11 64位、可用网络和 Microsoft Edge WebView2 Runtime。安装包自带所需 .NET 运行组件；安装时检测 WebView2，缺少时尝试联网安装微软官方运行库。</p>
+<p>如果对方电脑提示“Couldn&#x27;t find a compatible WebView2 Runtime”，请关闭App，运行分享包内的 MicrosoftEdgeWebView2RuntimeInstallerX64.exe。安装完成后重新打开App即可，不需要重新填写业务数据。若运行库因系统策略无法安装，请联系该电脑管理员。微软官方页面：https://developer.microsoft.com/microsoft-edge/webview2/ 。</p>
+<p>安装完成后可直接启动；需要登录百应和鑫客网站账号，软件不会附带其他人的账号。</p>
+<p>安装后双击桌面“鑫客主播工作台”打开。开启自启后，在登录 Windows 时进入任务栏托盘（可能在任务栏右下角的隐藏图标内），双击托盘图标打开工作台。自启不会自动提交任何上报。</p>
+<h2>登录账号</h2>
+<p>软件使用两种账号，各自独立：</p>
+<ul>
+<li>网站账号：用于确认操作人、读取授权直播间及上传记录。使用日常鑫客网站账号登录。</li>
+<li>百应账号：用于读取直播场次和指标。登录成功后返回工作台，登录信息保存在本机。</li>
+</ul>
+<p>账号失效时按照页面提示重新登录，不需要把 Cookie 或密码发送给其他人。</p>
+<h2>每次上报</h2>
+<ol>
+<li>核对顶部直播间名称、开播时间和当前场次，必要时点击“切换场次”。</li>
+<li>在“本次上报”选择实际上播主播。普通主播只能上报本人被授权直播间的数据；管理员可以选择分配名单内的主播。</li>
+<li>点击“采集并预览”，等待指标采集和服务器生成区间预览。</li>
+<li>核对主播、起止时间、时长及本次区间数据。区间明细默认展开，并提供上次上报参考列。</li>
+<li>点击“确认上报”。看到成功提示后，可在“上报记录”查询；App和网站查看同一份记录。</li>
+</ol>
+<p>本场累计是整场直播截至采集时的累计数据；本次区间是这次归属主播要提交的数据。两者金额通常不同。</p>
+<p>上次参考是同一场次最近一条有效上报，可能属于另一位主播。两次时长不同，仅用于核对，不代表直接可比较的业绩。首次上报没有上次参考。</p>
+<p>重新采集、切换场次或更改主播后，需要重新预览。历史记录缺少的指标显示“—”，不代表0。</p>
+<h2>漏报与历史调整</h2>
+<p>管理员在“上报记录”中选择直播间和日期，使用补录、调整或作废操作，并核对受影响区间。修改或作废需要填写原因，操作会留痕。</p>
+<p>当前采集的累计数据不能当作过去某个时间的数据。漏报应走补录流程，不要修改当前上报结束时间来回填历史。</p>
+<p>若上次为人工补录，按页面提示从已确认的人工基线接续。首次上报从开播开始计算，确认前检查前面是否存在漏报主播。</p>
+<h2>为直播间分配主播（管理员）</h2>
+<p>进入“主播分配”，选择直播间，添加或移除可上报用户；核对名单变更后保存。也可以从其他直播间带入名单再修改。</p>
+<p>名单保存后App与网站同步，历史上报保留。普通主播看不到管理入口或没有目标直播间时，应由管理员检查分配和账号权限。</p>
+<h2>常见问题</h2>
+<ul>
+<li>没有数据或缺少指标：核对百应登录及场次，重新采集；仍失败时查看运行日志。不要把缺失指标手工填成0。</li>
+<li>直播间未匹配：由管理员确认系统直播间绑定，不要绑定到名称相似的其他直播间。</li>
+<li>提示预览过期或数据冲突：重新采集并生成预览，再确认提交。</li>
+<li>提交超时或出现待确认草稿：先点击“核对并重试原上报”，必要时查看记录。同一草稿重试有防重复保护，不要立即新建另一份上报。</li>
+<li>切换百应账号：在“设置与更新”退出百应后重新登录；退出网站账号是另一个独立操作。</li>
+<li>获取日志：进入“设置与更新”的运行日志，按采集、上传、登录或更新分类查看。反馈问题时提供出错时间、版本和相关错误，不要公开账号凭据。</li>
+</ul>
+<h2>软件更新</h2>
+<p>进入“设置与更新”，点击“检查更新”。发现新版后确认下载，软件校验安装包后提示开始安装。先完成正在进行的采集、上报或编辑再安装。</p>
+<p>更新覆盖程序文件并保留登录目录；登录是否仍有效取决于平台。更新会保留自启及快捷方式选择。</p>
+<h2>开机自启与使用帮助</h2>
+<p>在“设置与更新 → 启动设置”打开或关闭“登录 Windows 后自动启动”。自动启动进入托盘，手动打开正常显示窗口。退出软件可使用关闭按钮或托盘菜单的“退出”。</p>
+<p>在“设置与更新 → 使用帮助”或开始菜单“使用说明”查看随版本附带的本地文档，无需联网。</p><footer>鑫客主播工作台 0.3.4 · 本文档可离线阅读，也可使用浏览器打印功能保存为 PDF。</footer></main></body></html>

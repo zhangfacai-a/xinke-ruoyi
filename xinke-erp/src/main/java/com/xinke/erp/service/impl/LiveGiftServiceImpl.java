@@ -50,6 +50,8 @@ public class LiveGiftServiceImpl implements ILiveGiftService
 
     @Autowired
     private LiveGiftMapper mapper;
+    @Autowired
+    private com.xinke.erp.service.ShopStaffGroupService shopStaffGroups;
     @Value("${live.dingtalk.app-key:}")
     private String appKey;
     @Value("${live.dingtalk.app-secret:}")
@@ -64,6 +66,14 @@ public class LiveGiftServiceImpl implements ILiveGiftService
 
     @Override public List<Map<String, Object>> listShops(Map<String, Object> q) { return mapper.selectShops(limitedQuery(q, 200, 500)); }
     @Override public Map<String, Object> getShop(Long id) { return mapper.selectShopById(id); }
+    @Override @Transactional public void deleteShop(Long id) {
+        if(mapper.selectShopById(id)==null) throw new ServiceException("店铺不存在");
+        java.util.Set<Long> affected=shopStaffGroups.affectedUsers(id);
+        mapper.deleteShop(id);
+        mapper.deleteSubjectMappings("SHOP",id);
+        shopStaffGroups.removeShop(id);
+        shopStaffGroups.reconcile(affected);
+    }
 
     @Override
     @Transactional
@@ -71,6 +81,10 @@ public class LiveGiftServiceImpl implements ILiveGiftService
     {
         required(value, "shopCode", "店铺编码不能为空");
         required(value, "shopName", "店铺名称不能为空");
+        if (value.get("shopId") != null && mapper.selectShopById(Long.valueOf(value.get("shopId").toString())) == null)
+            throw new ServiceException("店铺不存在或已删除");
+        if (value.get("status") != null && !Set.of("0", "1").contains(value.get("status").toString()))
+            throw new ServiceException("店铺状态不正确");
         value.putIfAbsent("status", "0"); value.put("username", username);
         try
         {
@@ -80,6 +94,12 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         {
             throw new ServiceException("店铺编码已经存在");
         }
+        if(value.containsKey("staffGroupId")) {
+            Object raw=value.get("staffGroupId");
+            Long groupId=raw==null||raw.toString().isBlank()?null:Long.valueOf(raw.toString());
+            shopStaffGroups.bind(Long.valueOf(value.get("shopId").toString()),groupId,username);
+        }
+        shopStaffGroups.reconcile(shopStaffGroups.subjectUsers("SHOP",Long.valueOf(value.get("shopId").toString())));
     }
 
     @Override public List<Map<String, Object>> listRooms(Map<String, Object> q) { mapper.syncAudienceRooms(); return mapper.selectRooms(limitedQuery(q, 200, 500)); }
@@ -103,7 +123,12 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         }
     }
 
-    @Override public List<Map<String, Object>> listSubjectMappings(Map<String, Object> q) { return mapper.selectSubjectMappings(limitedQuery(q, 500, 500)); }
+    @Override public List<Map<String, Object>> listSubjectMappings(Map<String, Object> q) {
+        List<Map<String,Object>> result=mapper.selectSubjectMappings(limitedQuery(q,500,500));
+        for(Map<String,Object> row:result) if("SHOP".equals(row.get("subjectType")))
+            row.put("staffGroupId",shopStaffGroups.groupForShop(Long.valueOf(row.get("subjectId").toString())));
+        return result;
+    }
 
     @Override
     @Transactional
@@ -115,11 +140,29 @@ public class LiveGiftServiceImpl implements ILiveGiftService
         Long subjectId = Long.valueOf(value.get("subjectId").toString());
         if ("ROOM".equals(subjectType) && mapper.selectRoomById(subjectId) == null) throw new ServiceException("直播间不存在");
         if ("SHOP".equals(subjectType) && mapper.selectShopById(subjectId) == null) throw new ServiceException("店铺不存在");
+        if ("SHOP".equals(subjectType) && shopStaffGroups.groupForShop(subjectId)!=null)
+            throw new ServiceException("此店铺继承人员组，请先切换为单独配置");
+        java.util.Set<Long> affected=shopStaffGroups.subjectUsers(subjectType,subjectId);
         mapper.deleteSubjectMappings(subjectType, subjectId);
-        longList(value.get("anchorIds")).stream().distinct()
-            .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "anchor", username));
-        longList(value.get("controllerIds")).stream().distinct()
-            .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "controller", username));
+        if ("SHOP".equals(subjectType))
+        {
+            longList(value.get("operatorIds")).stream().distinct()
+                .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "operator", username));
+            longList(value.get("customerServiceIds")).stream().distinct()
+                .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "customer_service", username));
+            longList(value.get("customerAdminIds")).stream().distinct()
+                .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "customer_admin", username));
+        }
+        else
+        {
+            longList(value.get("anchorIds")).stream().distinct()
+                .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "anchor", username));
+            longList(value.get("controllerIds")).stream().distinct()
+                .forEach(userId -> mapper.insertSubjectMapping(subjectType, subjectId, userId, "controller", username));
+        }
+        affected=new java.util.HashSet<>(affected);
+        affected.addAll(shopStaffGroups.subjectUsers(subjectType,subjectId));
+        shopStaffGroups.reconcile(affected);
     }
 
     @Override public List<Map<String, Object>> listDaily(Map<String, Object> q) { return mapper.selectDailyRecords(limitedQuery(q, 200, 500)); }

@@ -8,59 +8,44 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface LiveMetricsMapper
 {
-    List<Map<String,Object>> listShifts(Map<String,Object> query);
-    Map<String,Object> getShift(@Param("shiftId") Long shiftId);
-    int insertShift(Map<String,Object> value);
-    int updateShift(Map<String,Object> value);
-    int countOverlappingShifts(Map<String,Object> value);
-    int countOverlappingAnchorShifts(Map<String,Object> value);
-    int countAnchorShiftsOnDate(Map<String,Object> value);
-    int countShiftSubmissions(@Param("shiftId") Long shiftId);
-    int deleteShift(@Param("shiftId") Long shiftId);
-
     List<Map<String,Object>> listRoomOptions();
-    List<Map<String,Object>> listRoomOptionsForAnchor(@Param("userId") Long userId);
+    List<Map<String,Object>> listRoomAnchors(@Param("roomId") Long roomId);
     List<Map<String,Object>> listStaffOptions();
-    List<Long> listHiddenStaffUserIds(@Param("viewerUserId") Long viewerUserId);
-    int deleteHiddenStaff(@Param("viewerUserId") Long viewerUserId);
-    int insertHiddenStaff(@Param("viewerUserId") Long viewerUserId,@Param("hiddenUserIds") List<Long> hiddenUserIds);
+    Map<String,Object> findRoomByAliasKey(@Param("aliasKey") String aliasKey);
     int countActiveUser(@Param("userId") Long userId);
     int countRoomAnchor(@Param("roomId") Long roomId,@Param("userId") Long userId);
-    String getDingUserId(@Param("userId") Long userId);
-
-    List<Map<String,Object>> listShiftTemplates(@Param("roomId") Long roomId);
-    int countShiftTemplateName(@Param("roomId") Long roomId,@Param("templateName") String name,@Param("templateId") Long templateId);
-    int insertShiftTemplate(Map<String,Object> value);
-    int updateShiftTemplate(Map<String,Object> value);
-    int deleteShiftTemplate(@Param("templateId") Long templateId);
-
-    Map<String,Object> findRoomByAliasKey(@Param("aliasKey") String aliasKey);
-    int insertRoomAlias(Map<String,Object> value);
-    Map<String,Object> findLiveSession(@Param("roomNameKey") String roomNameKey,@Param("liveStartTime") String liveStartTime);
-    Map<String,Object> findLiveSessionByRoom(@Param("roomId") Long roomId,@Param("liveStartTime") String liveStartTime);
-    Map<String,Object> getLiveSession(@Param("sessionId") Long sessionId);
-    int insertLiveSession(Map<String,Object> value);
-    int bindLiveSessionRoom(Map<String,Object> value);
-    List<Map<String,Object>> findAutoMatchShifts(@Param("roomId") Long roomId,
-            @Param("sessionId") Long sessionId,@Param("liveStartTime") String liveStartTime,
-            @Param("snapshotAt") String snapshotAt);
-
-    Map<String,Object> getSubmissionByKey(@Param("idempotencyKey") String key);
-    Map<String,Object> getSubmission(@Param("submissionId") Long submissionId);
-    int insertRawSubmission(Map<String,Object> value);
-    int countSessionSubmissions(@Param("sessionId") Long sessionId);
-    int updateSubmissionShift(Map<String,Object> value);
-    List<Map<String,Object>> listSessionSubmissions(@Param("sessionId") Long sessionId);
-    List<Map<String,Object>> listRawSessionSubmissions(@Param("sessionId") Long sessionId);
-    List<Map<String,Object>> listSessionShifts(@Param("sessionId") Long sessionId);
-    int resetSessionCalculation(@Param("sessionId") Long sessionId);
-    int resetShiftSubmissionStatus(@Param("sessionId") Long sessionId);
-    int updateSubmissionCalculation(Map<String,Object> value);
-    int markShiftSubmitted(@Param("shiftId") Long shiftId);
-    int refreshShiftStatus(@Param("shiftId") Long shiftId);
-    List<Map<String,Object>> listReportingRows(Map<String,Object> query);
-    int insertCorrection(Map<String,Object> value);
-
-    List<Map<String,Object>> findReminderCandidates();
-    int insertReminderLog(Map<String,Object> value);
+    int insertRoomAnchor(@Param("roomId") Long roomId,@Param("userId") Long userId,@Param("createBy") String createBy);
+    int deleteRoomAnchor(@Param("roomId") Long roomId,@Param("userId") Long userId);
+    Map<String,Object> findHandoverSessionByPlatformId(@Param("platformSessionId") String platformSessionId);
+    Map<String,Object> getHandoverSession(@Param("sessionId") Long sessionId);
+    Map<String,Object> lockHandoverSession(@Param("sessionId") Long sessionId);
+    int insertHandoverSession(Map<String,Object> value);
+    int updateHandoverSessionSnapshot(@Param("sessionId") Long sessionId,@Param("capturedAt") String capturedAt);
+    int resetHandoverSessionSnapshot(@Param("sessionId") Long sessionId,@Param("capturedAt") String capturedAt);
+    Map<String,Object> getHandoverSnapshotByKey(@Param("idempotencyKey") String idempotencyKey);
+    Map<String,Object> getLatestHandoverSnapshot(@Param("sessionId") Long sessionId);
+    Map<String,Object> getHandoverSnapshot(@Param("snapshotId") Long snapshotId);
+    int insertHandoverSnapshot(Map<String,Object> value);
+    Map<String,Object> getHandoverSegment(@Param("segmentId") Long segmentId);
+    int insertHandoverSegment(Map<String,Object> value);
+    int countHandoverSegmentOverlap(@Param("sessionId") Long sessionId,@Param("startTime") Object startTime,@Param("endTime") Object endTime,@Param("excludeSegmentId") Long excludeSegmentId);
+    int updateHandoverSegment(Map<String,Object> value);
+    int voidHandoverSegment(Map<String,Object> value);
+    List<Map<String,Object>> listHandoverRooms();
+    Map<String,Object> getHandoverRoom(@Param("roomId") Long roomId);
+    List<Map<String,Object>> listHandoverSessions(Map<String,Object> query);
+    List<Map<String,Object>> listHandoverSegments(@Param("sessionId") Long sessionId);
+    List<Map<String,Object>> listHandoverSnapshots(@Param("sessionId") Long sessionId);
+    List<Map<String,Object>> listHandoverCorrections(@Param("sessionId") Long sessionId);
+    int insertHandoverCorrection(Map<String,Object> value);
+    @org.apache.ibatis.annotations.Select("select room_id roomId from live_room where room_id=#{roomId} and status='0' for update")
+    Map<String,Object> lockRoom(@Param("roomId") Long roomId);
+    @org.apache.ibatis.annotations.Select("select count(*) from live_subject_user_map m join live_room r on r.room_id=m.subject_id and r.status='0' join sys_user u on u.user_id=m.user_id and u.status='0' and u.del_flag='0' where m.subject_type='ROOM' and m.role_code='anchor' and m.user_id=#{userId}")
+    int countActiveAnchorRooms(Long userId);
+    @org.apache.ibatis.annotations.Insert("insert ignore into sys_user_role(user_id,role_id) select #{userId},role_id from sys_role where role_key='auto_live_anchor_app' and status='0' and del_flag='0'")
+    int grantAppRole(Long userId);
+    @org.apache.ibatis.annotations.Delete("delete ur from sys_user_role ur join sys_role r on r.role_id=ur.role_id where ur.user_id=#{userId} and r.role_key='auto_live_anchor_app'")
+    int revokeAppRole(Long userId);
+    @org.apache.ibatis.annotations.Insert("insert into live_metric_room_alias(room_id,alias_name,alias_key,create_by,create_time) values(#{roomId},#{name},#{key},#{operator},now())")
+    int bindAlias(@Param("roomId") Long roomId,@Param("name") String name,@Param("key") String key,@Param("operator") String operator);
 }

@@ -25,7 +25,6 @@
         <fastjson.version>2.0.62</fastjson.version>
         <oshi.version>7.3.0</oshi.version>
         <commons.io.version>2.22.0</commons.io.version>
-        <commons.csv.version>1.12.0</commons.csv.version>
         <poi.version>4.1.2</poi.version>
         <velocity.version>2.3</velocity.version>
         <jwt.version>0.9.1</jwt.version>
@@ -93,13 +92,6 @@
                 <version>${commons.io.version}</version>
             </dependency>
 
-            <!-- CSV解析 -->
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-csv</artifactId>
-                <version>${commons.csv.version}</version>
-            </dependency>
-
             <!-- excel工具 -->
             <dependency>
                 <groupId>org.apache.poi</groupId>
@@ -135,13 +127,6 @@
                 <version>${kaptcha.version}</version>
             </dependency>
 
-            <!-- 定时任务-->
-            <dependency>
-                <groupId>com.xinke</groupId>
-                <artifactId>xinke-quartz</artifactId>
-                <version>${xinke.version}</version>
-            </dependency>
-
             <!-- 代码生成-->
             <dependency>
                 <groupId>com.xinke</groupId>
@@ -152,13 +137,6 @@
             <dependency>
                 <groupId>com.xinke</groupId>
                 <artifactId>xinke-erp</artifactId>
-                <version>${xinke.version}</version>
-            </dependency>
-
-            <!-- 数据表导入与动态数据集 -->
-            <dependency>
-                <groupId>com.xinke</groupId>
-                <artifactId>xinke-datahub</artifactId>
                 <version>${xinke.version}</version>
             </dependency>
 
@@ -190,10 +168,8 @@
         <module>xinke-admin</module>
         <module>xinke-framework</module>
         <module>xinke-system</module>
-        <module>xinke-quartz</module>
         <module>xinke-generator</module>
         <module>xinke-erp</module>
-        <module>xinke-datahub</module>
         <module>xinke-common</module>
     </modules>
     <packaging>pom</packaging>

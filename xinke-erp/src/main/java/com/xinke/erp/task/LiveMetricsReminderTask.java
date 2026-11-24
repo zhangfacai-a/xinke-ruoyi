@@ -1,3 +1,0 @@
-package com.xinke.erp.task;
-import org.slf4j.*; import org.springframework.scheduling.annotation.Scheduled; import org.springframework.stereotype.Component; import com.xinke.erp.service.LiveMetricsReminderService;
-@Component public class LiveMetricsReminderTask {private static final Logger log=LoggerFactory.getLogger(LiveMetricsReminderTask.class);private final LiveMetricsReminderService service;public LiveMetricsReminderTask(LiveMetricsReminderService service){this.service=service;}@Scheduled(cron="${live.metrics.reminder-cron:0 */5 * * * ?}") public void run(){try{service.sendPending();}catch(Exception e){log.error("直播数据提醒任务失败",e);}}}

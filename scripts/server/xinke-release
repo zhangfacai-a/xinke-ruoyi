@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEPLOY_ROOT=/ruoyi
+DB_NAME=xinkeerp
+DB_CONFIG=/etc/xinke-deploy-db.cnf
+
+preflight() {
+  systemctl is-active --quiet ruoyi
+  nginx -t
+  test "$(df -Pk "$DEPLOY_ROOT" | awk 'NR==2 {print $4}')" -gt 1048576
+  test -r "$DB_CONFIG"
+  curl -fsS --max-time 5 http://127.0.0.1/ >/dev/null
+  curl -fsS --max-time 5 http://127.0.0.1:8080/ >/dev/null
+  systemctl show ruoyi --property=ActiveState,MainPID,MemoryCurrent
+}
+
+rollback() {
+  local backup=$1
+  local failed=$2
+  systemctl stop ruoyi || true
+  if [[ -f "$DEPLOY_ROOT/xinke-admin.jar" && -f "$backup/xinke-admin.jar" ]]; then
+    mv "$DEPLOY_ROOT/xinke-admin.jar" "$failed/xinke-admin.failed.jar"
+    mv "$backup/xinke-admin.jar" "$DEPLOY_ROOT/xinke-admin.jar"
+  fi
+  if [[ -d "$DEPLOY_ROOT/dist" && -d "$backup/dist" ]]; then
+    mv "$DEPLOY_ROOT/dist" "$failed/dist"
+    mv "$backup/dist" "$DEPLOY_ROOT/dist"
+  fi
+  systemctl start ruoyi
+}
+
+deploy() {
+  local requested=$1
+  local stamp=$2
+  [[ "$stamp" =~ ^[0-9]{8}-[0-9]{6}$ ]] || { echo "invalid stamp" >&2; exit 2; }
+
+  local release
+  release=$(readlink -f "$requested")
+  [[ "$release" == "/home/deploy/releases/release-$stamp" ]] || { echo "invalid release directory" >&2; exit 2; }
+  test -s "$release/xinke-admin.jar"
+  test -s "$release/xinke-ui.tar.gz"
+  test -s "$release/add-live-metrics-void-report.sql"
+  test -s "$release/add-bi-live-anchor-segment-fact.sql"
+
+  preflight
+  local backup="$DEPLOY_ROOT/backup/deploy-$stamp"
+  local staging="$DEPLOY_ROOT/incoming/dist-new-$stamp"
+  local failed="$DEPLOY_ROOT/incoming/failed-$stamp"
+  mkdir -p "$backup" "$staging" "$failed"
+  tar -tzf "$release/xinke-ui.tar.gz" >/dev/null
+  tar -xzf "$release/xinke-ui.tar.gz" -C "$staging"
+  test -s "$staging/index.html"
+
+  local tables
+  tables=$(mysql --defaults-extra-file="$DB_CONFIG" -N -B -e \
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_name IN ('live_metric_anchor_segment','live_metric_segment_correction','bi_live_anchor_segment_fact') ORDER BY table_name")
+  grep -qx live_metric_anchor_segment <<<"$tables"
+  # shellcheck disable=SC2086
+  mysqldump --defaults-extra-file="$DB_CONFIG" --single-transaction --routines --triggers "$DB_NAME" $tables \
+    | gzip -c > "$backup/live-metrics.sql.gz"
+  test -s "$backup/live-metrics.sql.gz"
+
+  mysql --defaults-extra-file="$DB_CONFIG" "$DB_NAME" < "$release/add-live-metrics-void-report.sql"
+  mysql --defaults-extra-file="$DB_CONFIG" "$DB_NAME" < "$release/add-bi-live-anchor-segment-fact.sql"
+  local columns
+  columns=$(mysql --defaults-extra-file="$DB_CONFIG" -N -B "$DB_NAME" -e \
+    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='live_metric_anchor_segment' AND column_name IN ('void_reason','void_by','void_name','void_at')")
+  [[ "$columns" == 4 ]]
+  mysql --defaults-extra-file="$DB_CONFIG" -N -B "$DB_NAME" -e \
+    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='bi_live_anchor_segment_fact'" \
+    | grep -qx 1
+
+  cp -a "$DEPLOY_ROOT/xinke-admin.jar" "$backup/xinke-admin.jar"
+  cp -a "$DEPLOY_ROOT/dist" "$backup/dist"
+  systemctl stop ruoyi
+  install -o root -g root -m 0644 "$release/xinke-admin.jar" "$DEPLOY_ROOT/xinke-admin.jar"
+  rm -rf "$DEPLOY_ROOT/dist"
+  mv "$staging" "$DEPLOY_ROOT/dist"
+  chown -R root:root "$DEPLOY_ROOT/dist"
+  systemctl start ruoyi
+
+  local healthy=0
+  for _ in $(seq 1 45); do
+    if curl -fsS --max-time 3 http://127.0.0.1:8080/ >/dev/null; then
+      healthy=1
+      break
+    fi
+    sleep 2
+  done
+  if [[ "$healthy" != 1 ]]; then
+    rollback "$backup" "$failed"
+    echo "backend health check failed; previous release restored" >&2
+    exit 1
+  fi
+
+  nginx -t
+  curl -fsS --max-time 5 http://127.0.0.1/ >/dev/null
+  rm -rf "$release"
+  echo "DEPLOY_OK backup=$backup"
+  systemctl show ruoyi --property=ActiveState,MainPID,MemoryCurrent
+}
+
+case "${1:-}" in
+  preflight)
+    [[ $# == 1 ]] || exit 2
+    preflight
+    ;;
+  deploy)
+    [[ $# == 3 ]] || exit 2
+    deploy "$2" "$3"
+    ;;
+  *)
+    echo "usage: xinke-release preflight | xinke-release deploy RELEASE_DIR YYYYMMDD-HHMMSS" >&2
+    exit 2
+    ;;
+esac

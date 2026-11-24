@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import com.xinke.erp.service.ILiveGiftService;
+import com.xinke.erp.config.LiveScheduleGate;
 
 @Component
 public class DingTalkUserSyncTask
@@ -15,9 +16,13 @@ public class DingTalkUserSyncTask
     @Autowired
     private ILiveGiftService liveGiftService;
 
+    @Autowired
+    private LiveScheduleGate scheduleGate;
+
     @Scheduled(cron = "${live.dingtalk.sync-cron:0 30 2 * * ?}")
     public void syncUsers()
     {
+        if(!scheduleGate.isActive())return;
         try
         {
             liveGiftService.syncDingTalk("dingtalk-scheduler");

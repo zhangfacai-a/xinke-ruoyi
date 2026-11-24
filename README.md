@@ -1,175 +1,76 @@
-# 鑫客管理系统
+# 鑫客直播运营系统
 
-基于 SpringBoot+Vue 前后端分离架构定制开发的企业级综合管理系统，涵盖 ERP 进销存、财务核算、直播运营分析等核心业务场景。
+鑫客直播运营系统用于管理直播客户、主播数据上报和直播礼品等业务。项目采用 Spring Boot 与 Vue 3 前后端分离架构。
 
-## 技术栈
+## 主要功能
 
-| 层级          | 技术选型                    |
-| :------------ | :-------------------------- |
-| **后端框架**  | Spring Boot 3.5.14 / JDK 17 |
-| **安全认证**  | Spring Security + JWT       |
-| **持久层**    | MyBatis + Druid 连接池      |
-| **缓存**      | Redis (Lettuce)             |
-| **数据库**    | MySQL                       |
-| **前端框架**  | Vue 3.5 + Vite 6            |
-| **UI 组件库** | Element Plus 2.13           |
-| **状态管理**  | Pinia                       |
-| **图表**      | ECharts 5.6                 |
-| **API 文档**  | SpringDoc (OpenAPI 3)       |
+- 直播客户中心：接收插件上报的观众和评论，完成客户领取、跟进、资料维护与导出。
+- 主播数据上报：接收插件采集的直播经营指标，按主播交接区间计算业绩，并支持补录和调整。
+- 直播礼品：维护礼品记录、个人设置、快捷模板、库存与成本汇总。
+- 系统管理：管理用户、角色、菜单、部门、字典、日志和系统配置。
 
-## 项目模块
+## 项目结构
 
-```
-xinke-admin        启动入口 & 系统控制器
-xinke-framework    安全框架、拦截器、AOP 切面
-xinke-system       系统基础服务（用户/角色/菜单/字典等）
-xinke-erp          ERP 进销存 & 财务 & 直播运营业务模块
-xinke-quartz       定时任务调度
+```text
+xinke-admin        后端启动入口与系统控制器
+xinke-framework    安全框架、拦截器和通用配置
+xinke-system       用户、角色、菜单、字典等基础服务
+xinke-erp          直播运营后端模块（保留旧模块名以兼容现有代码）
 xinke-generator    代码生成器
-xinke-common       通用工具 & 基础组件
-xinke-ui           前端工程（Vue 3 + Vite）
+xinke-common       通用工具和基础组件
+xinke-ui           Vue 3 前端
+clients            插件、桌面启动器和发布包
+scripts            服务端启动与构建脚本
+config             本机配置模板和数据库维护脚本
 ```
 
-## 业务功能
-
-### ERP 进销存
-
-| 功能       | 说明                       |
-| :--------- | :------------------------- |
-| 商品管理   | 商品档案 & SKU 规格维护    |
-| 供应商管理 | 供应商信息及合作记录       |
-| 仓库管理   | 多仓库信息维护             |
-| 采购订单   | 采购下单、到货、入库全流程 |
-| 销售订单   | 销售开单、出库、发货管理   |
-| 库存管理   | 实时库存查询与库存变动流水 |
-| 流水管理   | 库存出入库明细追溯         |
-| 店铺管理   | 多渠道店铺信息维护         |
-
-### 财务管理
-
-| 功能     | 说明                     |
-| :------- | :----------------------- |
-| 应收管理 | 客户应收账款登记与核销   |
-| 应付管理 | 供应商应付款项登记与核销 |
-| 收支流水 | 资金收支明细记录         |
-| 费用管理 | 日常费用报销与分类统计   |
-| 对账管理 | 往来账项核对与差异处理   |
-| 结算管理 | 周期性结算与账单生成     |
-| 凭证管理 | 财务凭证录入与归档       |
-| 日利润   | 每日利润自动核算         |
-| 月结关闭 | 会计期间结账与关账       |
-| 财务配置 | 财务参数与科目配置       |
-
-### 直播运营
-
-| 功能         | 说明                                     |
-| :----------- | :--------------------------------------- |
-| 礼品记录     | 按订单录入礼品并联动库存与成本           |
-| 礼品与库存   | 礼品档案、成本版本和库存调整             |
-| 直播资料     | 直播间、主播、场控及快捷模板维护         |
-| 礼品成本汇总 | 礼品成本与库存数据分析                   |
-| 观众客户     | 跟进扩展同步的观众客户并查看团队运营情况 |
-
-### BI 数据看板
-
-| 功能       | 说明                     |
-| :--------- | :----------------------- |
-| 综合仪表盘 | 核心经营指标可视化展示   |
-| 多维分析   | 按店铺/商品/时间维度汇总 |
-
-### 系统管理
-
-| 功能       | 说明                          |
-| :--------- | :---------------------------- |
-| 用户管理   | 系统用户配置与状态管理        |
-| 角色管理   | 角色权限分配与数据范围划分    |
-| 菜单管理   | 系统菜单与按钮权限标识配置    |
-| 部门管理   | 组织机构树结构维护            |
-| 岗位管理   | 用户职务配置                  |
-| 字典管理   | 常用固定数据字典维护          |
-| 参数管理   | 系统动态参数配置              |
-| 通知公告   | 系统公告信息发布              |
-| 操作日志   | 正常操作 & 异常信息日志记录   |
-| 登录日志   | 登录记录与异常追踪            |
-| 在线用户   | 活跃用户状态监控              |
-| 定时任务   | 在线任务调度与执行日志        |
-| 代码生成   | 前后端代码一键生成（CRUD）    |
-| 服务监控   | CPU / 内存 / 磁盘 / 堆栈信息  |
-| 缓存监控   | 缓存信息查询与命令统计        |
-| 连接池监控 | 数据库连接池状态与慢 SQL 分析 |
-
-## 快速开始
-
-### 环境要求
+## 技术环境
 
 - JDK 17+
 - Maven 3.6+
-- Node.js 16+（推荐 pnpm）
 - MySQL 8.0+
 - Redis 6.0+
+- Node.js 18+
+- pnpm
 
-### 后端启动
+## 本地运行
 
-```bash
-# 1. 导入 SQL 脚本
-#    基础表结构：sql/ry_20260417.sql
-#    定时任务：sql/quartz.sql
-#    业务模块：按 sql/ 目录下对应脚本依次执行
+后端：
 
-# 2. 修改配置
-#    编辑 xinke-admin/src/main/resources/application-druid.yml
-#    配置 MySQL 连接和 Redis 地址（支持环境变量注入）
-
-# 3. 编译运行
-mvn clean package -DskipTests
-java -jar xinke-admin/target/xinke-admin.jar
+```powershell
+powershell -File scripts/server/manage.ps1 build
+powershell -File scripts/server/manage.ps1 run
 ```
 
-后端默认端口 **8080**，Druid 监控台地址 `/druid`。
+本机数据库、Redis 和其他私有配置从 `config/local/application-local.yml` 读取。首次使用可复制同目录的 `application-local.example.yml`，实际配置文件已被 Git 忽略。
 
-### 前端启动
+前端：
 
 ```bash
-cd xinke-ui
-
-# 安装依赖
-pnpm install
-
-# 开发模式
-pnpm dev
-
-# 生产构建
-pnpm build:prod
+pnpm --dir xinke-ui install
+pnpm --dir xinke-ui dev
 ```
 
-前端开发服务器默认端口 **80**（Vite），API 代理指向 `localhost:8080`。
+生产构建：
 
-### 环境变量
+```bash
+pnpm --dir xinke-ui build:prod
+```
 
-| 变量             | 说明         | 默认值        |
-| :--------------- | :----------- | :------------ |
-| `MYSQL_HOST`     | MySQL 地址   | 47.116.62.234 |
-| `MYSQL_PORT`     | MySQL 端口   | 3306          |
-| `MYSQL_DATABASE` | 数据库名     | xinkeerp      |
-| `MYSQL_USERNAME` | 数据库用户   | root          |
-| `REDIS_HOST`     | Redis 地址   | 47.116.62.234 |
-| `REDIS_PORT`     | Redis 端口   | 6379          |
-| `JWT_SECRET`     | JWT 签名密钥 | —             |
+后端清理和测试也统一由同一个脚本执行：
 
-## SQL 脚本说明
+```powershell
+powershell -File scripts/server/manage.ps1 clean
+powershell -File scripts/server/manage.ps1 test
+```
 
-`sql/` 目录按功能模块拆分，主要包括：
+Linux 服务器使用 `sh scripts/server/manage.sh`，参数与 PowerShell 版本一致。
 
-| 脚本                           | 说明                                     |
-| :----------------------------- | :--------------------------------------- |
-| `live_gift_*.sql`              | 礼品、库存、直播资料及菜单迁移           |
-| `live_menu_grouping.sql`       | 直播运营菜单分组                         |
-| `dy_audience_rank.sql`         | 抖音观众榜单表结构                       |
-| `dy_audience_assignment_rule.sql` | 观众客户智能分配规则                 |
-| `dy_audience_rank_menu.sql`    | 抖音观众榜单菜单与权限                   |
-| `dy_audience_rank_cleanup.sql` | 删除旧插件、旧观众追单及影刀数据         |
+## 旧模块清理
 
-操作人员教程：[`docs/观众客户工作台与插件使用教程.md`](docs/观众客户工作台与插件使用教程.md)
+传统 ERP、财务、旧 BI 和 DataHub 代码已经下线。部署新版本时，在业务数据库执行一次 `config/database/remove-unused-business-menus.sql`，可移除对应菜单、角色授权和旧 ERP ETL 任务配置。该脚本不会删除业务表或历史业务数据，执行后重启后端并重新登录。
+
+通用 Quartz 任务模块已移除。直播提醒、钉钉同步和客户转交仍由直播模块内的 Spring 定时任务执行。
 
 ## 许可
 

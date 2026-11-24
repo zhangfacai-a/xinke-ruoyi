@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "鑫客主播数据上报",
+  "version": "5.0.12",
+  "description": "主播结束时单次上报，按本场上一条累计记录自动计算归属数据",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["http://47.116.62.234/*"],
+  "background": {"service_worker": "background.js", "type": "module"},
+  "icons": {"16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png"},
+  "action": {"default_title": "打开主播数据上报", "default_icon": {"16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png"}},
+  "content_scripts": [{"matches": ["https://compass.jinritemai.com/*", "https://buyin.jinritemai.com/*"], "js": ["dom-collector.js", "ui-state.js", "content.js"], "run_at": "document_start"}]
+}

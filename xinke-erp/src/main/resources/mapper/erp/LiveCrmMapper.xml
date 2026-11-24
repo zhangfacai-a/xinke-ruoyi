@@ -293,7 +293,7 @@
   <select id="listInbox" resultType="map">
     select /*+ MAX_EXECUTION_TIME(5000) */ c.id customerId,c.display_name nickname,
       case when c.consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id) then 'CONTACTED' else c.consult_stage end stage,
-      c.interaction_status interactionStatus,c.fan_status fanStatus,c.owner_user_id ownerUserId,c.owner_name ownerName,
+      c.interaction_status interactionStatus,c.fan_status fanStatus,c.owner_user_id ownerUserId,coalesce(nullif(ou.nick_name,''),c.owner_name) ownerName,
       page.sessionId,page.lastInteractionAt,page.interactionCount,page.commentCount,page.interactionType,
       (select ce.content from dy_audience_v2_interaction_event ce where ce.customer_id=c.id and ce.event_type='COMMENT'
         <if test="sessionId!=null">and ce.session_id=#{sessionId}</if>
@@ -305,9 +305,9 @@
       s.room_name roomName,s.live_date liveDate,
       (select o.id from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) opportunityId,
       (select o.anchor_user_id from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) anchorUserId,
-      (select o.anchor_name from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) anchorName,
+      (select coalesce(nullif(au.nick_name,''),nullif(o.anchor_name,'')) from dy_audience_v2_opportunity o left join sys_user au on au.user_id=o.anchor_user_id where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) anchorName,
       (select o.controller_user_id from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) controllerUserId,
-      (select o.controller_name from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) controllerName,
+      (select coalesce(nullif(cu.nick_name,''),nullif(o.controller_name,'')) from dy_audience_v2_opportunity o left join sys_user cu on cu.user_id=o.controller_user_id where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) controllerName,
       (select o.special_mark from dy_audience_v2_opportunity o where o.customer_id=c.id <if test="sessionId!=null">and o.session_id=#{sessionId}</if> order by o.id desc limit 1) specialMark,
       (select ft.id from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date)) desc,ft.task_date,ft.id desc limit 1) taskId,
       (select case when ft.status='PENDING' and ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) then 'OVERDUE' else ft.status end from dy_audience_v2_followup_task ft join dy_audience_v2_opportunity fo on fo.id=ft.opportunity_id where fo.customer_id=c.id and ft.status not in ('DONE','RELEASED') <if test="sessionId!=null">and fo.session_id=#{sessionId}</if> order by (ft.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date)) desc,ft.task_date,ft.id desc limit 1) taskStatus,
@@ -388,6 +388,7 @@
     ) page
     join dy_audience_v2_customer c on c.id=page.customerId
     left join dy_audience_v2_live_session s on s.id=page.sessionId
+    left join sys_user ou on ou.user_id=c.owner_user_id
     order by page.lastInteractionAt desc,page.customerId desc
   </select>
   <select id="countInbox" resultType="long">
@@ -440,6 +441,20 @@
   </select>
   <select id="findCustomerByUid" resultType="map">select c.id,c.display_name displayName,c.nickname_key nicknameKey,c.consult_stage stage,c.owner_user_id ownerUserId,c.owner_name ownerName from dy_audience_v2_customer c join dy_audience_v2_identity i on i.customer_id=c.id where i.sec_uid=#{secUid} limit 1</select>
   <select id="findCustomerByNickname" resultType="map">select id,display_name displayName,nickname_key nicknameKey,consult_stage stage,owner_user_id ownerUserId,owner_name ownerName from dy_audience_v2_customer where nickname_key=#{nicknameKey} order by id limit 1</select>
+  <select id="searchCustomerSuggestions" resultType="map">
+    select c.id customerId,c.display_name nickname,c.douyin_account douyinAccount,
+      c.phone,c.wechat,c.owner_user_id ownerUserId,
+      coalesce(nullif(u.nick_name,''),c.owner_name) ownerName
+    from dy_audience_v2_customer c
+    left join sys_user u on u.user_id=c.owner_user_id
+    where c.display_name like concat('%',#{keyword},'%')
+      or c.douyin_account like concat('%',#{keyword},'%')
+      or c.phone like concat('%',#{keyword},'%')
+      or c.wechat like concat('%',#{keyword},'%')
+    order by case when c.display_name=#{keyword} then 0 when c.display_name like concat(#{keyword},'%') then 1 else 2 end,
+      c.updated_at desc,c.id desc
+    limit #{limit}
+  </select>
   <select id="findIdentity" resultType="map">select id,customer_id customerId,sec_uid secUid from dy_audience_v2_identity where customer_id=#{customerId} and ((#{secUid} is not null and sec_uid=#{secUid}) or (#{secUid} is null and sec_uid is null and nickname_key=#{nicknameKey})) order by id limit 1</select>
   <select id="countDistinctIdentityUids" resultType="long">select count(distinct sec_uid) from dy_audience_v2_identity where customer_id=#{customerId} and sec_uid is not null and sec_uid!=''</select>
   <update id="markSameNameMultiIdentity">update dy_audience_v2_identity set same_name_multi_identity=1 where customer_id=#{customerId}</update>
@@ -464,6 +479,44 @@
       owner_name=coalesce(#{ownerName},owner_name),
       updated_at=now()
     where id=#{id}
+  </update>
+  <select id="lockCustomerForUpdate" resultType="map">
+    select c.id,
+      coalesce(c.owner_user_id,(select o.owner_user_id from dy_audience_v2_opportunity o
+        where o.customer_id=c.id and o.owner_user_id is not null
+          and o.status not in ('RELEASED','COMPLETED') order by o.id desc limit 1)) ownerUserId,
+      coalesce((select nullif(u.nick_name,'') from sys_user u where u.user_id=coalesce(c.owner_user_id,
+          (select o.owner_user_id from dy_audience_v2_opportunity o where o.customer_id=c.id and o.owner_user_id is not null
+            and o.status not in ('RELEASED','COMPLETED') order by o.id desc limit 1)) limit 1),c.owner_name,(select o.owner_name from dy_audience_v2_opportunity o
+        where o.customer_id=c.id and o.owner_user_id is not null
+          and o.status not in ('RELEASED','COMPLETED') order by o.id desc limit 1)) ownerName
+    from dy_audience_v2_customer c where c.id=#{customerId} for update
+  </select>
+  <update id="claimCustomerIfUnassigned">
+    update dy_audience_v2_customer
+    set owner_user_id=#{ownerUserId},owner_name=#{ownerName},updated_at=now()
+    where id=#{customerId} and owner_user_id is null
+      and not exists(select 1 from dy_audience_v2_opportunity o
+        where o.customer_id=#{customerId} and o.owner_user_id is not null
+          and o.status not in ('RELEASED','COMPLETED'))
+  </update>
+  <update id="synchronizeActiveOpportunityOwners">
+    update dy_audience_v2_opportunity
+    set owner_user_id=#{ownerUserId},owner_name=#{ownerName},updated_at=now()
+    where customer_id=#{customerId} and status not in ('RELEASED','COMPLETED')
+  </update>
+  <update id="transferCustomerOwner">
+    update dy_audience_v2_customer
+    set owner_user_id=#{ownerUserId},owner_name=#{ownerName},updated_at=now()
+    where id=#{customerId}
+  </update>
+  <update id="synchronizeOpenTaskAssignees">
+    update dy_audience_v2_followup_task t
+    join dy_audience_v2_opportunity o on o.id=t.opportunity_id
+    set t.assignee_user_id=#{ownerUserId},t.assignee_name=#{ownerName},t.updated_at=now()
+    where o.customer_id=#{customerId}
+      and t.status not in ('DONE','RELEASED')
+      and t.task_type!='PHONE_SERVICE'
   </update>
   <update id="updateCustomerOwnerByOpportunity">
     update dy_audience_v2_customer c
@@ -492,7 +545,8 @@
   <select id="listWorkbench" resultType="map">
     select c.id customerId,c.display_name nickname,c.douyin_account douyinAccount,c.phone,c.wechat,
       case when c.consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id) then 'CONTACTED' else c.consult_stage end stage,
-      c.interaction_status interactionStatus,c.fan_status fanStatus,c.owner_name ownerName,
+      c.interaction_status interactionStatus,c.fan_status fanStatus,
+      coalesce((select nullif(u.nick_name,'') from sys_user u where u.user_id=c.owner_user_id limit 1),c.owner_name) ownerName,
       (select i.sec_uid from dy_audience_v2_identity i where i.customer_id=c.id and i.sec_uid is not null order by i.last_seen_at desc limit 1) secUid,
       (select o.special_mark from dy_audience_v2_opportunity o where o.customer_id=c.id order by o.id desc limit 1) specialMark,
       (select s.room_name from dy_audience_v2_interaction_event le join dy_audience_v2_live_session s on s.id=le.session_id where le.customer_id=c.id order by le.occurred_at desc,le.id desc limit 1) roomName,
@@ -551,16 +605,16 @@
       <where><if test="sessionId!=null">e.session_id=#{sessionId}</if></where>
   </select>
   <select id="getCustomer" resultType="map">
-    select id customerId,display_name nickname,douyin_account douyinAccount,phone,wechat,interaction_status interactionStatus,fan_status fanStatus,
-      case when consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id) then 'CONTACTED' else consult_stage end stage,owner_user_id ownerUserId,owner_name ownerName,priority,created_at createdAt,updated_at updatedAt
+    select c.id customerId,c.display_name nickname,c.douyin_account douyinAccount,c.phone,c.wechat,c.interaction_status interactionStatus,c.fan_status fanStatus,
+      case when c.consult_stage='NOT_CONSULTED' and exists(select 1 from dy_audience_v2_manual_registration sr where sr.customer_id=c.id) then 'CONTACTED' else c.consult_stage end stage,c.owner_user_id ownerUserId,coalesce(nullif(u.nick_name,''),c.owner_name) ownerName,c.priority,c.created_at createdAt,c.updated_at updatedAt
       ,case when exists(select 1 from dy_audience_v2_identity si where si.customer_id=c.id and si.same_name_multi_identity=1) then 1 else 0 end sameNameMultiIdentity,
       case when exists(select 1 from dy_audience_v2_interaction_event pe where pe.customer_id=c.id and pe.source_type='PLUGIN_REALTIME') then 'PLUGIN' else 'MANUAL' end sourceType
-    from dy_audience_v2_customer c where c.id=#{customerId}
+    from dy_audience_v2_customer c left join sys_user u on u.user_id=c.owner_user_id where c.id=#{customerId}
   </select>
   <select id="listCustomerIdentities" resultType="map">select id,sec_uid secUid,nickname,source_type sourceType,same_name_multi_identity sameNameMultiIdentity,first_seen_at firstSeenAt,last_seen_at lastSeenAt from dy_audience_v2_identity where customer_id=#{customerId} order by last_seen_at desc limit 50</select>
   <select id="listCustomerInteractions" resultType="map">select e.id,e.session_id sessionId,e.event_type eventType,e.content,e.occurred_at occurredAt,e.source_type sourceType,e.payload_json payloadJson,s.room_name roomName,s.live_date liveDate,coalesce(wp.watch_seconds,0) watchSeconds from dy_audience_v2_interaction_event e left join dy_audience_v2_live_session s on s.id=e.session_id left join (select session_id,customer_id,least(max(cast(json_unquote(json_extract(payload_json,'$.watchSeconds')) as unsigned)),21600) watch_seconds from dy_audience_v2_interaction_event where customer_id=#{customerId} and event_type='VIEWER' and json_valid(payload_json) and cast(json_unquote(json_extract(payload_json,'$.watchSeconds')) as unsigned)&gt;=300 group by session_id,customer_id) wp on wp.customer_id=e.customer_id and wp.session_id=e.session_id where e.customer_id=#{customerId} order by e.occurred_at desc,e.id desc limit 100</select>
   <select id="listCustomerRegistrations" resultType="map">select r.id,r.session_id sessionId,r.interaction_type interactionType,r.consult_stage stage,r.consult_model consultModel,r.concern,r.special_mark specialMark,r.fan_status fanStatus,r.note,r.order_no orderNo,coalesce(nullif(u.nick_name,''),r.registered_name) registeredName,r.created_at createdAt,s.room_name roomName,s.live_date liveDate,(select o.id from dy_audience_v2_opportunity o where o.customer_id=r.customer_id and (r.session_id is null or o.session_id=r.session_id) order by o.id desc limit 1) opportunityId from dy_audience_v2_manual_registration r left join dy_audience_v2_live_session s on s.id=r.session_id left join sys_user u on u.user_id=r.registered_by where r.customer_id=#{customerId} order by r.id desc limit 100</select>
-  <select id="listCustomerOpportunities" resultType="map">select id,session_id sessionId,consult_stage stage,consult_model consultModel,concern,special_mark specialMark,owner_user_id ownerUserId,owner_name ownerName,anchor_user_id anchorUserId,anchor_name anchorName,controller_user_id controllerUserId,controller_name controllerName,controller_first_followup_at controllerFirstFollowupAt,controller_first_followup_user_id controllerFirstFollowupUserId,controller_first_followup_name controllerFirstFollowupName,status,handoff_reason handoffReason,handoff_at handoffAt,first_followed_at firstFollowedAt,last_followed_at lastFollowedAt,created_at createdAt,updated_at updatedAt from dy_audience_v2_opportunity where customer_id=#{customerId} order by id desc limit 100</select>
+  <select id="listCustomerOpportunities" resultType="map">select o.id,o.session_id sessionId,o.consult_stage stage,o.consult_model consultModel,o.concern,o.special_mark specialMark,o.owner_user_id ownerUserId,coalesce(nullif(u.nick_name,''),o.owner_name) ownerName,o.anchor_user_id anchorUserId,coalesce(nullif(au.nick_name,''),nullif(o.anchor_name,'')) anchorName,o.controller_user_id controllerUserId,coalesce(nullif(cu.nick_name,''),nullif(o.controller_name,'')) controllerName,o.controller_first_followup_at controllerFirstFollowupAt,o.controller_first_followup_user_id controllerFirstFollowupUserId,o.controller_first_followup_name controllerFirstFollowupName,o.status,o.handoff_reason handoffReason,o.handoff_at handoffAt,o.first_followed_at firstFollowedAt,o.last_followed_at lastFollowedAt,o.created_at createdAt,o.updated_at updatedAt from dy_audience_v2_opportunity o left join sys_user u on u.user_id=o.owner_user_id left join sys_user au on au.user_id=o.anchor_user_id left join sys_user cu on cu.user_id=o.controller_user_id where o.customer_id=#{customerId} order by o.id desc limit 100</select>
   <select id="listCustomerOrders" resultType="map">select id,order_no orderNo,order_status orderStatus,product_model productModel,pay_amount payAmount,submitted_at submittedAt,updated_at updatedAt from dy_audience_v2_order_link where customer_id=#{customerId} order by id desc limit 100</select>
   <select id="listCustomerAttachments" resultType="map">select id,opportunity_id opportunityId,order_id orderId,original_name originalName,content_type contentType,file_size fileSize,status,uploaded_by uploadedBy,created_at createdAt from dy_audience_v2_attachment where customer_id=#{customerId} and status='READY' order by id desc limit 100</select>
   <select id="listCustomerTasks" resultType="map">select t.id,t.opportunity_id opportunityId,t.task_date taskDate,t.status,t.task_type taskType,t.result,t.created_at createdAt from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id where o.customer_id=#{customerId} order by (t.status not in ('DONE','RELEASED')) desc,t.id desc limit 100</select>
@@ -569,6 +623,13 @@
   <update id="completeAttachment">update dy_audience_v2_attachment set status='READY',sha256=coalesce(#{sha256},sha256),uploaded_at=now(),failure_reason=null where id=#{id}</update>
   <update id="updateAttachmentObjectKey">update dy_audience_v2_attachment set object_key=#{objectKey} where id=#{id}</update>
   <update id="markAttachmentFailed">update dy_audience_v2_attachment set status='FAILED',failure_reason=#{reason} where id=#{id}</update>
+  <select id="listReadyAttachmentsForCustomers" resultType="map">
+    select id,customer_id customerId,object_key objectKey,original_name originalName
+    from dy_audience_v2_attachment
+    where status='READY' and customer_id in
+    <foreach collection="customerIds" item="customerId" open="(" separator="," close=")">#{customerId}</foreach>
+    order by customer_id,id
+  </select>
   <insert id="insertRegistration" useGeneratedKeys="true" keyProperty="id">
     insert into dy_audience_v2_manual_registration(session_id,customer_id,interaction_type,stage,consult_stage,consult_model,concern,special_mark,add_fan_status,fan_status,note,order_no,registered_by,registered_name)
     values(#{sessionId},#{customerId},#{interactionType},#{stage},#{stage},#{consultModel},#{concern},#{specialMark},#{addFanStatus},#{addFanStatus},#{note},#{orderNo},#{registeredBy},#{registeredName})
@@ -582,10 +643,11 @@
   <select id="getTask" resultType="map">select t.id,t.opportunity_id opportunityId,t.task_type taskType,t.task_date taskDate,t.status,t.assignee_user_id assigneeUserId,t.assignee_name assigneeName,t.handoff_reason handoffReason,o.customer_id customerId,o.owner_user_id ownerUserId,o.owner_name ownerName from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id where t.id=#{id}</select>
   <update id="updateTask">update dy_audience_v2_followup_task set status=#{status},result=#{result},assignee_user_id=coalesce(#{assigneeUserId},assignee_user_id),assignee_name=coalesce(#{assigneeName},assignee_name),completed_at=#{completedAt},completed_by=#{completedBy},completed_name=#{completedName},updated_at=now() where id=#{id}</update>
   <select id="findOrderByOpportunity" resultType="map">select id,order_no orderNo,order_status orderStatus from dy_audience_v2_order_link where opportunity_id=#{opportunityId} order by id desc limit 1</select>
+  <select id="findOrderByOrderNo" resultType="map">select id,opportunity_id opportunityId,customer_id customerId,order_no orderNo,order_status orderStatus from dy_audience_v2_order_link where order_no=#{orderNo} limit 1</select>
   <insert id="insertOrder" useGeneratedKeys="true" keyProperty="id">insert into dy_audience_v2_order_link(opportunity_id,customer_id,order_no,order_status,product_model,submitted_at,source_type) values(#{opportunityId},#{customerId},#{orderNo},#{orderStatus},#{productModel},now(),'MANUAL')</insert>
   <update id="updateOrder">update dy_audience_v2_order_link set order_no=coalesce(#{orderNo},order_no),order_status=#{orderStatus},product_model=coalesce(#{productModel},product_model),pay_amount=coalesce(#{payAmount},pay_amount),shipped_at=case when #{orderStatus}='SHIPPED' and shipped_at is null then now() else shipped_at end,completed_at=case when #{orderStatus}='COMPLETED' and completed_at is null then now() else completed_at end,refunded_at=case when #{orderStatus}='REFUNDED' and refunded_at is null then now() else refunded_at end,updated_at=now() where id=#{id}</update>
   <select id="getOrder" resultType="map">select id,opportunity_id opportunityId,customer_id customerId,order_no orderNo,order_status orderStatus,product_model productModel,pay_amount payAmount from dy_audience_v2_order_link where id=#{id}</select>
-  <select id="listTasks" resultType="map">select t.id,t.task_date taskDate,t.task_type taskType,t.assignee_user_id assigneeUserId,t.assignee_name assigneeName,t.handoff_reason handoffReason,case when t.status='PENDING' and t.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) then 'OVERDUE' else t.status end status,o.consult_stage stage,o.consult_model consultModel,o.owner_name ownerName,c.display_name nickname,c.id customerId,o.session_id sessionId from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id join dy_audience_v2_customer c on c.id=o.customer_id where t.status not in ('DONE','RELEASED') order by (t.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date)) desc,t.task_date,t.id limit #{offset},#{limit}</select>
+  <select id="listTasks" resultType="map">select t.id,t.task_date taskDate,t.task_type taskType,t.assignee_user_id assigneeUserId,coalesce(nullif(au.nick_name,''),t.assignee_name) assigneeName,t.handoff_reason handoffReason,case when t.status='PENDING' and t.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date) then 'OVERDUE' else t.status end status,o.consult_stage stage,o.consult_model consultModel,coalesce(nullif(ou.nick_name,''),c.owner_name,o.owner_name) ownerName,c.display_name nickname,c.id customerId,o.session_id sessionId from dy_audience_v2_followup_task t join dy_audience_v2_opportunity o on o.id=t.opportunity_id join dy_audience_v2_customer c on c.id=o.customer_id left join sys_user au on au.user_id=t.assignee_user_id left join sys_user ou on ou.user_id=coalesce(c.owner_user_id,o.owner_user_id) where t.status not in ('DONE','RELEASED') order by (t.task_date&lt;cast(convert_tz(now(),'+00:00','+08:00') as date)) desc,t.task_date,t.id limit #{offset},#{limit}</select>
   <select id="countTasks" resultType="long">select count(*) from dy_audience_v2_followup_task where status not in ('DONE','RELEASED')</select>
   <select id="listPhoneHandoffCandidates" resultType="map">
     select o.id opportunityId,

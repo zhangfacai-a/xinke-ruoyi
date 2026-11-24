@@ -278,6 +278,29 @@ public class TokenService
         }
     }
 
+    /** Refresh an online user's role snapshot after a managed grant changes. */
+    public void refreshPermissionByUserId(Long userId, SysPermissionService permissionService,
+                                           com.xinke.system.service.ISysUserService userService)
+    {
+        String pattern = CacheConstants.LOGIN_TOKEN_KEY + "*";
+        Collection<String> keys = redisCache.keys(pattern);
+        if (keys == null) return;
+        for (String key : keys)
+        {
+            LoginUser loginUser = getLoginUserByKey(key);
+            if (loginUser == null || !userId.equals(loginUser.getUserId())) continue;
+            com.xinke.common.core.domain.entity.SysUser user = userService.selectUserById(userId);
+            if (user == null || !"0".equals(user.getStatus()) || !"0".equals(user.getDelFlag()))
+            {
+                redisCache.deleteObject(key);
+                continue;
+            }
+            loginUser.setUser(user);
+            loginUser.setPermissions(permissionService.getMenuPermission(user));
+            refreshToken(loginUser);
+        }
+    }
+
     private LoginUser toLoginUser(Object cacheObject)
     {
         if (cacheObject == null)

@@ -1,0 +1,12 @@
+{
+  "version": "0.3.4",
+  "files": {
+    "app.ico": "b011169f0d7e9e8a03ec52e6574ba8f8601622c6fdef74d741405be55d30e08f",
+    "ui/anchor-desktop.html": "c2ad370c1b91787d68398e6b40b7d7368a4072d922740e03e1addadd3338bd4b",
+    "ui/assets/anchor-desktop-Chr8oqVm.css": "bf03edda4e013117f1e3e57f82e39db97ac32b077a52c52fa734787ca6ac0b50",
+    "ui/assets/anchor-desktop-T1c0cqEz.js": "d08ca83dc3deb8043cc9458455c0d423576106417cda6b2569f7502572c37163",
+    "ui/favicon.ico": "67834c776d53132b0e94e2ff69fe3937859890414861a85c920d51ef1a533b82",
+    "help/使用说明.html": "6ec2dd5c3a97f944d3588728012ef077db03384dfe5036368c84fde457f73c66",
+    "help/安装后须知.txt": "650ed172c18c1d86b93383af8237cecabfa6aefc56037492f318f324c80f9f79"
+  }
+}

@@ -1,18 +1,18 @@
 <template>
   <div class="login">
     <div class="login-visual">
-      <div class="brand-pill">XINKE ERP</div>
-      <h1>让经营数据回到业务现场</h1>
-      <p>统一管理 ERP、BI、财务核算与经营决策，让运营和财务基于同一套数据工作。</p>
+      <div class="brand-pill">XINKE LIVE</div>
+      <h1>让直播运营更清晰</h1>
+      <p>统一管理直播客户、主播交接、经营数据与礼品记录。</p>
       <div class="visual-metrics">
-        <span><strong>统一</strong>业务口径</span>
-        <span><strong>实时</strong>经营数据</span>
-        <span><strong>闭环</strong>财务协同</span>
+        <span><strong>统一</strong>客户跟进</span>
+        <span><strong>清晰</strong>主播交接</span>
+        <span><strong>准确</strong>片段业绩</span>
       </div>
     </div>
     <el-form ref="loginRef" :model="loginForm" :rules="loginRules" class="login-form">
       <h3 class="title">{{ title }}</h3>
-      <p class="subtitle">登录经营管理平台</p>
+      <p class="subtitle">登录直播运营平台</p>
       <el-form-item prop="username">
         <el-input v-model="loginForm.username" type="text" size="large" auto-complete="off" placeholder="账号">
           <template #prefix><svg-icon icon-class="user" class="el-input__icon input-icon" /></template>

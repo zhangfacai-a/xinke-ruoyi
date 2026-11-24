@@ -69,7 +69,8 @@
       where i.customer_id=c.id and i.sec_uid is not null and i.sec_uid!='' and i.sec_uid not like 'dom:%'
       order by i.last_seen_at desc,i.id desc limit 1) secUid,
     coalesce(o.consult_stage,c.consult_stage) stage,c.interaction_status interactionStatus,c.fan_status fanStatus,
-    coalesce(o.owner_user_id,c.owner_user_id) ownerUserId,coalesce(o.owner_name,c.owner_name) ownerName,
+    coalesce(c.owner_user_id,o.owner_user_id) ownerUserId,
+    coalesce(nullif(ou.nick_name,''),c.owner_name,o.owner_name) ownerName,
     a.sessionId,a.firstInteractionAt,a.lastInteractionAt,a.commentCount,a.lastCommentId,a.visitCount,a.watchSeconds,
     s.room_name roomName,s.live_date liveDate,o.id opportunityId,o.special_mark specialMark,
     o.controller_user_id controllerUserId,o.controller_name controllerName,
@@ -79,7 +80,11 @@
     t.id taskId,t.task_type taskType,t.task_date taskDate,
     case when t.status='PENDING' and t.task_date&lt;current_date then 'OVERDUE' else t.status end taskStatus,
     t.assignee_user_id taskAssigneeUserId,t.assignee_name taskAssigneeName,
-    ol.id orderId,ol.order_no orderNo,ol.order_status orderStatus
+    ol.id orderId,ol.order_no orderNo,ol.order_status orderStatus,
+    (select group_concat(distinct nullif(trim(eol.order_no),'') order by eol.id separator '；')
+      from dy_audience_v2_order_link eol where eol.customer_id=c.id) orderNos,
+    (select count(*) from dy_audience_v2_attachment ea
+      where ea.customer_id=c.id and ea.status='READY') screenshotCount
   </sql>
 
   <sql id="centerFrom">
@@ -87,14 +92,15 @@
     join dy_audience_v2_customer c on c.id=a.customerId
     join dy_audience_v2_live_session s on s.id=a.sessionId
     left join latest_opportunity o on o.customer_id=c.id
+    left join sys_user ou on ou.user_id=coalesce(c.owner_user_id,o.owner_user_id)
     left join latest_task t on t.customer_id=c.id
     left join latest_order ol on ol.customer_id=c.id
   </sql>
 
   <sql id="centerWhere">
     <where>
-      <if test="queue=='INBOX'">coalesce(o.owner_user_id,c.owner_user_id) is null</if>
-      <if test="queue=='FOLLOWUP'">coalesce(o.owner_user_id,c.owner_user_id) is not null</if>
+      <if test="queue=='INBOX'">coalesce(c.owner_user_id,o.owner_user_id) is null</if>
+      <if test="queue=='FOLLOWUP'">coalesce(c.owner_user_id,o.owner_user_id) is not null</if>
       <if test="commentedOnly">and a.commentCount&gt;0</if>
       <if test="stage!=null">and coalesce(o.consult_stage,c.consult_stage)=#{stage}</if>
       <if test="keyword!=null">
@@ -133,10 +139,10 @@
     select /*+ MAX_EXECUTION_TIME(5000) */ count(*) validCustomers,
       sum(a.commentCount&gt;0) commentedCustomers,
       sum(a.commentCount=0 and a.watchSeconds&gt;=300) viewerCustomers,
-      sum(coalesce(o.owner_user_id,c.owner_user_id) is null) unclaimed,
-      sum(coalesce(o.owner_user_id,c.owner_user_id) is not null) claimed,
-      sum(a.commentCount&gt;0 and coalesce(o.owner_user_id,c.owner_user_id) is null) unclaimedCommented,
-      sum(a.commentCount&gt;0 and coalesce(o.owner_user_id,c.owner_user_id) is not null) claimedCommented,
+      sum(coalesce(c.owner_user_id,o.owner_user_id) is null) unclaimed,
+      sum(coalesce(c.owner_user_id,o.owner_user_id) is not null) claimed,
+      sum(a.commentCount&gt;0 and coalesce(c.owner_user_id,o.owner_user_id) is null) unclaimedCommented,
+      sum(a.commentCount&gt;0 and coalesce(c.owner_user_id,o.owner_user_id) is not null) claimedCommented,
       sum(coalesce(o.consult_stage,c.consult_stage)='CONSULTING') consulting,
       sum(coalesce(o.consult_stage,c.consult_stage)='ORDERED' or ol.id is not null) ordered,
       sum(coalesce(o.controller_first_followup_at,o.first_followed_at) is not null) controllerFollowed,
@@ -147,14 +153,14 @@
 
   <select id="ownerRanking" resultType="map">
     <include refid="activityCtes"/>
-    select coalesce(o.owner_user_id,c.owner_user_id) ownerUserId,
-      coalesce(o.owner_name,c.owner_name,'待领取') ownerName,count(*) customerCount,
+    select coalesce(c.owner_user_id,o.owner_user_id) ownerUserId,
+      coalesce(nullif(ou.nick_name,''),c.owner_name,o.owner_name,'待领取') ownerName,count(*) customerCount,
       sum(a.commentCount&gt;0) commentedCount,
       sum(coalesce(o.consult_stage,c.consult_stage)='CONSULTING') consultingCount,
       sum(coalesce(o.consult_stage,c.consult_stage)='ORDERED' or ol.id is not null) orderedCount
     <include refid="centerFrom"/>
-    where coalesce(o.owner_user_id,c.owner_user_id) is not null
-    group by coalesce(o.owner_user_id,c.owner_user_id),coalesce(o.owner_name,c.owner_name,'待领取')
+    where coalesce(c.owner_user_id,o.owner_user_id) is not null
+    group by coalesce(c.owner_user_id,o.owner_user_id),coalesce(nullif(ou.nick_name,''),c.owner_name,o.owner_name,'待领取')
     order by orderedCount desc,customerCount desc limit 50
   </select>
 

@@ -32,11 +32,26 @@ public interface LiveCrmMapper {
     List<Map<String,Object>> listRoomStaff(@Param("roomNameKey") String roomNameKey);
     Map<String,Object> findCustomerByUid(String secUid);
     Map<String,Object> findCustomerByNickname(String nicknameKey);
+    List<Map<String,Object>> searchCustomerSuggestions(@Param("keyword") String keyword,
+                                                       @Param("limit") int limit);
     Map<String,Object> findIdentity(@Param("customerId") Long customerId, @Param("secUid") String secUid, @Param("nicknameKey") String nicknameKey);
     long countDistinctIdentityUids(@Param("customerId") Long customerId);
     int markSameNameMultiIdentity(Long customerId);
     int insertCustomer(Map<String,Object> value);
     int updateCustomer(Map<String,Object> value);
+    Map<String,Object> lockCustomerForUpdate(@Param("customerId") Long customerId);
+    int claimCustomerIfUnassigned(@Param("customerId") Long customerId,
+                                  @Param("ownerUserId") Long ownerUserId,
+                                  @Param("ownerName") String ownerName);
+    int synchronizeActiveOpportunityOwners(@Param("customerId") Long customerId,
+                                           @Param("ownerUserId") Long ownerUserId,
+                                           @Param("ownerName") String ownerName);
+    int transferCustomerOwner(@Param("customerId") Long customerId,
+                              @Param("ownerUserId") Long ownerUserId,
+                              @Param("ownerName") String ownerName);
+    int synchronizeOpenTaskAssignees(@Param("customerId") Long customerId,
+                                     @Param("ownerUserId") Long ownerUserId,
+                                     @Param("ownerName") String ownerName);
     int updateCustomerOwnerByOpportunity(@Param("opportunityId") Long opportunityId,
                                          @Param("ownerUserId") Long ownerUserId,
                                          @Param("ownerName") String ownerName);
@@ -90,6 +105,7 @@ public interface LiveCrmMapper {
     int completeAttachment(@Param("id") Long id, @Param("sha256") String sha256);
     int updateAttachmentObjectKey(@Param("id") Long id, @Param("objectKey") String objectKey);
     int markAttachmentFailed(@Param("id") Long id, @Param("reason") String reason);
+    List<Map<String,Object>> listReadyAttachmentsForCustomers(@Param("customerIds") List<Long> customerIds);
     int insertRegistration(Map<String,Object> value);
     List<Map<String,Object>> listPhoneHandoffCandidates();
     Map<String,Object> findOpenPhoneTask(@Param("opportunityId") Long opportunityId);
@@ -104,6 +120,7 @@ public interface LiveCrmMapper {
     Map<String,Object> getTask(Long id);
     int updateTask(Map<String,Object> value);
     Map<String,Object> findOrderByOpportunity(@Param("opportunityId") Long opportunityId);
+    Map<String,Object> findOrderByOrderNo(@Param("orderNo") String orderNo);
     int insertOrder(Map<String,Object> value);
     int updateOrder(Map<String,Object> value);
     Map<String,Object> getOrder(Long id);

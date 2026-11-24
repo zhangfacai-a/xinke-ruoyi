@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 import com.xinke.common.exception.ServiceException;
 import com.xinke.erp.livecrm.mapper.LiveCrmCenterMapper;
+import com.xinke.erp.livecrm.mapper.LiveCrmMapper;
 
 @Service
 public class LiveCrmCenterService {
@@ -23,10 +24,16 @@ public class LiveCrmCenterService {
     private static final int MAX_RANGE_DAYS = 31;
     private static final int MAX_EXPORT_ROWS = 10000;
     private final LiveCrmCenterMapper mapper;
+    private final LiveCrmMapper liveCrmMapper;
+    private final LiveCrmAttachmentService attachmentService;
     private final Semaphore exportPermit = new Semaphore(1, true);
 
-    public LiveCrmCenterService(LiveCrmCenterMapper mapper) {
+    public LiveCrmCenterService(LiveCrmCenterMapper mapper,
+                                LiveCrmMapper liveCrmMapper,
+                                LiveCrmAttachmentService attachmentService) {
         this.mapper = mapper;
+        this.liveCrmMapper = liveCrmMapper;
+        this.attachmentService = attachmentService;
     }
 
     public Map<String, Object> list(String day, String beginDate, String endDate, String roomName,
@@ -75,6 +82,7 @@ public class LiveCrmCenterService {
             String roomKey = normalizeRoom(roomName);
             List<Map<String, Object>> rows = mapper.exportCustomers(window.beginAt(), window.endAt(),
                     roomKey, normalizeQueue(queue), null, blankToNull(stage), commentedOnly, MAX_EXPORT_ROWS);
+            hydrateExportAttachments(rows);
             String range = window.beginDate() + "至" + window.endDate();
             String filename = URLEncoder.encode("直播客户明细-" + range + ".csv", StandardCharsets.UTF_8)
                     .replace("+", "%20");
@@ -85,7 +93,7 @@ public class LiveCrmCenterService {
             response.setHeader("Cache-Control", "no-store");
             try (PrintWriter writer = response.getWriter()) {
                 writer.write('\ufeff');
-                writer.println("日期,直播间,客户昵称,抖音号,手机号,微信号,首次互动,最近互动,最新评论,评论数,来访次数,有效观看分钟,客户阶段,负责人,场控首次跟进时间,场控");
+                writer.println("日期,直播间,客户昵称,抖音号,手机号,微信号,首次互动,最近互动,最新评论,评论数,来访次数,有效观看分钟,客户阶段,负责人,订单号,截图数量,截图文件名,截图链接,场控首次跟进时间,场控");
                 for (Map<String, Object> row : rows) {
                     writer.println(csv(row.get("liveDate")) + ',' + csv(row.get("roomName")) + ','
                             + csv(row.get("nickname")) + ',' + csv(row.get("douyinAccount")) + ','
@@ -94,6 +102,8 @@ public class LiveCrmCenterService {
                             + csv(row.get("lastComment")) + ',' + csv(row.get("commentCount")) + ','
                             + csv(row.get("visitCount")) + ',' + csv(minutes(row.get("watchSeconds"))) + ','
                             + csv(stageLabel(row.get("stage"))) + ',' + csv(row.get("ownerName")) + ','
+                            + csv(row.get("orderNos")) + ',' + csv(row.get("screenshotCount")) + ','
+                            + csv(row.get("screenshotNames")) + ',' + csv(row.get("screenshotUrls")) + ','
                             + csv(row.get("controllerFirstFollowupAt")) + ',' + csv(row.get("controllerFirstFollowupName")));
                 }
             }
@@ -179,6 +189,39 @@ public class LiveCrmCenterService {
         }
         for (Map<String, Object> row : rows) {
             row.put("lastComment", contents.get(number(row.get("lastCommentId"))));
+        }
+    }
+
+    private void hydrateExportAttachments(List<Map<String, Object>> rows) {
+        List<Long> customerIds = rows.stream()
+                .map(row -> number(row.get("customerId")))
+                .filter(id -> id > 0)
+                .distinct().toList();
+        if (customerIds.isEmpty()) return;
+        Map<Long, List<Map<String, Object>>> grouped = new HashMap<>();
+        for (int start = 0; start < customerIds.size(); start += 500) {
+            List<Long> batch = customerIds.subList(start, Math.min(start + 500, customerIds.size()));
+            for (Map<String, Object> attachment : liveCrmMapper.listReadyAttachmentsForCustomers(batch)) {
+                grouped.computeIfAbsent(number(attachment.get("customerId")), ignored -> new ArrayList<>())
+                        .add(attachment);
+            }
+        }
+        for (Map<String, Object> row : rows) {
+            List<Map<String, Object>> attachments = grouped.getOrDefault(
+                    number(row.get("customerId")), List.of());
+            row.put("screenshotCount", attachments.size());
+            row.put("screenshotNames", attachments.stream()
+                    .map(item -> String.valueOf(item.getOrDefault("originalName", "截图")))
+                    .distinct().reduce((left, right) -> left + "；" + right).orElse(""));
+            List<String> urls = new ArrayList<>();
+            for (Map<String, Object> attachment : attachments) {
+                try {
+                    urls.add(attachmentService.exportViewUrl(attachment));
+                } catch (RuntimeException ignored) {
+                    // A broken storage item should not abort the complete CSV export.
+                }
+            }
+            row.put("screenshotUrls", String.join("；", urls));
         }
     }
 

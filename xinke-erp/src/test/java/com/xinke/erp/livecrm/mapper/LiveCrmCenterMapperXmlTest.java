@@ -66,5 +66,8 @@ class LiveCrmCenterMapperXmlTest {
         assertTrue(exportSql.contains("owner_user_id"));
         assertTrue(exportSql.contains("consult_stage"));
         assertTrue(exportSql.contains("commentCount>0"));
+        assertTrue(exportSql.contains("orderNos"));
+        assertTrue(exportSql.contains("screenshotCount"));
+        assertTrue(exportSql.contains("dy_audience_v2_attachment"));
     }
 }

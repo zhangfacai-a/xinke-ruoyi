@@ -100,13 +100,35 @@ export const constantRoutes = [
     path: '/live-ops/liveMetrics',
     component: Layout,
     hidden: true,
-    children: [{ path: '', component: () => import('@/views/live/metrics/index.vue'), name: 'LiveMetricsScheduleDirect', meta: { title: '主播排班', icon: 'calendar' } }]
+    children: [
+      { path: '', component: () => import('@/views/live/metrics/index.vue'), name: 'LiveMetricsDirect', meta: { title: '主播数据上报', icon: 'switch' } },
+      { path: 'room/:roomId', component: () => import('@/views/live/metrics/room.vue'), name: 'LiveMetricsRoom', meta: { title: '直播间交接记录', activeMenu: '/live-ops/liveMetrics' } }
+    ]
   },
   {
     path: '/live-ops/liveMetricsReport',
     component: Layout,
     hidden: true,
-    children: [{ path: '', component: () => import('@/views/live/metrics/report.vue'), name: 'LiveMetricsReportDirect', meta: { title: '数据上报', icon: 'chart' } }]
+    redirect: '/live-ops/liveMetrics',
+    children: []
+  },
+  {
+    path: '/live-ops/retention-center',
+    component: Layout,
+    hidden: true,
+    children: [{ path: '', component: () => import('@/views/live/retention/index.vue'), name: 'RetentionCenterDirect', meta: { title: '挽单与转推中心', icon: 'documentation' } }]
+  },
+  {
+    path: '/live-ops/freight-collection',
+    component: Layout,
+    hidden: true,
+    children: [{ path: '', component: () => import('@/views/live/freight/index.vue'), name: 'FreightCollectionDirect', meta: { title: '运费征收明细', icon: 'money' } }]
+  },
+  {
+    path: '/live-ops/jd-customers',
+    component: Layout,
+    hidden: true,
+    children: [{ path: '', component: () => import('@/views/live/jd-customers/index.vue'), name: 'JdCustomersDirect', meta: { title: '京东客户信息', icon: 'peoples' } }]
   },
   ...[
     ['giftLedger', 'ledger'],
@@ -214,20 +236,6 @@ export const dynamicRoutes = [
     ]
   },
   {
-    path: '/monitor/job-log',
-    component: Layout,
-    hidden: true,
-    permissions: ['monitor:job:list'],
-    children: [
-      {
-        path: 'index/:jobId(\\d+)',
-        component: () => import('@/views/monitor/job/log'),
-        name: 'JobLog',
-        meta: { title: '调度日志', activeMenu: '/monitor/job' }
-      }
-    ]
-  },
-  {
     path: '/tool/gen-edit',
     component: Layout,
     hidden: true,
@@ -238,34 +246,6 @@ export const dynamicRoutes = [
         component: () => import('@/views/tool/gen/editTable'),
         name: 'GenEdit',
         meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
-      }
-    ]
-  },
-  {
-    path: '/datahub/dataset-create',
-    component: Layout,
-    hidden: true,
-    permissions: ['datahub:dataset:add'],
-    children: [
-      {
-        path: 'index',
-        component: () => import('@/views/datahub/dataset/create'),
-        name: 'DataHubDatasetCreate',
-        meta: { title: '创建数据表', activeMenu: '/datahub/dataset' }
-      }
-    ]
-  },
-  {
-    path: '/datahub/dataset-detail',
-    component: Layout,
-    hidden: true,
-    permissions: ['datahub:dataset:query'],
-    children: [
-      {
-        path: 'index/:datasetId(\\d+)',
-        component: () => import('@/views/datahub/dataset/detail'),
-        name: 'DataHubDatasetDetail',
-        meta: { title: '数据表详情', activeMenu: '/datahub/dataset' }
       }
     ]
   }

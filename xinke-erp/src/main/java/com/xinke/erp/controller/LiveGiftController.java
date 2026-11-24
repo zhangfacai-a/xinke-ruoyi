@@ -26,6 +26,7 @@ public class LiveGiftController extends BaseController
 {
     @Autowired private ILiveGiftService service;
     @Autowired private LiveCrmService liveCrmService;
+    @Autowired private com.xinke.erp.service.ShopStaffGroupService staffGroups;
 
     @GetMapping("/staff") @PreAuthorize("isAuthenticated()")
     public AjaxResult staff(@RequestParam Map<String,Object> q){return success(service.listLiveUserOptions(q));}
@@ -39,8 +40,11 @@ public class LiveGiftController extends BaseController
     public AjaxResult shops(@RequestParam Map<String,Object> q){return success(service.listShops(q));}
     @GetMapping("/shop/{id}") @PreAuthorize("isAuthenticated()")
     public AjaxResult shop(@PathVariable Long id){return success(service.getShop(id));}
-    @PostMapping("/shop") @PreAuthorize("isAuthenticated()")
+    @PostMapping("/shop") @PreAuthorize("@ss.hasPermi('system:user:edit')")
     public AjaxResult shopSave(@RequestBody Map<String,Object> value){service.saveShop(value,getUsername());return success(value);}
+    @DeleteMapping("/shop/{id}") @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @Log(title="删除店铺",businessType=BusinessType.DELETE)
+    public AjaxResult shopDelete(@PathVariable Long id){service.deleteShop(id);return success();}
 
     @GetMapping("/room") @PreAuthorize("isAuthenticated()")
     public AjaxResult rooms(@RequestParam Map<String,Object> q){return success(service.listRooms(q));}
@@ -54,8 +58,21 @@ public class LiveGiftController extends BaseController
 
     @GetMapping("/mapping") @PreAuthorize("isAuthenticated()")
     public AjaxResult mappings(@RequestParam Map<String,Object> q){return success(service.listSubjectMappings(q));}
-    @PostMapping("/mapping") @PreAuthorize("isAuthenticated()")
+    @PostMapping("/mapping") @PreAuthorize("isAuthenticated() and (!T(java.lang.String).valueOf(#value['subjectType']).equalsIgnoreCase('SHOP') or @ss.hasPermi('system:user:edit'))")
     public AjaxResult mappingSave(@RequestBody Map<String,Object> value){service.saveSubjectMapping(value,getUsername());return success();}
+
+    @GetMapping("/staff-groups") @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    public AjaxResult staffGroups(){return success(staffGroups.list());}
+    @GetMapping("/staff-groups/{id}") @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    public AjaxResult staffGroup(@PathVariable Long id){return success(staffGroups.detail(id));}
+    @PostMapping("/staff-groups") @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    public AjaxResult saveStaffGroup(@RequestBody Map<String,Object> value){return success(staffGroups.save(value,getUsername()));}
+    @PutMapping("/shop/{id}/staff-group") @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    public AjaxResult bindStaffGroup(@PathVariable Long id,@RequestBody Map<String,Object> value){
+        Object raw=value.get("groupId");
+        Long groupId=raw==null?null:Long.valueOf(raw.toString());
+        staffGroups.bind(id,groupId,getUsername());return success();
+    }
 
     @GetMapping("/template") @PreAuthorize("@ss.hasAnyPermi('live:gift:template,live:gift:entry')")
     public AjaxResult templates(){return success(service.listQuickTemplates(getUserId()));}
