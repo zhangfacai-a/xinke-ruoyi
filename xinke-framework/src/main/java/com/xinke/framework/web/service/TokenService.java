@@ -282,13 +282,20 @@ public class TokenService
     public void refreshPermissionByUserId(Long userId, SysPermissionService permissionService,
                                            com.xinke.system.service.ISysUserService userService)
     {
+        refreshPermissionsByUserIds(java.util.Set.of(userId),permissionService,userService);
+    }
+
+    public void refreshPermissionsByUserIds(java.util.Set<Long> userIds, SysPermissionService permissionService,
+                                           com.xinke.system.service.ISysUserService userService)
+    {
         String pattern = CacheConstants.LOGIN_TOKEN_KEY + "*";
         Collection<String> keys = redisCache.keys(pattern);
         if (keys == null) return;
         for (String key : keys)
         {
             LoginUser loginUser = getLoginUserByKey(key);
-            if (loginUser == null || !userId.equals(loginUser.getUserId())) continue;
+            if (loginUser == null || !userIds.contains(loginUser.getUserId())) continue;
+            Long userId=loginUser.getUserId();
             com.xinke.common.core.domain.entity.SysUser user = userService.selectUserById(userId);
             if (user == null || !"0".equals(user.getStatus()) || !"0".equals(user.getDelFlag()))
             {

@@ -2,7 +2,7 @@
   <main class="live-home">
     <header class="page-head">
       <div>
-        <h1>直播运营</h1>
+        <h1>工作台</h1>
         <p>{{ today }}</p>
       </div>
     </header>
@@ -23,6 +23,8 @@
 <script setup name="Index">
 import { ArrowRight, Goods, Switch, User } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import {computed} from 'vue'
+import {checkPermi} from '@/utils/permission'
 
 const router = useRouter()
 const today = new Intl.DateTimeFormat('zh-CN', {
@@ -32,11 +34,15 @@ const today = new Intl.DateTimeFormat('zh-CN', {
   weekday: 'long'
 }).format(new Date())
 
-const entries = [
-  { title: '直播客户中心', subtitle: '客户领取、跟进与资料', path: '/live-ops/customer-center', icon: User },
-  { title: '主播交接', subtitle: '查看当前主播与场次业绩', path: '/live-ops/liveMetrics', icon: Switch },
-  { title: '礼品工作台', subtitle: '礼品记录、成本与库存', path: '/live-ops/giftWorkbench', icon: Goods }
-]
+const entries=computed(()=>[
+  {title:'直播客户中心',subtitle:'客户领取、跟进与资料',path:'/ops-customers/customer-center',icon:User,perms:['live:customerCenter:list']},
+  {title:'京东客户信息',subtitle:'RPA 导入、订单与联系方式',path:'/ops-customers/jd-customers',icon:User},
+  {title:'挽单与转推中心',subtitle:'订单处理、跟进与经营看板',path:'/ops-customers/retention-center',icon:Switch,perms:['live:retention:access']},
+  {title:'主播数据',subtitle:'主播交接、区间明细与业绩',path:'/ops-anchors/liveMetrics',icon:Switch,perms:['live:metrics:list']},
+  {title:'礼品工作台',subtitle:'礼品登记、记录与汇总',path:'/ops-gifts/giftWorkbench',icon:Goods,perms:['live:gift:entry','live:gift:list']},
+  {title:'运费征收',subtitle:'快速录入、明细与看板',path:'/ops-freight/freight-collection',icon:Goods,perms:['live:freight:access']},
+  {title:'人员与业务配置',subtitle:'业务分配、共享人员组与实际权限',path:'/ops-people/user',icon:User,perms:['system:user:list']}
+].filter(entry=>!entry.perms||checkPermi(entry.perms)))
 </script>
 
 <style scoped lang="scss">

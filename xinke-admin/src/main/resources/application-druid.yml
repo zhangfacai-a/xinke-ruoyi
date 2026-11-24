@@ -2,7 +2,7 @@
 spring:
     config:
         # 本地开发私有配置（已被 Git 忽略），生产环境仍使用环境变量
-        import: optional:file:./config/local/application-local.yml
+        import: optional:file:./config/local/application-local.yml,optional:file:${XINKE_PRIVATE_CONFIG:/home/deploy/xinke-config/application-private.yml}
     datasource:
         type: com.alibaba.druid.pool.DruidDataSource
         driverClassName: com.mysql.cj.jdbc.Driver

@@ -50,15 +50,17 @@ public class LiveGiftController extends BaseController
     public AjaxResult rooms(@RequestParam Map<String,Object> q){return success(service.listRooms(q));}
     @GetMapping("/room/{id}") @PreAuthorize("isAuthenticated()")
     public AjaxResult room(@PathVariable Long id){return success(service.getRoom(id));}
-    @PostMapping("/room") @PreAuthorize("isAuthenticated()")
+    @PostMapping("/room") @PreAuthorize("@ss.hasAnyPermi('system:user:edit,live:metrics:manage')")
+    @Log(title="直播间配置",businessType=BusinessType.UPDATE)
     public AjaxResult roomSave(@RequestBody Map<String,Object> value){service.saveRoom(value,getUsername());return success(value);}
-    @DeleteMapping("/room/{id}") @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/room/{id}") @PreAuthorize("@ss.hasPermi('system:user:edit')")
     @Log(title="删除直播间及客户记录",businessType=BusinessType.DELETE)
     public AjaxResult roomDelete(@PathVariable Long id){liveCrmService.deleteRoom(id);return success();}
 
     @GetMapping("/mapping") @PreAuthorize("isAuthenticated()")
     public AjaxResult mappings(@RequestParam Map<String,Object> q){return success(service.listSubjectMappings(q));}
-    @PostMapping("/mapping") @PreAuthorize("isAuthenticated() and (!T(java.lang.String).valueOf(#value['subjectType']).equalsIgnoreCase('SHOP') or @ss.hasPermi('system:user:edit'))")
+    @PostMapping("/mapping") @PreAuthorize("@ss.hasPermi('system:user:edit') or (T(java.lang.String).valueOf(#value['subjectType']).equalsIgnoreCase('ROOM') and @ss.hasPermi('live:metrics:manage'))")
+    @Log(title="业务人员分配",businessType=BusinessType.UPDATE)
     public AjaxResult mappingSave(@RequestBody Map<String,Object> value){service.saveSubjectMapping(value,getUsername());return success();}
 
     @GetMapping("/staff-groups") @PreAuthorize("@ss.hasPermi('system:user:edit')")
@@ -66,6 +68,7 @@ public class LiveGiftController extends BaseController
     @GetMapping("/staff-groups/{id}") @PreAuthorize("@ss.hasPermi('system:user:edit')")
     public AjaxResult staffGroup(@PathVariable Long id){return success(staffGroups.detail(id));}
     @PostMapping("/staff-groups") @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @Log(title="店铺人员组",businessType=BusinessType.UPDATE)
     public AjaxResult saveStaffGroup(@RequestBody Map<String,Object> value){return success(staffGroups.save(value,getUsername()));}
     @PutMapping("/shop/{id}/staff-group") @PreAuthorize("@ss.hasPermi('system:user:edit')")
     public AjaxResult bindStaffGroup(@PathVariable Long id,@RequestBody Map<String,Object> value){

@@ -42,18 +42,24 @@
             <artifactId>xinke-framework</artifactId>
         </dependency>
 
-        <!-- 代码生成-->
-        <dependency>
-            <groupId>com.xinke</groupId>
-            <artifactId>xinke-generator</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>com.xinke</groupId>
             <artifactId>xinke-erp</artifactId>
         </dependency>
 
     </dependencies>
+
+    <profiles>
+        <profile>
+            <id>dev-tools</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.xinke</groupId>
+                    <artifactId>xinke-generator</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>

@@ -1,7 +1,7 @@
 <template>
-  <GiftAdmin section="subject" />
+  <BusinessConfig />
 </template>
 
 <script setup name="LiveSubject">
-import GiftAdmin from '@/views/live/giftAdmin/index.vue'
+import BusinessConfig from './BusinessConfig.vue'
 </script>

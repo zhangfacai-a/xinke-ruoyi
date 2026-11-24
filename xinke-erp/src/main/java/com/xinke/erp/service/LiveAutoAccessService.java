@@ -21,10 +21,13 @@ public class LiveAutoAccessService {
     public void reconcile(Set<Long> userIds) {
         if (userIds==null || userIds.isEmpty()) return;
         Set<Long> changed=new HashSet<>();
+        Set<Long> managed=new HashSet<>(mapper.managedRoles());
+        Long authenticatedRole=mapper.authenticatedRole();
+        if(authenticatedRole!=null && authenticatedRole>0)managed.add(authenticatedRole);
         for (Long userId:userIds) {
             if (userId==null) continue;
-            for (Long roleId:mapper.managedRoles()) {
-                boolean eligible=mapper.activeUser(userId)>0 && mapper.eligible(userId,roleId)>0;
+            for (Long roleId:managed) {
+                boolean eligible=mapper.activeUser(userId)>0 && (roleId.equals(authenticatedRole) || mapper.eligible(userId,roleId)>0);
                 boolean granted=mapper.hasRole(userId,roleId)>0;
                 if (eligible && !granted) { mapper.grant(userId,roleId); changed.add(userId); }
                 if (!eligible && granted) { mapper.revoke(userId,roleId); changed.add(userId); }
@@ -36,7 +39,10 @@ public class LiveAutoAccessService {
     @Transactional
     public void reconcileAll() {
         Set<Long> users=new HashSet<>(mapper.allStaffUsers());
+        users.addAll(mapper.allActiveUsers());
         for (Long roleId:mapper.managedRoles()) users.addAll(mapper.roleUsers(roleId));
+        Long authenticatedRole=mapper.authenticatedRole();
+        if(authenticatedRole!=null && authenticatedRole>0)users.addAll(mapper.roleUsers(authenticatedRole));
         reconcile(users);
     }
 }

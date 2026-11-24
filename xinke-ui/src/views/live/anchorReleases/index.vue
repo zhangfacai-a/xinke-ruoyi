@@ -2,9 +2,9 @@
 <script setup>
 import {ref,onMounted} from 'vue'
 import {ElMessageBox,ElMessage} from 'element-plus'
-import Cookies from 'js-cookie'
+import http from '@/utils/request'
 const rows=ref([]),installer=ref(null),manifest=ref(null),busy=ref(false),error=ref('')
-async function request(path,method='GET',body){const token=Cookies.get('Admin-Token');if(!token)throw Error('请先在网站登录管理员账号，再打开本页');const headers={Authorization:'Bearer '+token};if(body&&!(body instanceof FormData))headers['Content-Type']='application/json';const response=await fetch('/prod-api/system/anchor-app-releases'+path,{method,headers,body:body instanceof FormData?body:body?JSON.stringify(body):undefined});const data=await response.json();if(data.code!==200)throw Error(data.msg||'操作失败');return data}
+async function request(path,method='GET',body){return http({url:'/system/anchor-app-releases'+path,method,data:body,timeout:120000,headers:{repeatSubmit:false,skipError:true,...(body instanceof FormData?{'Content-Type':'multipart/form-data'}:{})}})}
 async function load(){try{rows.value=(await request('')).data||[]}catch(e){error.value=e.message}}
 async function upload(){busy.value=true;error.value='';try{const data=new FormData();data.append('manifest',manifest.value);data.append('total',installer.value.size);const id=(await request('/uploads','POST',data)).data;for(let offset=0,index=0;offset<installer.value.size;offset+=524288,index++){const part=new FormData();part.append('chunk',installer.value.slice(offset,offset+524288),'chunk.bin');await request(`/uploads/${id}/chunks?index=${index}`,'POST',part)}await request(`/uploads/${id}/finish`,'POST');ElMessage.success('校验通过，已保存为草稿');await load()}catch(e){error.value=e.message}finally{busy.value=false}}
 async function act(row,action){try{await ElMessageBox.confirm(action==='publish'?`发布 ${row.version} 后客户端可检查到此更新。确认发布？`:'撤回后恢复上一版更新清单，已安装客户端不会降级。确认撤回？','软件发布',{type:'warning'});busy.value=true;await request('/'+row.version+'/'+action,'POST');await load();ElMessage.success('操作成功')}catch(e){if(e!=='cancel'&&e!=='close')error.value=e.message}finally{busy.value=false}}

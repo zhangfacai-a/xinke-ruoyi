@@ -53,7 +53,7 @@
     where b.sync_batch&lt;&gt;#{syncBatch}
   </update>
   <select id="selectDingUserBinding" resultType="java.util.LinkedHashMap">
-    select b.ding_user_id dingUserId,b.user_id userId,u.user_name userName,u.status
+    select b.ding_user_id dingUserId,b.user_id userId,u.user_name userName,u.status,u.del_flag delFlag
     from live_ding_user_bind b join sys_user u on u.user_id=b.user_id
     where b.ding_user_id=#{dingUserId}
   </select>
@@ -68,8 +68,8 @@
   </insert>
   <update id="updateSystemUser" parameterType="map">
     update sys_user set dept_id=#{deptId},user_name=#{userName},nick_name=#{nickName},phonenumber=#{mobile},
-      avatar=#{avatar},sex=#{sex},status=#{status},del_flag='0',update_by=#{operator},update_time=sysdate()
-    where user_id=#{userId}
+      avatar=#{avatar},sex=#{sex},status=case when local_disabled=1 then '1' else #{status} end,update_by=#{operator},update_time=sysdate()
+    where user_id=#{userId} and del_flag='0'
   </update>
   <update id="touchDingUserBinding">
     update live_ding_user_bind set sync_batch=#{syncBatch},last_sync_time=sysdate() where ding_user_id=#{dingUserId}

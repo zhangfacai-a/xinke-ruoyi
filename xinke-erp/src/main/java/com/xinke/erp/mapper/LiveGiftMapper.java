@@ -10,6 +10,10 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface LiveGiftMapper
 {
+    @org.apache.ibatis.annotations.Select("select count(*) from sys_user where user_id=#{userId} and status='0' and del_flag='0'")
+    int countActiveStaff(Long userId);
+    @org.apache.ibatis.annotations.Select("select distinct user_id from live_ding_user_bind")
+    java.util.List<Long> allBoundDingUsers();
     List<Map<String, Object>> selectLiveUserOptions(Map<String, Object> query);
     Map<String, Object> selectDingDepartmentBinding(Long dingDeptId);
     Map<String, Object> selectSystemDepartment(@Param("parentId") Long parentId,

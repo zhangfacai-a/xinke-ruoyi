@@ -1,0 +1,3 @@
+-r requirements.txt
+bcrypt>=4.1,<6
+redis>=5,<8

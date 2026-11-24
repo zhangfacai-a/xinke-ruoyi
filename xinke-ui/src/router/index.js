@@ -20,7 +20,7 @@ import Layout from '@/layout'
     title: 'title'                  // 设置该路由在侧边栏和面包屑中展示的名字
     icon: 'svg-name'                // 设置该路由的图标，对应路径src/assets/icons/svg
     breadcrumb: false               // 如果设置为false，则不会在breadcrumb面包屑中显示
-    activeMenu: '/system/user'      // 当路由设置了该属性，则会高亮相对应的侧边栏。
+    activeMenu: '/ops-people/user'      // 当路由设置了该属性，则会高亮相对应的侧边栏。
   }
  */
 
@@ -43,6 +43,11 @@ export const constantRoutes = [
     hidden: true
   },
   {
+    path: '/system/user',
+    redirect: to => ({path:'/ops-people/user',query:to.query}),
+    hidden: true
+  },
+  {
     path: '/register',
     component: () => import('@/views/register'),
     hidden: true
@@ -53,6 +58,12 @@ export const constantRoutes = [
     redirect: `/live-ops/gift/${path}`,
     hidden: true
   })),
+  {
+    path: '/live-ops/liveSubject',
+    component: Layout,
+    hidden: true,
+    children: [{path:'',component:()=>import('@/views/live/liveSubject/index.vue'),name:'BusinessConfigurationLegacy',meta:{title:'直播间与店铺配置'}}]
+  },
   {
     path: '/live-ops/giftAdmin',
     redirect: to => to.query.section === 'inventory'
@@ -102,7 +113,7 @@ export const constantRoutes = [
     hidden: true,
     children: [
       { path: '', component: () => import('@/views/live/metrics/index.vue'), name: 'LiveMetricsDirect', meta: { title: '主播数据上报', icon: 'switch' } },
-      { path: 'room/:roomId', component: () => import('@/views/live/metrics/room.vue'), name: 'LiveMetricsRoom', meta: { title: '直播间交接记录', activeMenu: '/live-ops/liveMetrics' } }
+      { path: 'room/:roomId', component: () => import('@/views/live/metrics/room.vue'), name: 'LiveMetricsRoom', meta: { title: '直播间交接记录', activeMenu: '/ops-anchors/liveMetrics' } }
     ]
   },
   {
@@ -111,6 +122,12 @@ export const constantRoutes = [
     hidden: true,
     redirect: '/live-ops/liveMetrics',
     children: []
+  },
+  {
+    path: '/live-ops/anchor-releases',
+    component: Layout,
+    hidden: true,
+    children: [{path:'',component:()=>import('@/views/live/anchorReleases/index.vue'),name:'AnchorReleaseLegacy',meta:{title:'App 版本发布'}}]
   },
   {
     path: '/live-ops/retention-center',
@@ -203,7 +220,7 @@ export const dynamicRoutes = [
         path: 'role/:userId(\\d+)',
         component: () => import('@/views/system/user/authRole'),
         name: 'AuthRole',
-        meta: { title: '分配角色', activeMenu: '/system/user' }
+        meta: { title: '分配角色', activeMenu: '/ops-people/user' }
       }
     ]
   },

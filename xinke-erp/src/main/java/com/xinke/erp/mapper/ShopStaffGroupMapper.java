@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.*;
 
 @Mapper
 public interface ShopStaffGroupMapper {
-    @Select("select group_id groupId,group_name groupName from live_shop_staff_group order by group_name")
+    @Select("select g.group_id groupId,g.group_name groupName,(select count(*) from live_shop_staff_group_shop s where s.group_id=g.group_id) shopCount,(select count(distinct user_id) from live_shop_staff_group_member m where m.group_id=g.group_id) memberCount from live_shop_staff_group g order by group_name")
     List<Map<String,Object>> groups();
 
     @Select("select group_id groupId,group_name groupName from live_shop_staff_group where group_id=#{id}")
@@ -52,8 +52,14 @@ public interface ShopStaffGroupMapper {
     @Select("select role_id from sys_role where role_key='auto_live_retention' and status='0' and del_flag='0'")
     Long retentionRole();
 
-    @Select("select distinct grant_role_id from live_auto_access_rule")
+    @Select("select distinct a.grant_role_id from live_auto_access_rule a join sys_role r on r.role_id=a.grant_role_id and r.status='0' and r.del_flag='0'")
     List<Long> managedRoles();
+
+    @Select("select role_id from sys_role where role_key='auto_live_authenticated' and status='0' and del_flag='0'")
+    Long authenticatedRole();
+
+    @Select("select user_id from sys_user where status='0' and del_flag='0'")
+    List<Long> allActiveUsers();
 
     @Select("select count(*) from live_auto_access_rule r join live_subject_user_map m on m.subject_type=r.subject_type and m.role_code=r.role_code and m.user_id=#{userId} join sys_user u on u.user_id=m.user_id and u.status='0' and u.del_flag='0' left join erp_shop s on r.subject_type='SHOP' and s.shop_id=m.subject_id and s.status='0' left join live_room room on r.subject_type='ROOM' and room.room_id=m.subject_id and room.status='0' where r.grant_role_id=#{roleId} and (s.shop_id is not null or room.room_id is not null)")
     int eligible(@Param("userId") Long userId,@Param("roleId") Long roleId);

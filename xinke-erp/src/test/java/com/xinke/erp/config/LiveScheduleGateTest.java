@@ -16,6 +16,10 @@ class LiveScheduleGateTest {
         assertTrue(new LiveScheduleGate(new MockEnvironment()).isActive());
     }
 
+    @Test void isolatedTestInstanceNeverRunsProductionTasks() {
+        assertFalse(new LiveScheduleGate(new MockEnvironment().withProperty("live.scheduling.enabled","false")).isActive());
+    }
+
     @Test void onlyMarkedPortRunsTasks() throws Exception {
         Path marker=directory.resolve("active-port");
         MockEnvironment environment=new MockEnvironment()

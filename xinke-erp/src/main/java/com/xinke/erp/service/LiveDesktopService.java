@@ -16,7 +16,8 @@ public class LiveDesktopService {
     private final LiveHandoverService reports;
     private final LiveMetricsMapper mapper;
     private final RedisCache cache;
-    public LiveDesktopService(LiveHandoverService reports,LiveMetricsMapper mapper,RedisCache cache){this.reports=reports;this.mapper=mapper;this.cache=cache;}
+    private final LiveAutoAccessService access;
+    public LiveDesktopService(LiveHandoverService reports,LiveMetricsMapper mapper,RedisCache cache,LiveAutoAccessService access){this.reports=reports;this.mapper=mapper;this.cache=cache;this.access=access;}
     public boolean manager(){return SecurityUtils.isAdmin()||SecurityUtils.hasPermi("live:metrics:manage");}
     public void requireRoom(Long roomId){if(roomId==null||(!manager()&&mapper.countRoomAnchor(roomId,SecurityUtils.getUserId())==0))throw new ServiceException("没有该直播间的访问权限");}
     public List<Map<String,Object>> rooms(){return reports.rooms().stream().filter(r->manager()||mapper.countRoomAnchor(number(r.get("roomId")),SecurityUtils.getUserId())>0).toList();}
@@ -79,6 +80,6 @@ public class LiveDesktopService {
     public void add(Long roomId,Long user){reports.addRoomAnchor(roomId,user,SecurityUtils.getUsername());refreshAccess(Set.of(user));}
     @Transactional
     public void remove(Long roomId,Long user){reports.removeRoomAnchor(roomId,user);refreshAccess(Set.of(user));}
-    private void refreshAccess(Set<Long> users){for(Long user:users){if(mapper.countActiveAnchorRooms(user)>0)mapper.grantAppRole(user);else mapper.revokeAppRole(user);}}
+    private void refreshAccess(Set<Long> users){access.reconcile(users);}
     private static Long number(Object value){return value==null?null:Long.valueOf(String.valueOf(value));}
 }

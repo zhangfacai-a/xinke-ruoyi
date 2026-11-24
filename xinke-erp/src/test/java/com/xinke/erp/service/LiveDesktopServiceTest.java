@@ -17,7 +17,7 @@ class LiveDesktopServiceTest {
     LiveMetricsMapper mapper=mock(LiveMetricsMapper.class);
     LiveHandoverService reports=mock(LiveHandoverService.class);
     RedisCache cache=mock(RedisCache.class);
-    LiveDesktopService service=new LiveDesktopService(reports,mapper,cache);
+    LiveDesktopService service=new LiveDesktopService(reports,mapper,cache,mock(LiveAutoAccessService.class));
     @BeforeEach void login(){SysUser user=new SysUser();user.setUserId(42L);user.setUserName("operator");LoginUser login=new LoginUser(42L,1L,user,Set.of("live:metrics:report"));SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(login,null,List.of()));}
     @AfterEach void logout(){SecurityContextHolder.clearContext();}
     @Test void roomsAreFilteredOnServer(){when(reports.rooms()).thenReturn(List.of(Map.of("roomId",1L),Map.of("roomId",2L)));when(mapper.countRoomAnchor(2L,42L)).thenReturn(1);assertEquals(List.of(Map.of("roomId",2L)),service.rooms());assertThrows(ServiceException.class,()->service.requireRoom(1L));}

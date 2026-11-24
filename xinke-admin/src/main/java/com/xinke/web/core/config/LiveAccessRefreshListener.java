@@ -7,6 +7,9 @@ import com.xinke.erp.service.LiveAccessChangedEvent;
 import com.xinke.framework.web.service.SysPermissionService;
 import com.xinke.framework.web.service.TokenService;
 import com.xinke.system.service.ISysUserService;
+import com.xinke.common.core.domain.model.UserManagementChangedEvent;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 @Component
 public class LiveAccessRefreshListener {
@@ -19,7 +22,14 @@ public class LiveAccessRefreshListener {
     }
 
     @TransactionalEventListener(phase=TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation=Propagation.REQUIRES_NEW)
     public void refresh(LiveAccessChangedEvent event) {
-        for(Long userId:event.userIds()) tokens.refreshPermissionByUserId(userId,permissions,users);
+        tokens.refreshPermissionsByUserIds(event.userIds(),permissions,users);
+    }
+
+    @TransactionalEventListener(phase=TransactionPhase.AFTER_COMMIT, fallbackExecution=true)
+    @Transactional(propagation=Propagation.REQUIRES_NEW)
+    public void refreshAccount(UserManagementChangedEvent event) {
+        tokens.refreshPermissionsByUserIds(event.userIds(),permissions,users);
     }
 }

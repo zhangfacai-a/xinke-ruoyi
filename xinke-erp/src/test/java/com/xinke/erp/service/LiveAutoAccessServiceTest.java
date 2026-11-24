@@ -8,6 +8,18 @@ import com.xinke.erp.mapper.ShopStaffGroupMapper;
 import static org.mockito.Mockito.*;
 
 class LiveAutoAccessServiceTest {
+    @Test void loggedInBaseRoleDoesNotRequireShopAssignmentAndIsRevokedWhenDisabled() {
+        ShopStaffGroupMapper mapper=mock(ShopStaffGroupMapper.class);
+        ApplicationEventPublisher events=mock(ApplicationEventPublisher.class);
+        when(mapper.authenticatedRole()).thenReturn(12L);
+        when(mapper.activeUser(7L)).thenReturn(1);
+        new LiveAutoAccessService(mapper,events).reconcile(Set.of(7L));
+        verify(mapper).grant(7L,12L);
+        when(mapper.activeUser(7L)).thenReturn(0);
+        when(mapper.hasRole(7L,12L)).thenReturn(1);
+        new LiveAutoAccessService(mapper,events).reconcile(Set.of(7L));
+        verify(mapper).revoke(7L,12L);
+    }
     private final ShopStaffGroupMapper mapper=mock(ShopStaffGroupMapper.class);
     private final ApplicationEventPublisher events=mock(ApplicationEventPublisher.class);
     private final LiveAutoAccessService service=new LiveAutoAccessService(mapper,events);

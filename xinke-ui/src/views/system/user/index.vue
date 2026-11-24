@@ -25,6 +25,7 @@
         </el-form>
 
         <el-row :gutter="10" class="mb8">
+          <el-col :span="1.5"><el-button plain icon="CircleCheck" :loading="reconciling" @click="reconcileAccess" v-hasPermi="['system:user:edit']">核对业务权限</el-button></el-col>
           <el-col :span="1.5">
             <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['system:user:add']">新增</el-button>
           </el-col>
@@ -57,6 +58,12 @@
           <el-table-column label="用户昵称" align="center" key="nickName" prop="nickName" v-if="columns.nickName.visible" :show-overflow-tooltip="true" />
           <el-table-column label="部门" align="center" key="deptName" prop="dept.deptName" v-if="columns.deptName.visible" :show-overflow-tooltip="true" />
           <el-table-column label="手机号码" align="center" key="phonenumber" prop="phonenumber" v-if="columns.phonenumber.visible" width="120" />
+          <el-table-column label="业务岗位" min-width="170">
+            <template #default="{row}"><span>{{ businessRoleNames(row.businessRoles) }}</span><el-tag v-if="row.inactiveAssignment" type="warning" size="small">停用待核查</el-tag><el-tag v-if="row.noRole" type="info" size="small">未关联角色</el-tag></template>
+          </el-table-column>
+          <el-table-column label="业务分配" width="140">
+            <template #default="{row}"><el-button link type="primary" v-hasPermi="['system:user:query']" @click="personnelDrawer.open(row)">{{ row.assignmentCount ?? '—' }} 项 · 查看权限</el-button></template>
+          </el-table-column>
           <el-table-column label="状态" align="center" key="status" v-if="columns.status.visible">
             <template #default="scope">
               <el-switch
@@ -182,6 +189,7 @@
 
     <!-- 用户详情抽屉 -->
     <user-view-drawer ref="userViewRef" />
+    <PersonnelDrawer ref="personnelDrawer" />
     <!-- 用户导入对话框 -->
     <excel-import-dialog ref="importUserRef" title="用户导入" action="/system/user/importData" template-action="/system/user/importTemplate" template-file-name="user_template" update-support-label="是否更新已经存在的用户数据" @success="getList" />
   </div>
@@ -191,6 +199,8 @@
 import TreePanel from "@/components/TreePanel"
 import ExcelImportDialog from "@/components/ExcelImportDialog"
 import UserViewDrawer from "./view"
+import PersonnelDrawer from './PersonnelDrawer.vue'
+import { personnelSummaries, personnelDetail, reconcilePersonnel } from '@/api/live/personnel'
 import { usePasswordRule } from "@/utils/passwordRule"
 import { changeUserStatus, listUser, resetUserPwd, delUser, getUser, updateUser, addUser, deptTreeSelect, syncDingTalkUsers } from "@/api/system/user"
 
@@ -203,6 +213,10 @@ const userList = ref([])
 const open = ref(false)
 const loading = ref(true)
 const dingSyncing = ref(false)
+const personnelDrawer = ref(null)
+const reconciling = ref(false)
+async function reconcileAccess(){await proxy.$modal.confirm('按当前有效业务分配核对自动权限，保留人工角色与历史订单。确认执行？');reconciling.value=true;try{await reconcilePersonnel();proxy.$modal.msgSuccess('自动权限已核对');await getList()}finally{reconciling.value=false}}
+const businessRoleNames=value=>String(value||'').split(',').filter(Boolean).map(code=>({anchor:'主播',controller:'场控',operator:'运营',customer_service:'电话客服',customer_admin:'客服管理员'}[code]||code)).join('、')||'未配置' 
 const showSearch = ref(true)
 const ids = ref([])
 const single = ref(true)
@@ -247,13 +261,19 @@ const data = reactive({
 const { queryParams, form, rules } = toRefs(data)
 
 /** 查询用户列表 */
-function getList() {
-  loading.value = true
-  listUser(proxy.addDateRange(queryParams.value, dateRange.value)).then(res => {
-    loading.value = false
-    userList.value = res.rows
-    total.value = res.total
-  })
+let listGeneration=0
+async function getList() {
+  const generation=++listGeneration
+  loading.value=true
+  try {
+    const res=await listUser(proxy.addDateRange(queryParams.value,dateRange.value))
+    if(generation!==listGeneration)return
+    userList.value=res.rows;total.value=res.total
+    if(res.rows.length){
+      const summaries=(await personnelSummaries(res.rows.map(row=>row.userId))).data||[]
+      if(generation===listGeneration){const byId=new Map(summaries.map(row=>[String(row.userId),row]));userList.value=res.rows.map(row=>({...row,...byId.get(String(row.userId))}))}
+    }
+  }finally{if(generation===listGeneration)loading.value=false}
 }
 
 /** 查询部门下拉树结构 */
@@ -317,15 +337,19 @@ function handleExport() {
 }
 
 /** 用户状态修改  */
-function handleStatusChange(row) {
-  let text = row.status === "0" ? "启用" : "停用"
-  proxy.$modal.confirm('确认要"' + text + '""' + row.userName + '"用户吗?').then(function () {
-    return changeUserStatus(row.userId, row.status)
-  }).then(() => {
-    proxy.$modal.msgSuccess(text + "成功")
-  }).catch(function () {
-    row.status = row.status === "0" ? "1" : "0"
-  })
+async function handleStatusChange(row) {
+  const text=row.status==='0'?'启用':'停用'
+  try {
+    let message='确认'+text+'账号“'+row.nickName+'”？'
+    if(row.status==='1'){
+      const info=(await personnelDetail(row.userId)).data
+      message+=` 当前有 ${info.pendingRetention} 条未完成挽单、${info.pendingFollowups} 条待办跟进、${info.assignments.length} 项业务分配。请先核查交接；停用将退出登录并保留历史记录。`
+    }
+    await proxy.$modal.confirm(message)
+    await changeUserStatus(row.userId,row.status)
+    proxy.$modal.msgSuccess(text+'成功')
+    await getList()
+  }catch{row.status=row.status==='0'?'1':'0'}
 }
 
 /** 更多操作 */

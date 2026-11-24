@@ -9,6 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import com.xinke.common.core.domain.model.UserManagementChangedEvent;
+import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import com.xinke.common.annotation.DataScope;
@@ -44,6 +47,9 @@ public class SysUserServiceImpl implements ISysUserService
 
     @Autowired
     private SysUserMapper userMapper;
+
+    @Autowired
+    private ApplicationEventPublisher events;
 
     @Autowired
     private SysRoleMapper roleMapper;
@@ -267,6 +273,7 @@ public class SysUserServiceImpl implements ISysUserService
         insertUserPost(user);
         // 新增用户与角色管理
         insertUserRole(user);
+        events.publishEvent(new UserManagementChangedEvent(Set.of(user.getUserId())));
         return rows;
     }
 
@@ -301,7 +308,9 @@ public class SysUserServiceImpl implements ISysUserService
         userPostMapper.deleteUserPostByUserId(userId);
         // 新增用户与岗位管理
         insertUserPost(user);
-        return userMapper.updateUser(user);
+        int changed = userMapper.updateUser(user);
+        events.publishEvent(new UserManagementChangedEvent(Set.of(userId)));
+        return changed;
     }
 
     /**
@@ -316,6 +325,7 @@ public class SysUserServiceImpl implements ISysUserService
     {
         userRoleMapper.deleteUserRoleByUserId(userId);
         insertUserRole(userId, roleIds);
+        events.publishEvent(new UserManagementChangedEvent(Set.of(userId)));
     }
 
     /**
@@ -325,9 +335,12 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @Transactional
     public int updateUserStatus(SysUser user)
     {
-        return userMapper.updateUserStatus(user.getUserId(), user.getStatus());
+        int changed = userMapper.updateUserStatus(user.getUserId(), user.getStatus());
+        events.publishEvent(new UserManagementChangedEvent(Set.of(user.getUserId())));
+        return changed;
     }
 
     /**
@@ -469,7 +482,9 @@ public class SysUserServiceImpl implements ISysUserService
         userRoleMapper.deleteAllUserRoleByUserId(userId);
         // 删除用户与岗位表
         userPostMapper.deleteUserPostByUserId(userId);
-        return userMapper.deleteUserById(userId);
+        int changed = userMapper.deleteUserById(userId);
+        events.publishEvent(new UserManagementChangedEvent(Set.of(userId)));
+        return changed;
     }
 
     /**
@@ -491,7 +506,9 @@ public class SysUserServiceImpl implements ISysUserService
         userRoleMapper.deleteUserRole(userIds);
         // 删除用户与岗位关联
         userPostMapper.deleteUserPost(userIds);
-        return userMapper.deleteUserByIds(userIds);
+        int changed = userMapper.deleteUserByIds(userIds);
+        events.publishEvent(new UserManagementChangedEvent(Set.of(userIds)));
+        return changed;
     }
 
     /**
@@ -527,6 +544,7 @@ public class SysUserServiceImpl implements ISysUserService
                     user.setPassword(SecurityUtils.encryptPassword(password));
                     user.setCreateBy(operName);
                     userMapper.insertUser(user);
+                    events.publishEvent(new UserManagementChangedEvent(Set.of(user.getUserId())));
                     successNum++;
                     successMsg.append("<br/>" + successNum + "、账号 " + user.getUserName() + " 导入成功");
                 }
@@ -540,6 +558,7 @@ public class SysUserServiceImpl implements ISysUserService
                     user.setDeptId(u.getDeptId());
                     user.setUpdateBy(operName);
                     userMapper.updateUser(user);
+                    events.publishEvent(new UserManagementChangedEvent(Set.of(user.getUserId())));
                     successNum++;
                     successMsg.append("<br/>" + successNum + "、账号 " + user.getUserName() + " 更新成功");
                 }
