@@ -25,6 +25,21 @@ import com.xinke.common.exception.ServiceException;
 import com.xinke.erp.mapper.FreightCollectionMapper;
 
 class FreightCollectionServiceTest {
+    @Test void globalOperatorCreatesAndEditsOtherUsersRecordsWithoutShopAssignment() {
+        SysUser user=new SysUser();user.setUserId(7L);user.setUserName("operator");
+        LoginUser login=new LoginUser(7L,1L,user,Set.of("live:freight:viewAll","live:freight:access"));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(login,null,List.of()));
+        when(mapper.shop(10L,7L,true)).thenReturn(Map.of("shopId",10L,"shopName","测试店铺"));
+        when(mapper.insert(anyMap())).thenAnswer(call -> { Map<String,Object> value=call.getArgument(0);value.put("id",42L);return 1; });
+        assertEquals(42L,service.create(input()));
+        when(mapper.get(42L)).thenReturn(Map.of("shopId",10L,"createdByUserId",99L));
+        when(mapper.update(anyMap())).thenReturn(1);
+        Map<String,Object> value=input();value.put("version",1L);
+        service.update(42L,value);
+        verify(mapper).update(anyMap());
+        verify(mapper,org.mockito.Mockito.times(2)).shop(10L,7L,true);
+    }
+
     @Test void globalViewerReadsAllShopsAndDashboardWithoutChangingWriteScope() {
         SysUser user=new SysUser();user.setUserId(7L);user.setUserName("viewer");
         LoginUser login=new LoginUser(7L,1L,user,Set.of("live:freight:viewAll"));

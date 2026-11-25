@@ -70,7 +70,7 @@ public class FreightCollectionService {
         if(old==null) throw new ServiceException("明细不存在");
         Long userId=SecurityUtils.getUserId();
         Long oldShop=((Number)old.get("shopId")).longValue();
-        if(!SecurityUtils.isAdmin() && !userId.equals(((Number)old.get("createdByUserId")).longValue())
+        if(!canOperateAll() && !userId.equals(((Number)old.get("createdByUserId")).longValue())
             && mapper.isManager(oldShop,userId)==0) throw new ServiceException("无权修改此明细");
         Map<String,Object> value=validated(input);
         value.put("id",id);
@@ -138,7 +138,7 @@ public class FreightCollectionService {
     private Map<String,Object> validated(Map<String,Object> input) {
         Long shopId=longValue(input.get("shopId"));
         if(shopId==null) throw new ServiceException("请选择店铺");
-        Map<String,Object> shop=mapper.shop(shopId,SecurityUtils.getUserId(),SecurityUtils.isAdmin());
+        Map<String,Object> shop=mapper.shop(shopId,SecurityUtils.getUserId(),canOperateAll());
         if(shop==null) throw new ServiceException("店铺不存在、已停用或未配置当前账号");
         String orderNo=Objects.toString(input.get("orderNo"),"").trim();
         if(orderNo.isEmpty() || orderNo.length()>64) throw new ServiceException("订单号应为1到64个字符");
@@ -199,6 +199,11 @@ public class FreightCollectionService {
 
     private boolean canViewAll() {
         return SecurityUtils.isAdmin() || SecurityUtils.hasPermi("live:freight:viewAll");
+    }
+
+    private boolean canOperateAll() {
+        return SecurityUtils.isAdmin() || (SecurityUtils.hasPermi("live:freight:viewAll")
+            && SecurityUtils.hasPermi("live:freight:access"));
     }
 
     private static String cell(Row row,int index,DataFormatter formatter) {
