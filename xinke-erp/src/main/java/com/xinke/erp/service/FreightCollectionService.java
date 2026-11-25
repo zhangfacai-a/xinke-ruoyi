@@ -32,7 +32,7 @@ public class FreightCollectionService {
     public FreightCollectionService(FreightCollectionMapper mapper) { this.mapper=mapper; }
 
     public List<Map<String,Object>> shops() {
-        return mapper.shops(SecurityUtils.getUserId(),SecurityUtils.isAdmin());
+        return mapper.shops(SecurityUtils.getUserId(),canViewAll());
     }
 
     public Map<String,Object> list(Map<String,Object> input) {
@@ -193,8 +193,12 @@ public class FreightCollectionService {
         int page=integer(input.get("pageNum"),1),size=integer(input.get("pageSize"),20);
         page=Math.max(1,Math.min(100000,page)); size=export?5000:Math.max(1,Math.min(100,size));
         query.put("limit",size); query.put("offset",export?0:(page-1)*size);
-        if(!SecurityUtils.isAdmin()) query.put("scopeUserId",SecurityUtils.getUserId());
+        if(!canViewAll()) query.put("scopeUserId",SecurityUtils.getUserId());
         return query;
+    }
+
+    private boolean canViewAll() {
+        return SecurityUtils.isAdmin() || SecurityUtils.hasPermi("live:freight:viewAll");
     }
 
     private static String cell(Row row,int index,DataFormatter formatter) {

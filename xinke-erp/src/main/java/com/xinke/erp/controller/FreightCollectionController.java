@@ -20,7 +20,7 @@ import com.xinke.erp.service.FreightCollectionService;
 
 @RestController
 @RequestMapping("/live/freight")
-@PreAuthorize("@ss.hasPermi('live:freight:access')")
+@PreAuthorize("@ss.hasAnyPermi('live:freight:access,live:freight:viewAll')")
 public class FreightCollectionController {
     private final FreightCollectionService service;
 
@@ -36,22 +36,26 @@ public class FreightCollectionController {
     public AjaxResult dashboard(@RequestParam Map<String,Object> query) { return AjaxResult.success(service.dashboard(query)); }
 
     @PostMapping
+    @PreAuthorize("@ss.hasPermi('live:freight:access')")
     public AjaxResult create(@RequestBody Map<String,Object> value) {
         return AjaxResult.success(Map.of("id",service.create(value)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@ss.hasPermi('live:freight:access')")
     public AjaxResult update(@PathVariable Long id,@RequestBody Map<String,Object> value) {
         service.update(id,value);
         return AjaxResult.success();
     }
 
     @PostMapping("/import")
+    @PreAuthorize("@ss.hasPermi('live:freight:access')")
     public AjaxResult importFile(@RequestParam("file") MultipartFile file) {
         return AjaxResult.success(Map.of("imported",service.importFile(file)));
     }
 
     @GetMapping("/export")
+    @PreAuthorize("@ss.hasPermi('live:freight:access')")
     public void export(@RequestParam Map<String,Object> query,HttpServletResponse response) throws Exception {
         List<Map<String,Object>> rows=service.export(query);
         response.setContentType("text/csv;charset=UTF-8");

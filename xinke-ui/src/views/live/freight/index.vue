@@ -3,10 +3,10 @@
     <header class="page-head">
       <div><h2>运费征收明细</h2><span>共 {{ total }} 条 · 运费合计 ¥ {{ money(summaryAmount) }}</span></div>
       <div class="head-actions">
-        <el-button :icon="Upload" :loading="importing" @click="fileInput?.click()">导入 Excel</el-button>
+        <el-button v-if="canWrite" :icon="Upload" :loading="importing" @click="fileInput?.click()">导入 Excel</el-button>
         <input ref="fileInput" type="file" accept=".xlsx,.xls" hidden @change="importFile" />
-        <el-button :icon="Download" :loading="exporting" :disabled="!total" @click="exportRows">导出 CSV</el-button>
-        <el-button type="primary" :icon="Plus" @click="openCreate">新增明细</el-button>
+        <el-button v-if="canWrite" :icon="Download" :loading="exporting" :disabled="!total" @click="exportRows">导出 CSV</el-button>
+        <el-button v-if="canWrite" type="primary" :icon="Plus" @click="openCreate">新增明细</el-button>
       </div>
     </header>
 
@@ -45,7 +45,7 @@
       <el-table-column prop="createdByName" label="录入人" width="115" />
       <el-table-column label="征收时间" width="170"><template #default="{ row }">{{ time(row.collectedAt) }}</template></el-table-column>
       <el-table-column prop="remark" label="备注" min-width="170" show-overflow-tooltip />
-      <el-table-column label="操作" width="95" fixed="right"><template #default="{ row }"><el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button></template></el-table-column>
+      <el-table-column v-if="canWrite" label="操作" width="95" fixed="right"><template #default="{ row }"><el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button></template></el-table-column>
     </el-table>
     <el-pagination v-model:current-page="page" v-model:page-size="pageSize" class="pager" :total="total" :page-sizes="[10,20,50,100]" layout="total, sizes, prev, pager, next" @size-change="load" @current-change="load" />
     </template>
@@ -78,10 +78,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { saveAs } from 'file-saver'
 import * as echarts from 'echarts'
 import useUserStore from '@/store/modules/user'
+import { checkPermi } from '@/utils/permission'
 import { freightShops, freightList, freightDashboard, freightCreate, freightUpdate, freightImport, freightExport } from '@/api/live/freight'
 
 const user = useUserStore()
 const currentName = computed(() => user.nickName || user.name)
+const canWrite = computed(() => checkPermi(['live:freight:access']))
 const statuses = [{ value: 'SIGNED', label: '已签收' }, { value: 'SHIPPED_UNSIGNED', label: '已发货未签收' }]
 const methods = [{ value: 'ALIPAY_PERSONAL', label: '支付宝个人账户9%' }, { value: 'ORDER_PAYMENT', label: '订单打款7%' }]
 const statusLabel = value => statuses.find(item => item.value === value)?.label || value

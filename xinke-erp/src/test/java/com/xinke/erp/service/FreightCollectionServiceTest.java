@@ -25,6 +25,21 @@ import com.xinke.common.exception.ServiceException;
 import com.xinke.erp.mapper.FreightCollectionMapper;
 
 class FreightCollectionServiceTest {
+    @Test void globalViewerReadsAllShopsAndDashboardWithoutChangingWriteScope() {
+        SysUser user=new SysUser();user.setUserId(7L);user.setUserName("viewer");
+        LoginUser login=new LoginUser(7L,1L,user,Set.of("live:freight:viewAll"));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(login,null,List.of()));
+        when(mapper.summary(anyMap())).thenReturn(Map.of("total",0));
+        when(mapper.daily(anyMap())).thenReturn(List.of());
+        service.shops();verify(mapper).shops(7L,true);
+        service.dashboard(Map.of());
+        var query=org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(mapper).daily(query.capture());
+        org.junit.jupiter.api.Assertions.assertFalse(query.getValue().containsKey("scopeUserId"));
+        when(mapper.shop(10L,7L,false)).thenReturn(null);
+        assertThrows(ServiceException.class,()->service.create(input()));
+        verify(mapper).shop(10L,7L,false);
+    }
     private final FreightCollectionMapper mapper=mock(FreightCollectionMapper.class);
     private final FreightCollectionService service=new FreightCollectionService(mapper);
 
