@@ -67,7 +67,7 @@
     values(#{deptId},#{userName},#{nickName},#{mobile},#{avatar},#{sex},#{password},#{status},'0',#{operator},sysdate(),'钉钉通讯录自动同步')
   </insert>
   <update id="updateSystemUser" parameterType="map">
-    update sys_user set dept_id=#{deptId},user_name=#{userName},nick_name=#{nickName},phonenumber=#{mobile},
+    update sys_user set dept_id=#{deptId},nick_name=#{nickName},phonenumber=#{mobile},
       avatar=#{avatar},sex=#{sex},status=case when local_disabled=1 then '1' else #{status} end,update_by=#{operator},update_time=sysdate()
     where user_id=#{userId} and del_flag='0'
   </update>

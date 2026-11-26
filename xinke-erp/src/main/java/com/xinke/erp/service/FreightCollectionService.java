@@ -28,21 +28,35 @@ import com.xinke.erp.mapper.FreightCollectionMapper;
 @Service
 public class FreightCollectionService {
     private final FreightCollectionMapper mapper;
+    private final FreightAccessService access;
 
-    public FreightCollectionService(FreightCollectionMapper mapper) { this.mapper=mapper; }
+    public FreightCollectionService(FreightCollectionMapper mapper,FreightAccessService access) { this.mapper=mapper;this.access=access; }
 
     public List<Map<String,Object>> shops() {
+        var policy=access.current();
+        if(policy!=null) {
+            var all=mapper.shops(SecurityUtils.getUserId(),true);
+            if("ALL".equals(policy.viewScope()) || "ALL".equals(policy.operateScope())) return all;
+            Set<Long> ids=new HashSet<>(access.scopeShops(policy,false,SecurityUtils.getUserId()));
+            ids.addAll(access.scopeShops(policy,true,SecurityUtils.getUserId()));
+            return all.stream().filter(s->ids.contains(((Number)s.get("shopId")).longValue())).toList();
+        }
         return mapper.shops(SecurityUtils.getUserId(),canViewAll());
     }
 
     public Map<String,Object> list(Map<String,Object> input) {
+        access.require("view");
         Map<String,Object> query=query(input,false);
         Map<String,Object> result=new HashMap<>(mapper.summary(query));
-        result.put("rows",mapper.list(query));
+        var rows=mapper.list(query);
+        var policy=access.current();
+        if(policy!=null) for(var row:rows) row.put("editable",access.canEdit(policy,row,SecurityUtils.getUserId()));
+        result.put("rows",rows);
         return result;
     }
 
     public List<Map<String,Object>> export(Map<String,Object> input) {
+        access.require("export");
         Map<String,Object> query=query(input,true);
         if(((Number)mapper.summary(query).get("total")).longValue()>5000)
             throw new ServiceException("单次最多导出5000条，请缩短日期范围");
@@ -50,6 +64,7 @@ public class FreightCollectionService {
     }
 
     public Map<String,Object> dashboard(Map<String,Object> input) {
+        access.require("dashboard");
         Map<String,Object> query=query(input,false);
         Map<String,Object> result=new HashMap<>(mapper.summary(query));
         result.put("daily",mapper.daily(query));
@@ -58,6 +73,7 @@ public class FreightCollectionService {
 
     @Transactional
     public Long create(Map<String,Object> input) {
+        access.require("create");
         Map<String,Object> value=validated(input);
         try { mapper.insert(value); }
         catch(DuplicateKeyException ex) { throw new ServiceException("订单号已存在，请勿重复录入"); }
@@ -66,13 +82,16 @@ public class FreightCollectionService {
 
     @Transactional
     public void update(Long id,Map<String,Object> input) {
+        access.require("edit");
         Map<String,Object> old=mapper.get(id);
         if(old==null) throw new ServiceException("明细不存在");
         Long userId=SecurityUtils.getUserId();
         Long oldShop=((Number)old.get("shopId")).longValue();
-        if(!canOperateAll() && !userId.equals(((Number)old.get("createdByUserId")).longValue())
+        var policy=access.current();
+        if(policy!=null ? !access.canEdit(policy,old,userId) :
+            !canOperateAll() && !userId.equals(((Number)old.get("createdByUserId")).longValue())
             && mapper.isManager(oldShop,userId)==0) throw new ServiceException("无权修改此明细");
-        Map<String,Object> value=validated(input);
+        Map<String,Object> value=validated(input,oldShop);
         value.put("id",id);
         Long version=longValue(input.get("version"));
         if(version==null || version<0) throw new ServiceException("请刷新后重试");
@@ -84,6 +103,7 @@ public class FreightCollectionService {
 
     @Transactional
     public int importFile(MultipartFile file) {
+        access.require("import");
         if(file==null || file.isEmpty() || file.getSize()>5*1024*1024)
             throw new ServiceException("请选择不超过5MB的 Excel 文件");
         String filename=Objects.toString(file.getOriginalFilename(),"").toLowerCase();
@@ -136,9 +156,17 @@ public class FreightCollectionService {
     }
 
     private Map<String,Object> validated(Map<String,Object> input) {
+        return validated(input,null);
+    }
+
+    private Map<String,Object> validated(Map<String,Object> input,Long existingShop) {
         Long shopId=longValue(input.get("shopId"));
         if(shopId==null) throw new ServiceException("请选择店铺");
-        Map<String,Object> shop=mapper.shop(shopId,SecurityUtils.getUserId(),canOperateAll());
+        var policy=access.current();
+        if(policy!=null && !("OWN".equals(policy.operateScope()) && shopId.equals(existingShop))
+            && !access.canOperateShop(policy,shopId,SecurityUtils.getUserId()))
+            throw new ServiceException("此店铺不在当前账号的运费操作范围内");
+        Map<String,Object> shop=mapper.shop(shopId,SecurityUtils.getUserId(),policy!=null || canOperateAll());
         if(shop==null) throw new ServiceException("店铺不存在、已停用或未配置当前账号");
         String orderNo=Objects.toString(input.get("orderNo"),"").trim();
         if(orderNo.isEmpty() || orderNo.length()>64) throw new ServiceException("订单号应为1到64个字符");
@@ -193,7 +221,9 @@ public class FreightCollectionService {
         int page=integer(input.get("pageNum"),1),size=integer(input.get("pageSize"),20);
         page=Math.max(1,Math.min(100000,page)); size=export?5000:Math.max(1,Math.min(100,size));
         query.put("limit",size); query.put("offset",export?0:(page-1)*size);
-        if(!canViewAll()) query.put("scopeUserId",SecurityUtils.getUserId());
+        var policy=access.current();
+        if(policy!=null) access.applyReadScope(query,policy,SecurityUtils.getUserId());
+        else if(!canViewAll()) query.put("scopeUserId",SecurityUtils.getUserId());
         return query;
     }
 
@@ -202,8 +232,7 @@ public class FreightCollectionService {
     }
 
     private boolean canOperateAll() {
-        return SecurityUtils.isAdmin() || (SecurityUtils.hasPermi("live:freight:viewAll")
-            && SecurityUtils.hasPermi("live:freight:access"));
+        return SecurityUtils.isAdmin();
     }
 
     private static String cell(Row row,int index,DataFormatter formatter) {

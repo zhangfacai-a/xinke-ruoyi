@@ -67,6 +67,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<if test="userName != null and userName != ''">
 			AND u.user_name like concat('%', #{userName}, '%')
 		</if>
+		<if test="nickName != null and nickName != ''">
+			AND u.nick_name like concat('%', #{nickName}, '%')
+		</if>
+		<if test="params.personKeyword != null and params.personKeyword != ''">
+			AND (u.nick_name like concat('%', #{params.personKeyword}, '%') OR u.user_name like concat('%', #{params.personKeyword}, '%') OR u.phonenumber like concat('%', #{params.personKeyword}, '%'))
+		</if>
 		<if test="status != null and status != ''">
 			AND u.status = #{status}
 		</if>

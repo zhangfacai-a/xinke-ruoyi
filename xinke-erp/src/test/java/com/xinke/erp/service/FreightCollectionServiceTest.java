@@ -29,6 +29,10 @@ class FreightCollectionServiceTest {
         SysUser user=new SysUser();user.setUserId(7L);user.setUserName("operator");
         LoginUser login=new LoginUser(7L,1L,user,Set.of("live:freight:viewAll","live:freight:access"));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(login,null,List.of()));
+        var policy=new FreightAccessService.Policy(Set.of("view","create","edit"),"ALL","ALL",List.of(),List.of(),1L);
+        when(access.current()).thenReturn(policy);
+        when(access.canOperateShop(policy,10L,7L)).thenReturn(true);
+        when(access.canEdit(org.mockito.ArgumentMatchers.eq(policy),anyMap(),org.mockito.ArgumentMatchers.eq(7L))).thenReturn(true);
         when(mapper.shop(10L,7L,true)).thenReturn(Map.of("shopId",10L,"shopName","测试店铺"));
         when(mapper.insert(anyMap())).thenAnswer(call -> { Map<String,Object> value=call.getArgument(0);value.put("id",42L);return 1; });
         assertEquals(42L,service.create(input()));
@@ -56,7 +60,8 @@ class FreightCollectionServiceTest {
         verify(mapper).shop(10L,7L,false);
     }
     private final FreightCollectionMapper mapper=mock(FreightCollectionMapper.class);
-    private final FreightCollectionService service=new FreightCollectionService(mapper);
+    private final FreightAccessService access=mock(FreightAccessService.class);
+    private final FreightCollectionService service=new FreightCollectionService(mapper,access);
 
     @AfterEach void cleanup() { SecurityContextHolder.clearContext(); }
 

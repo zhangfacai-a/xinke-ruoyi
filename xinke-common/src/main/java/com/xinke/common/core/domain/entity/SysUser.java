@@ -33,11 +33,11 @@ public class SysUser extends BaseEntity
     private Long deptId;
 
     /** 用户账号 */
-    @Excel(name = "登录名称")
+    @Excel(name = "登录账号", importAliases = {"登录名称"})
     private String userName;
 
     /** 用户昵称 */
-    @Excel(name = "用户名称")
+    @Excel(name = "姓名", importAliases = {"用户名称", "用户昵称"})
     private String nickName;
 
     /** 用户邮箱 */

@@ -43,6 +43,11 @@ export const constantRoutes = [
     hidden: true
   },
   {
+    path: '/system/role',
+    redirect: to => ({path:'/ops-people/role',query:to.query}),
+    hidden: true
+  },
+  {
     path: '/system/user',
     redirect: to => ({path:'/ops-people/user',query:to.query}),
     hidden: true
@@ -234,7 +239,7 @@ export const dynamicRoutes = [
         path: 'user/:roleId(\\d+)',
         component: () => import('@/views/system/role/authUser'),
         name: 'AuthUser',
-        meta: { title: '分配用户', activeMenu: '/system/role' }
+        meta: { title: '分配用户', activeMenu: '/ops-people/role' }
       }
     ]
   },

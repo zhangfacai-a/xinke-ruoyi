@@ -222,6 +222,7 @@ public class SysUserController extends BaseController
     @GetMapping("/authRole/{userId}")
     public AjaxResult authRole(@PathVariable("userId") Long userId)
     {
+        userService.checkUserDataScope(userId);
         AjaxResult ajax = AjaxResult.success();
         SysUser user = userService.selectUserById(userId);
         List<SysRole> roles = roleService.selectRolesByUserId(userId);
@@ -238,6 +239,9 @@ public class SysUserController extends BaseController
     @PutMapping("/authRole")
     public AjaxResult insertAuthRole(Long userId, Long[] roleIds)
     {
+        SysUser target = userService.selectUserById(userId);
+        if (target == null) return error("人员不存在");
+        userService.checkUserAllowed(target);
         userService.checkUserDataScope(userId);
         roleService.checkRoleDataScope(roleIds);
         userService.insertUserAuth(userId, roleIds);

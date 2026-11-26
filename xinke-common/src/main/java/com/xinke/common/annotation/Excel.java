@@ -28,6 +28,9 @@ public @interface Excel
      */
     public String name() default "";
 
+    /** Accepted historical column names on import; export always uses name. */
+    public String[] importAliases() default {};
+
     /**
      * 日期格式, 如: yyyy-MM-dd
      */

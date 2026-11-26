@@ -2,6 +2,12 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.xinke.erp.mapper.FreightCollectionMapper">
   <sql id="scope">
+    <if test="policyOwnerId!=null">and f.created_by_user_id=#{policyOwnerId}</if>
+    <if test="policyShopIds!=null">
+      <choose><when test="policyShopIds.size()>0">and f.shop_id in
+        <foreach collection="policyShopIds" item="sid" open="(" close=")" separator=",">#{sid}</foreach>
+      </when><otherwise>and 1=0</otherwise></choose>
+    </if>
     <if test="scopeUserId!=null">and (f.created_by_user_id=#{scopeUserId} or exists (
       select 1 from live_subject_user_map m where m.subject_type='SHOP' and m.subject_id=f.shop_id
       and m.role_code='customer_admin' and m.user_id=#{scopeUserId}))</if>

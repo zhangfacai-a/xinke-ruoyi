@@ -28,14 +28,14 @@
       <template #footer><el-button @click="subjectVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="submitSubject">保存</el-button></template>
     </el-dialog>
     <el-dialog append-to-body align-center class="business-config-dialog" v-model="assignmentVisible" :title="'配置人员 · '+assignment.subjectName" width="620px" :close-on-click-modal="false">
-      <el-form label-position="top"><el-form-item v-for="field in staffingFields" :key="field.key" :label="field.label"><el-select v-model="assignment[field.key]" multiple filterable><el-option v-for="person in staff" :key="person.userId" :value="person.userId" :label="person.userName"/></el-select></el-form-item></el-form>
+      <el-form label-position="top"><el-form-item v-for="field in staffingFields" :key="field.key" :label="field.label"><el-select v-model="assignment[field.key]" multiple filterable><el-option v-for="person in staff" :key="person.userId" :value="person.userId" :label="`${person.userName}（${person.account || person.userId}）`"/></el-select></el-form-item></el-form>
       <p class="hint">保存后按有效岗位自动同步对应权限，不改派已有订单。</p>
       <template #footer><el-button @click="assignmentVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="submitAssignment">确认保存</el-button></template>
     </el-dialog>
     <el-dialog append-to-body align-center class="business-config-dialog" v-model="groupVisible" title="共享人员组" width="min(880px, 96vw)" :close-on-click-modal="false">
       <el-form ref="groupForm" :model="group" label-position="top">
         <el-form-item label="组名称" prop="groupName" :rules="[{required:true,message:'请输入组名称'}]"><el-input v-model.trim="group.groupName" maxlength="100"/></el-form-item>
-        <div class="group-fields"><el-form-item v-for="field in shopFields" :key="field.key" :label="field.label"><el-select v-model="group[field.key]" multiple filterable><el-option v-for="person in staff" :key="person.userId" :value="person.userId" :label="person.userName"/></el-select></el-form-item></div>
+        <div class="group-fields"><el-form-item v-for="field in shopFields" :key="field.key" :label="field.label"><el-select v-model="group[field.key]" multiple filterable><el-option v-for="person in staff" :key="person.userId" :value="person.userId" :label="`${person.userName}（${person.account || person.userId}）`"/></el-select></el-form-item></div>
         <el-form-item label="关联店铺"><el-select v-model="group.shopIds" multiple filterable><el-option v-for="shop in allShops" :key="shop.subjectId" :value="shop.subjectId" :label="shop.subjectName"/></el-select></el-form-item>
       </el-form>
       <div class="preview-head"><strong>保存影响预览</strong><small>移出组的店铺保留现有名单；切换组的店铺使用本组名单。</small></div>

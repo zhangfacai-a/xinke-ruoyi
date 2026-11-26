@@ -12,3 +12,5 @@ export const freightImport = file => {
   return request({ url: `${root}/import`, method: 'post', data, timeout: 120000, headers: { 'Content-Type': 'multipart/form-data', skipError: true, repeatSubmit: false } })
 }
 export const freightExport = params => request({ url: `${root}/export`, params, responseType: 'blob', timeout: 120000 })
+
+export const freightCapabilities = () => request({ url: `${root}/capabilities` })

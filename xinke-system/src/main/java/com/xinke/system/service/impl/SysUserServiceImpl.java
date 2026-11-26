@@ -455,7 +455,7 @@ public class SysUserServiceImpl implements ISysUserService
             {
                 SysRole role = roleMapper.selectRoleById(roleId);
                 if (role == null) throw new ServiceException("角色不存在");
-                if (role.getRoleKey() != null && role.getRoleKey().startsWith("auto_live_"))
+                if (role.getRoleKey() != null && (role.getRoleKey().startsWith("auto_live_") || role.getRoleKey().startsWith("personnel_freight_")))
                 {
                     continue;
                 }

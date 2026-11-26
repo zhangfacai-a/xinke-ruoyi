@@ -1,5 +1,5 @@
 <template>
-   <div class="app-container">
+   <div class="app-container"><h2 style="font-size:22px;margin:0 0 8px">岗位与通用权限</h2><p style="color:var(--el-text-color-secondary);font-size:13px;margin:0 0 24px">将常用功能组合为系统角色，再分配给人员。店铺与直播间职责在业务分工中维护，个人运费范围在人员详情中设置。</p>
       <el-form :model="queryParams" ref="queryRef" v-show="showSearch" :inline="true" label-width="68px">
          <el-form-item label="角色名称" prop="roleName">
             <el-input

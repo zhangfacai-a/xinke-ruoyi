@@ -40,7 +40,7 @@ const entries=computed(()=>[
   {title:'挽单与转推中心',subtitle:'订单处理、跟进与经营看板',path:'/ops-customers/retention-center',icon:Switch,perms:['live:retention:access']},
   {title:'主播数据',subtitle:'主播交接、区间明细与业绩',path:'/ops-anchors/liveMetrics',icon:Switch,perms:['live:metrics:list']},
   {title:'礼品工作台',subtitle:'礼品登记、记录与汇总',path:'/ops-gifts/giftWorkbench',icon:Goods,perms:['live:gift:entry','live:gift:list']},
-  {title:'运费征收',subtitle:'运费明细与经营看板',path:'/ops-freight/freight-collection',icon:Goods,perms:['live:freight:access','live:freight:viewAll']},
+  {title:'运费征收',subtitle:'运费明细与经营看板',path:'/ops-freight/freight-collection',icon:Goods,perms:['live:freight:access','live:freight:viewAll','live:freight:entry']},
   {title:'人员与业务配置',subtitle:'业务分配、共享人员组与实际权限',path:'/ops-people/user',icon:User,perms:['system:user:list']}
 ].filter(entry=>!entry.perms||checkPermi(entry.perms)))
 </script>

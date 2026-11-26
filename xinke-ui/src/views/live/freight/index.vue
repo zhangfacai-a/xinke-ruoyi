@@ -3,14 +3,14 @@
     <header class="page-head">
       <div><h2>运费征收明细</h2><span>共 {{ total }} 条 · 运费合计 ¥ {{ money(summaryAmount) }}</span></div>
       <div class="head-actions">
-        <el-button v-if="canWrite" :icon="Upload" :loading="importing" @click="fileInput?.click()">导入 Excel</el-button>
+        <el-button v-if="capabilities.import" :icon="Upload" :loading="importing" @click="fileInput?.click()">导入 Excel</el-button>
         <input ref="fileInput" type="file" accept=".xlsx,.xls" hidden @change="importFile" />
-        <el-button v-if="canWrite" :icon="Download" :loading="exporting" :disabled="!total" @click="exportRows">导出 CSV</el-button>
-        <el-button v-if="canWrite" type="primary" :icon="Plus" @click="openCreate">新增明细</el-button>
+        <el-button v-if="capabilities.export" :icon="Download" :loading="exporting" :disabled="!total" @click="exportRows">导出 CSV</el-button>
+        <el-button v-if="capabilities.create" type="primary" :icon="Plus" @click="openCreate">新增明细</el-button>
       </div>
     </header>
 
-    <el-tabs v-model="tab" class="view-tabs" @tab-change="search"><el-tab-pane label="明细" name="detail" /><el-tab-pane label="看板" name="dashboard" /></el-tabs>
+    <el-tabs v-model="tab" class="view-tabs" @tab-change="search"><el-tab-pane label="明细" name="detail" /><el-tab-pane v-if="capabilities.dashboard" label="看板" name="dashboard" /></el-tabs>
 
     <el-form class="filters" inline @submit.prevent="search">
       <el-form-item label="录入日期"><el-date-picker v-model="filters.dates" type="daterange" value-format="YYYY-MM-DD" start-placeholder="开始" end-placeholder="结束" :clearable="false" /></el-form-item>
@@ -45,7 +45,7 @@
       <el-table-column prop="createdByName" label="录入人" width="115" />
       <el-table-column label="征收时间" width="170"><template #default="{ row }">{{ time(row.collectedAt) }}</template></el-table-column>
       <el-table-column prop="remark" label="备注" min-width="170" show-overflow-tooltip />
-      <el-table-column v-if="canWrite" label="操作" width="95" fixed="right"><template #default="{ row }"><el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button></template></el-table-column>
+      <el-table-column v-if="capabilities.edit" label="操作" width="95" fixed="right"><template #default="{ row }"><el-button link type="primary" :icon="Edit" :disabled="row.editable === false" @click="openEdit(row)">编辑</el-button></template></el-table-column>
     </el-table>
     <el-pagination v-model:current-page="page" v-model:page-size="pageSize" class="pager" :total="total" :page-sizes="[10,20,50,100]" layout="total, sizes, prev, pager, next" @size-change="load" @current-change="load" />
     </template>
@@ -53,7 +53,7 @@
     <el-dialog v-model="visible" :title="form.id ? '编辑运费明细' : '新增运费明细'" width="min(600px, 96vw)" :close-on-click-modal="false" destroy-on-close @opened="focusOrderNo">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" :disabled="saving">
         <div class="form-grid">
-          <el-form-item label="店铺" prop="shopId"><el-select v-model="form.shopId" filterable placeholder="选择店铺"><el-option v-for="shop in shops" :key="shop.shopId" :label="shop.shopName" :value="shop.shopId" /></el-select></el-form-item>
+          <el-form-item label="店铺" prop="shopId"><el-select v-model="form.shopId" filterable placeholder="选择店铺"><el-option v-for="shop in operateShops" :key="shop.shopId" :label="shop.shopName" :value="shop.shopId" /></el-select></el-form-item>
           <el-form-item label="订单号" prop="orderNo"><el-input ref="orderNoInput" v-model.trim="form.orderNo" maxlength="64" placeholder="输入订单号" /></el-form-item>
           <el-form-item label="订单状态" prop="deliveryStatus"><el-select v-model="form.deliveryStatus" placeholder="选择状态"><el-option v-for="item in statuses" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
           <el-form-item label="运费金额（元）" prop="freightAmount"><el-input-number v-model="form.freightAmount" :min="0.01" :max="999999999999.99" :precision="2" :controls="false" /></el-form-item>
@@ -78,12 +78,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { saveAs } from 'file-saver'
 import * as echarts from 'echarts'
 import useUserStore from '@/store/modules/user'
-import { checkPermi } from '@/utils/permission'
-import { freightShops, freightList, freightDashboard, freightCreate, freightUpdate, freightImport, freightExport } from '@/api/live/freight'
+
+import { freightCapabilities, freightShops, freightList, freightDashboard, freightCreate, freightUpdate, freightImport, freightExport } from '@/api/live/freight'
 
 const user = useUserStore()
 const currentName = computed(() => user.nickName || user.name)
-const canWrite = computed(() => checkPermi(['live:freight:access']))
+const capabilities = ref({})
+const operateShops = computed(() => !capabilities.value.managed || capabilities.value.operateScope === 'ALL' ? shops.value : shops.value.filter(s => capabilities.value.operateShopIds?.map(String).includes(String(s.shopId))))
 const statuses = [{ value: 'SIGNED', label: '已签收' }, { value: 'SHIPPED_UNSIGNED', label: '已发货未签收' }]
 const methods = [{ value: 'ALIPAY_PERSONAL', label: '支付宝个人账户9%' }, { value: 'ORDER_PAYMENT', label: '订单打款7%' }]
 const statusLabel = value => statuses.find(item => item.value === value)?.label || value
@@ -161,8 +162,8 @@ function search() { page.value = 1; load() }
 function resetFilters() { filters.value = initialFilters(); search() }
 function focusOrderNo() { orderNoInput.value?.focus() }
 function openCreate() {
-  const rememberedShop = shops.value.find(shop => shop.shopId === lastCreate.value.shopId)
-  const shopId = rememberedShop?.shopId ?? (shops.value.length === 1 ? shops.value[0].shopId : null)
+  const rememberedShop = operateShops.value.find(shop => shop.shopId === lastCreate.value.shopId)
+  const shopId = rememberedShop?.shopId ?? (operateShops.value.length === 1 ? operateShops.value[0].shopId : null)
   form.value = createForm(shopId, lastCreate.value.deliveryStatus)
   visible.value = true
 }
@@ -211,7 +212,7 @@ async function exportRows() {
   } catch (error) { ElMessage.error(error?.message || '导出失败') }
   finally { exporting.value = false }
 }
-onMounted(async () => { window.addEventListener('resize', resizeTrend); try { shops.value = (await freightShops()).data || []; await load() } catch (error) { ElMessage.error(error?.message || '加载失败') } })
+onMounted(async () => { window.addEventListener('resize', resizeTrend); try { capabilities.value=(await freightCapabilities()).data || {}; shops.value = (await freightShops()).data || []; await load() } catch (error) { ElMessage.error(error?.message || '加载失败') } })
 onBeforeUnmount(() => { window.removeEventListener('resize', resizeTrend); trendInstance?.dispose(); trendInstance = null })
 </script>
 

@@ -17,14 +17,20 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.xinke.common.core.domain.AjaxResult;
 import com.xinke.erp.service.FreightCollectionService;
+import com.xinke.erp.service.FreightAccessService;
 
 @RestController
 @RequestMapping("/live/freight")
-@PreAuthorize("@ss.hasAnyPermi('live:freight:access,live:freight:viewAll')")
+@PreAuthorize("@freightAccess.allowed('view')")
 public class FreightCollectionController {
     private final FreightCollectionService service;
+    private final FreightAccessService access;
 
-    public FreightCollectionController(FreightCollectionService service) { this.service=service; }
+    public FreightCollectionController(FreightCollectionService service,FreightAccessService access) { this.service=service;this.access=access; }
+
+    @GetMapping("/capabilities")
+    @PreAuthorize("isAuthenticated()")
+    public AjaxResult capabilities() { return AjaxResult.success(access.capabilities()); }
 
     @GetMapping("/shops")
     public AjaxResult shops() { return AjaxResult.success(service.shops()); }
@@ -33,29 +39,30 @@ public class FreightCollectionController {
     public AjaxResult list(@RequestParam Map<String,Object> query) { return AjaxResult.success(service.list(query)); }
 
     @GetMapping("/dashboard")
+    @PreAuthorize("@freightAccess.allowed('dashboard')")
     public AjaxResult dashboard(@RequestParam Map<String,Object> query) { return AjaxResult.success(service.dashboard(query)); }
 
     @PostMapping
-    @PreAuthorize("@ss.hasPermi('live:freight:access')")
+    @PreAuthorize("@freightAccess.allowed('create')")
     public AjaxResult create(@RequestBody Map<String,Object> value) {
         return AjaxResult.success(Map.of("id",service.create(value)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@ss.hasPermi('live:freight:access')")
+    @PreAuthorize("@freightAccess.allowed('edit')")
     public AjaxResult update(@PathVariable Long id,@RequestBody Map<String,Object> value) {
         service.update(id,value);
         return AjaxResult.success();
     }
 
     @PostMapping("/import")
-    @PreAuthorize("@ss.hasPermi('live:freight:access')")
+    @PreAuthorize("@freightAccess.allowed('import')")
     public AjaxResult importFile(@RequestParam("file") MultipartFile file) {
         return AjaxResult.success(Map.of("imported",service.importFile(file)));
     }
 
     @GetMapping("/export")
-    @PreAuthorize("@ss.hasPermi('live:freight:access')")
+    @PreAuthorize("@freightAccess.allowed('export')")
     public void export(@RequestParam Map<String,Object> query,HttpServletResponse response) throws Exception {
         List<Map<String,Object>> rows=service.export(query);
         response.setContentType("text/csv;charset=UTF-8");

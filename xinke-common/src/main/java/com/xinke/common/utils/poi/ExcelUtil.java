@@ -403,6 +403,14 @@ public class ExcelUtil<T>
             {
                 Excel attr = (Excel) objects[1];
                 Integer column = cellMap.get(attr.name());
+                if (column == null)
+                {
+                    for (String alias : attr.importAliases())
+                    {
+                        column = cellMap.get(alias);
+                        if (column != null) break;
+                    }
+                }
                 if (column != null)
                 {
                     fieldsMap.put(column, objects);
