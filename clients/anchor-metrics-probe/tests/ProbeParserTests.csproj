@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <None Update="fixtures/**/*.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Remove="UpdateTests.Program.cs" />
     <Compile Include="../MetricResponse.cs" Link="MetricResponse.cs" />
     <Compile Include="../MetricSelection.cs" Link="MetricSelection.cs" />

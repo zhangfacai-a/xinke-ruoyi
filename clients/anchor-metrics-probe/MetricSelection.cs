@@ -7,7 +7,7 @@ internal static class MetricSelection
     internal static readonly string[] Required =
     [
         "watch_ucnt", "pay_ucnt", "stat_cost", "watch_pay_ucnt_ratio", "pay_deposit_pre_order_cnt",
-        "live_show_watch_cnt_ratio", "watch_interact_ucnt_ratio", "watch_follow_ucnt_ratio", "follow_anchor_ucnt"
+        "live_show_watch_cnt_ratio", "watch_interact_ucnt_ratio", "watch_follow_ucnt_ratio", "follow_anchor_ucnt", "presale_depay_deamt"
     ];
 
     internal static readonly string Script = LoadScript();

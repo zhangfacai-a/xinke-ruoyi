@@ -24,8 +24,8 @@ internal sealed partial class ProbeForm
                     !root.TryGetProperty("result", out var result)) return;
                 switch (result.GetString())
                 {
-                    case "updated": RecordDiagnostic("指标配置已自动调整为所需九项，等待百应生成指标请求"); break;
-                    case "ready": RecordDiagnostic("指标配置已包含所需九项"); break;
+                    case "updated": RecordDiagnostic("指标配置已自动调整为所需十项，等待百应生成指标请求"); break;
+                    case "ready": RecordDiagnostic("指标配置已包含所需十项"); break;
                     case "blocked": RecordDiagnostic("指标配置写入失败，可在百应大屏手动配置"); break;
                 }
             }
@@ -39,7 +39,7 @@ internal sealed partial class ProbeForm
         var missing = MetricSelection.MissingRequestedKeys(request);
         if (missing.Length == 0)
         {
-            RecordDiagnostic("请求已包含所需九项，响应仍有缺项；保留缺失状态，详情见上方指标日志");
+            RecordDiagnostic("请求已包含所需十项，响应仍有缺项；保留缺失状态，详情见上方指标日志");
             return false;
         }
         if (metricRepairAttempted) return false;

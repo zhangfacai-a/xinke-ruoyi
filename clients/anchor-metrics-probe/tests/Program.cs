@@ -5,14 +5,49 @@ var fullRequest = new Uri($"https://compass.jinritemai.com/compass_api/author/li
 if (MetricSelection.MissingRequestedKeys(fullRequest).Length != 0)
     throw new Exception("Encoded complete selection was not recognized.");
 var partialRequest = new Uri("https://compass.jinritemai.com/compass_api/author/live/live_screen/core_data?index_selected=watch_ucnt%2Cpay_ucnt");
-if (MetricSelection.MissingRequestedKeys(partialRequest).Length != 7 ||
+if (MetricSelection.MissingRequestedKeys(partialRequest).Length != 8 ||
     !MetricSelection.MissingRequestedKeys(partialRequest).Contains("stat_cost") ||
-    MetricSelection.MissingRequestedKeys(new Uri("https://compass.jinritemai.com/")).Length != 9 ||
+    MetricSelection.MissingRequestedKeys(new Uri("https://compass.jinritemai.com/")).Length != 10 ||
     !MetricSelection.Script.Contains("COMPASS_LIVE_SCEEN_CORE_INDICATORS_QIANCHUAN_TALENT_HIT"))
     throw new Exception("Partial selection detection or embedded configuration script is invalid.");
 
+var fiveJson=File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"fixtures","core-data-five-fields.json"));
+if(!MetricSnapshot.TryParse("test-room",fiveJson,out var five) || five is null ||
+    five.Values["pay_amt"]!=1289535 || five.Values["follow_anchor_ucnt"]!=25 || five.Values["stat_cost"]!=71001 ||
+    five.Values["pay_deposit_pre_order_cnt"]!=0 || five.Values["presale_depay_deamt"]!=0)
+    throw new Exception("Verified five-field response differs from source values.");
+var missingDeposit=System.Text.Json.Nodes.JsonNode.Parse(fiveJson)!;
+var depositItems=missingDeposit["data"]!["core_data"]!.AsArray();
+depositItems.Remove(depositItems.First(x=>x?["index_name"]?.GetValue<string>()=="presale_depay_deamt"));
+if(!MetricSnapshot.TryParse("test-room",missingDeposit.ToJsonString(),out var missingDepositSnapshot) ||
+    missingDepositSnapshot!.Values.ContainsKey("presale_depay_deamt")) throw new Exception("Missing deposit became zero.");
+var wrongUnit= fiveJson.Replace("\"unit\": \"price\"", "\"unit\": \"number\"");
+if(!MetricSnapshot.TryParse("test-room",wrongUnit,out var wrongUnitSnapshot) || wrongUnitSnapshot!.Values.ContainsKey("pay_amt"))
+    throw new Exception("Invalid money units were accepted.");
+var noCleanAmount=System.Text.Json.Nodes.JsonNode.Parse(fiveJson)!;
+noCleanAmount["data"]!.AsObject().Remove("pay_amt");
+if(!MetricSnapshot.TryParse("test-room",noCleanAmount.ToJsonString(),out var noCleanSnapshot) || noCleanSnapshot!.Values.ContainsKey("pay_amt"))
+    throw new Exception("Inclusive GMV was used as clean GMV.");
+var positiveDeposit=System.Text.Json.Nodes.JsonNode.Parse(fiveJson)!;
+var positiveItem=positiveDeposit["data"]!["core_data"]!.AsArray().First(x=>x?["index_name"]?.GetValue<string>()=="presale_depay_deamt")!;
+positiveItem["value"]!["value"]=12345;
+if(!MetricSnapshot.TryParse("test-room",positiveDeposit.ToJsonString(),out var positiveSnapshot) || positiveSnapshot!.Values["presale_depay_deamt"]/100!=123.45m)
+    throw new Exception("Nonzero deposit amount did not convert from cents correctly.");
+Console.WriteLine("Five source fields: exact raw values, zero versus missing, money units and clean-GMV isolation passed.");
+var complete=System.Text.Json.Nodes.JsonNode.Parse(fiveJson)!;
+foreach(var (name,unit) in new[]{("pay_ucnt","number"),("watch_pay_ucnt_ratio","ratio"),("live_show_watch_cnt_ratio","ratio"),("watch_interact_ucnt_ratio","ratio")})
+    complete["data"]!["core_data"]!.AsArray().Add(System.Text.Json.Nodes.JsonNode.Parse($"{{\"index_name\":\"{name}\",\"value\":{{\"unit\":\"{unit}\",\"value\":0}}}}"));
+if(!MetricSnapshot.TryParse("test-room",complete.ToJsonString(),out var completeSnapshot) || !completeSnapshot!.HasReportValues)
+    throw new Exception("Complete selection with deposit was not recognized.");
+var completeItems=complete["data"]!["core_data"]!.AsArray();
+completeItems.Remove(completeItems.First(x=>x?["index_name"]?.GetValue<string>()=="presale_depay_deamt"));
+if(!MetricSnapshot.TryParse("test-room",complete.ToJsonString(),out var incompleteSnapshot) || incompleteSnapshot!.HasReportValues)
+    throw new Exception("A missing deposit metric was marked complete.");
+if(args.Length==0) return;
 if (args.Length != 1) throw new ArgumentException("Pass a captured core_data response JSON file.");
-var json = File.ReadAllText(args[0]);
+var original=System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(args[0]))!;
+original["data"]!["core_data"]!.AsArray().Add(System.Text.Json.Nodes.JsonNode.Parse("{\"index_name\":\"presale_depay_deamt\",\"value\":{\"unit\":\"price\",\"value\":0}}"));
+var json=original.ToJsonString(new System.Text.Json.JsonSerializerOptions{WriteIndented=true});
 if (!MetricSnapshot.TryParse("7711489437338700579", json, out var snapshot) || snapshot is null)
     throw new Exception("Valid captured response did not parse.");
 if (snapshot.Values["pay_amt"] != 679600 || snapshot.Values["pay_deposit_pre_order_cnt"] != 50 ||
@@ -25,13 +60,13 @@ var metrics = partial["data"]!["core_data"]!.AsArray();
 var fanItem = metrics.First(item => item?["index_name"]?.GetValue<string>() == "follow_anchor_ucnt");
 metrics.Remove(fanItem);
 if (!MetricSnapshot.TryParse("7711489437338700579", partial.ToJsonString(), out var partialSnapshot) ||
-    partialSnapshot?.MetricCount != 8 || partialSnapshot.HasReportValues || !partialSnapshot.MissingMetrics.Contains("follow_anchor_ucnt"))
+    partialSnapshot?.MetricCount != 9 || partialSnapshot.HasReportValues || !partialSnapshot.MissingMetrics.Contains("follow_anchor_ucnt"))
     throw new Exception("Partial successful response was not retained.");
 
 var noAmount = System.Text.Json.Nodes.JsonNode.Parse(json)!;
 noAmount["data"]!.AsObject().Remove("pay_amt");
 if (!MetricSnapshot.TryParse("7711489437338700579", noAmount.ToJsonString(), out var noAmountSnapshot) ||
-    noAmountSnapshot?.MetricCount != 9 || noAmountSnapshot.HasReportValues)
+    noAmountSnapshot?.MetricCount != 10 || noAmountSnapshot.HasReportValues)
     throw new Exception("A response with no GMV was marked complete.");
 
 var invalid = json.Replace("\"StatusCode\": 0", "\"StatusCode\": 10012", StringComparison.Ordinal);

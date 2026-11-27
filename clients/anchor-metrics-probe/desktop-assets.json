@@ -2,10 +2,13 @@
   "version": "0.3.4",
   "files": {
     "app.ico": "b011169f0d7e9e8a03ec52e6574ba8f8601622c6fdef74d741405be55d30e08f",
-    "ui/anchor-desktop.html": "c2ad370c1b91787d68398e6b40b7d7368a4072d922740e03e1addadd3338bd4b",
+    "ui/anchor-console/anchor-releases.html": "f4d7acaf21cd138058df252760615debaee55c3d16711fef466960b8406ca54a",
+    "ui/anchor-desktop.html": "32fd9fa2439e573857ebdc1b2d14377edfd26241e14f6979bae014c4fad4e8c5",
     "ui/assets/anchor-desktop-Chr8oqVm.css": "bf03edda4e013117f1e3e57f82e39db97ac32b077a52c52fa734787ca6ac0b50",
-    "ui/assets/anchor-desktop-T1c0cqEz.js": "d08ca83dc3deb8043cc9458455c0d423576106417cda6b2569f7502572c37163",
+    "ui/assets/anchor-desktop-CuiMhw3n.js": "639f0a4555b3dc7e3d96192bec661e1410d5b8d7ab0d0193c9af21bfe56ecd75",
     "ui/favicon.ico": "67834c776d53132b0e94e2ff69fe3937859890414861a85c920d51ef1a533b82",
+    "ui/freight-app/freight.html": "7f204735b3eb810eabda96be33c091958cc0cf8bb5029cf46c478c4806eb985f",
+    "ui/jd-customers-app/jd-customers.html": "1af60199bb003a9f03f7f93e392d5a347cd317fff33ba87d5693fd9eb81317c1",
     "help/使用说明.html": "6ec2dd5c3a97f944d3588728012ef077db03384dfe5036368c84fde457f73c66",
     "help/安装后须知.txt": "650ed172c18c1d86b93383af8237cecabfa6aefc56037492f318f324c80f9f79"
   }

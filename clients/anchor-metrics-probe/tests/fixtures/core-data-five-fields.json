@@ -1,0 +1,61 @@
+{
+  "BaseResp": {
+    "StatusCode": 0,
+    "StatusMessage": ""
+  },
+  "st": 0,
+  "data": {
+    "pay_amt": {
+      "unit": "price",
+      "value": 1289535
+    },
+    "pay_amt_all": {
+      "unit": "price",
+      "value": 1289535
+    },
+    "core_data": [
+      {
+        "index_name": "watch_follow_ucnt_ratio",
+        "value": {
+          "unit": "ratio",
+          "value": 0.0390625
+        }
+      },
+      {
+        "index_name": "pay_deposit_pre_order_cnt",
+        "value": {
+          "unit": "number",
+          "value": 0
+        }
+      },
+      {
+        "index_name": "stat_cost",
+        "value": {
+          "unit": "price",
+          "value": 71001
+        }
+      },
+      {
+        "index_name": "follow_anchor_ucnt",
+        "value": {
+          "unit": "number",
+          "value": 25
+        }
+      },
+      {
+        "index_name": "presale_depay_deamt",
+        "value": {
+          "unit": "price",
+          "value": 0
+        }
+      },
+      {
+        "index_name": "watch_ucnt",
+        "value": {
+          "unit": "number",
+          "value": 640
+        }
+      }
+    ]
+  }
+}

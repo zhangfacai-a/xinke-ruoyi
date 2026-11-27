@@ -10,7 +10,8 @@ internal sealed record MetricSnapshot(string RoomId, DateTimeOffset CapturedAt, 
         ["watch_ucnt"] = "number", ["pay_ucnt"] = "number", ["stat_cost"] = "price",
         ["watch_pay_ucnt_ratio"] = "ratio", ["pay_deposit_pre_order_cnt"] = "number",
         ["live_show_watch_cnt_ratio"] = "ratio", ["watch_interact_ucnt_ratio"] = "ratio",
-        ["watch_follow_ucnt_ratio"] = "ratio", ["follow_anchor_ucnt"] = "number"
+        ["watch_follow_ucnt_ratio"] = "ratio", ["follow_anchor_ucnt"] = "number",
+        ["presale_depay_deamt"] = "price"
     };
 
     internal int MetricCount => RequiredMetrics.Keys.Count(Values.ContainsKey);

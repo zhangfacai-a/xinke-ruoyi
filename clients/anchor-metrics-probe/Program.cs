@@ -34,7 +34,8 @@ internal sealed partial class ProbeForm : Form
         ["watch_ucnt"] = "累计观看人数", ["pay_ucnt"] = "成交人数", ["stat_cost"] = "千川消耗",
         ["watch_pay_ucnt_ratio"] = "观看-成交率", ["pay_deposit_pre_order_cnt"] = "预售订单数",
         ["live_show_watch_cnt_ratio"] = "曝光-观看率", ["watch_interact_ucnt_ratio"] = "观看-互动率",
-        ["watch_follow_ucnt_ratio"] = "观看-关注率", ["follow_anchor_ucnt"] = "新增粉丝数"
+        ["watch_follow_ucnt_ratio"] = "观看-关注率", ["follow_anchor_ucnt"] = "新增粉丝数",
+        ["presale_depay_deamt"] = "预售定金金额"
     };
     private readonly WebView2 listBrowser = new() { Dock = DockStyle.Fill, Visible = false };
     private WebView2? screenBrowser;
@@ -230,7 +231,7 @@ internal sealed partial class ProbeForm : Form
             {
                 metricRequestObserved = true;
                 var missing = MetricSelection.MissingRequestedKeys(uri);
-                RecordDiagnostic($"指标请求已选择 {9 - missing.Length}/9 项所需指标");
+                RecordDiagnostic($"指标请求已选择 {MetricSelection.Required.Length - missing.Length}/{MetricSelection.Required.Length} 项所需指标");
             }
         };
         view.CoreWebView2.WebResourceResponseReceived += (sender, args) => { if (view == browser) OnResponseReceived(sender, args); };
@@ -309,7 +310,7 @@ internal sealed partial class ProbeForm : Form
             if (snapshotTaken && !configuring) return;
             if (bestSnapshot is { } best && snapshot.ReportValueCount <= best.ReportValueCount) return;
             bestSnapshot = snapshot;
-            RecordDiagnostic($"有效指标 {snapshot.MetricCount}/9，成交金额：{(snapshot.Values.ContainsKey("pay_amt") ? "有" : "缺失")}，缺项：{string.Join("、", snapshot.MissingMetrics.Select(key => MetricNames[key]))}");
+            RecordDiagnostic($"有效指标 {snapshot.MetricCount}/{MetricSelection.Required.Length}，成交金额：{(snapshot.Values.ContainsKey("pay_amt") ? "有" : "缺失")}，缺项：{string.Join("、", snapshot.MissingMetrics.Select(key => MetricNames[key]))}");
             snapshotTaken = snapshot.HasReportValues;
             Render(snapshot);
             if (snapshot.MetricCount < 9 && await TryRepairMetricSelectionAsync(uri, roomId, generation)) return;
@@ -347,7 +348,7 @@ internal sealed partial class ProbeForm : Form
             configure.Visible = true;
             RecordDiagnostic($"采集等待结束：{reason}，场次 {DiagnosticRoomId(id)}");
         }
-        else RecordDiagnostic($"采集等待结束，保留 {bestSnapshot.MetricCount}/9 项指标");
+        else RecordDiagnostic($"采集等待结束，保留 {bestSnapshot.MetricCount}/{MetricSelection.Required.Length} 项指标");
         ParkCollector();
     }
 
@@ -557,8 +558,8 @@ internal sealed partial class ProbeForm : Form
         var missing = snapshot.MissingMetrics.Select(key => MetricNames[key]).ToList();
         if (!snapshot.Values.ContainsKey("pay_amt")) missing.Add("成交金额");
         status.Text = snapshot.HasReportValues
-            ? "已读齐 9 项指标和成交金额"
-            : $"已读取 {snapshot.MetricCount}/9 项指标。缺少：{string.Join("、", missing)}";
+            ? "已读齐所需指标和成交金额"
+            : $"已读取 {snapshot.MetricCount}/{MetricSelection.Required.Length} 项指标。缺少：{string.Join("、", missing)}";
         if (snapshot.HasReportValues && configuring) SetConfigurationVisible(false);
         configure.Visible = !snapshot.HasReportValues;
         if (!configuring) configure.Text = "补齐指标";
@@ -569,7 +570,8 @@ internal sealed partial class ProbeForm : Form
 
         var fields = new (string Name, string Key, string Format)[]
         {
-            ("成交金额", "pay_amt", "money"), ("含异常交易", "pay_amt_all", "money"),
+            ("直播间成交金额（不含异常交易）", "pay_amt", "money"),
+            ("预售定金金额", "presale_depay_deamt", "money"),
             ("累计观看人数", "watch_ucnt", "number"), ("成交人数", "pay_ucnt", "number"),
             ("千川消耗", "stat_cost", "money"), ("观看-成交率", "watch_pay_ucnt_ratio", "percent"),
             ("预售订单数", "pay_deposit_pre_order_cnt", "number"),

@@ -6,7 +6,7 @@ const source = fs.readFileSync(path.join(__dirname, '../MetricSelection.js'), 'u
 const key = 'COMPASS_LIVE_SCEEN_CORE_INDICATORS_QIANCHUAN_TALENT_HIT';
 const required = ['watch_ucnt', 'pay_ucnt', 'stat_cost', 'watch_pay_ucnt_ratio',
     'pay_deposit_pre_order_cnt', 'live_show_watch_cnt_ratio', 'watch_interact_ucnt_ratio',
-    'watch_follow_ucnt_ratio', 'follow_anchor_ucnt'];
+    'watch_follow_ucnt_ratio', 'follow_anchor_ucnt', 'presale_depay_deamt'];
 
 function run(initial, options = {}) {
     const storage = new Map([[key, initial], ['unrelated-preference', 'preserve']]);
