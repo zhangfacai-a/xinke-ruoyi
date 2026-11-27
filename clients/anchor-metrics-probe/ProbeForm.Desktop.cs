@@ -49,9 +49,11 @@ internal sealed partial class ProbeForm
     private object DesktopState()=>new{
         version=AppUpdates.VersionLabel,loginRequired=loginStarted,roomId=observedRoomId??currentSession?.Id,
         roomName=observedRoomName,liveStartTime=observedStartTime?.Replace('/','-'),title=currentSession?.Title,
-        status=status.Text,complete=bestSnapshot?.HasReportValues==true&&observedRoomId==bestSnapshot.RoomId,
+        status=status.Text,complete=CollectionComplete,
         capturedAt=bestSnapshot?.CapturedAt.ToString("yyyy-MM-dd HH:mm:ss"),capturedAtEpoch=bestSnapshot?.CapturedAt.ToUnixTimeMilliseconds(),
-        values=bestSnapshot?.Values,interactionEstimate=bestSnapshot?.InteractionEstimate,logs=diagnosticEntries.ToArray(),startupEnabled=StartupSettings.Enabled
+        values=CombinedMetricValues(),interactionEstimate=bestSnapshot?.InteractionEstimate,
+        funnelCapturedAt=funnelSnapshot?.CapturedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+        funnelRateSource="内容互动人数 / 直播间观看人数（同一漏斗响应）",logs=diagnosticEntries.ToArray(),startupEnabled=StartupSettings.Enabled
     };
     private void PushDesktopState(){if(desktopReady&&!IsDisposed&&!desktopBrowser.IsDisposed)desktopBrowser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new{ @event="state",data=DesktopState()}));}
     private async void OnDesktopMessage(object? sender,CoreWebView2WebMessageReceivedEventArgs e)
@@ -105,7 +107,7 @@ internal sealed partial class ProbeForm
             for(var i=0;i<180;i++){
                 await Task.Delay(250);
                 if(IsDisposed||signingOut)throw new InvalidOperationException("采集已取消");
-                if(bestSnapshot is {HasReportValues:true} snapshot&&snapshot.CapturedAt!=previous&&observedRoomId==snapshot.RoomId){PushDesktopState();return DesktopState();}
+                if(CollectionComplete && bestSnapshot!.CapturedAt!=previous){PushDesktopState();return DesktopState();}
                 if(collectorParked)break;
             }
             throw new InvalidOperationException("本次未收齐指标或直播间信息，请查看日志或百应大屏");

@@ -43,6 +43,28 @@ var completeItems=complete["data"]!["core_data"]!.AsArray();
 completeItems.Remove(completeItems.First(x=>x?["index_name"]?.GetValue<string>()=="presale_depay_deamt"));
 if(!MetricSnapshot.TryParse("test-room",complete.ToJsonString(),out var incompleteSnapshot) || incompleteSnapshot!.HasReportValues)
     throw new Exception("A missing deposit metric was marked complete.");
+var funnelJson=File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"fixtures","flow-analysis.json"));
+if(!FunnelSnapshot.TryParse("room-a",funnelJson,out var funnel,out _) || funnel is null ||
+    funnel.Exposure!=10968 || funnel.Watch!=679 || funnel.Deal!=2 || funnel.Interaction!=59 ||
+    Math.Round(funnel.WatchInteractionRatio!.Value*100,2)!=8.69m)
+    throw new Exception("Funnel exact counts or same-response ratio invalid.");
+var funnelNode=System.Text.Json.Nodes.JsonNode.Parse(funnelJson)!;
+var interactionItems=funnelNode["data"]!["interaction_change"]!.AsArray();
+interactionItems.RemoveAt(2);
+if(FunnelSnapshot.TryParse("room-a",funnelNode.ToJsonString(),out _,out _)) throw new Exception("Missing interaction became zero.");
+funnelNode=System.Text.Json.Nodes.JsonNode.Parse(funnelJson)!;
+funnelNode["data"]!["interaction_change"]![1]!["value"]!["value"]=680;
+if(FunnelSnapshot.TryParse("room-a",funnelNode.ToJsonString(),out _,out _)) throw new Exception("Inconsistent funnels accepted.");
+funnelNode=System.Text.Json.Nodes.JsonNode.Parse(funnelJson)!;
+funnelNode["data"]!["gmv_change"]![0]!["value"]!["unit"]="times";
+if(FunnelSnapshot.TryParse("room-a",funnelNode.ToJsonString(),out _,out _)) throw new Exception("Exposure times accepted as people.");
+funnelNode=System.Text.Json.Nodes.JsonNode.Parse(funnelJson)!;
+foreach(var group in new[]{"gmv_change","interaction_change"}) foreach(var item in funnelNode["data"]![group]!.AsArray())item!["value"]!["value"]=0;
+if(!FunnelSnapshot.TryParse("room-a",funnelNode.ToJsonString(),out var emptyFunnel,out _) || emptyFunnel!.WatchInteractionRatio is not null)
+    throw new Exception("Zero viewers produced a fabricated ratio.");
+funnelNode["st"]=10012;
+if(FunnelSnapshot.TryParse("room-a",funnelNode.ToJsonString(),out _,out _)) throw new Exception("Failed funnel accepted.");
+Console.WriteLine("Funnel: exact counts, derived ratio, missing values, conflicting groups, people vs times, zero denominator and business failures passed.");
 if(args.Length==0) return;
 if (args.Length != 1) throw new ArgumentException("Pass a captured core_data response JSON file.");
 var original=System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(args[0]))!;

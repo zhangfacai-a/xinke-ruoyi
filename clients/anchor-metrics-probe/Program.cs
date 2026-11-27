@@ -198,6 +198,9 @@ internal sealed partial class ProbeForm : Form
             collectorParked = false;
             snapshotTaken = false;
             bestSnapshot = null;
+            CloseFunnelCollector();
+            funnelSnapshot = null;
+            funnelDiagnostic = null;
             captureDiagnostic = null;
             roomDiagnostic = null;
             metricRequestObserved = differentRoomResponseObserved = false;
@@ -211,6 +214,7 @@ internal sealed partial class ProbeForm : Form
             if (destination is not null && IsScreenPage(destination))
             {
                 var id = System.Web.HttpUtility.ParseQueryString(destination.Query)["live_room_id"];
+                if(!string.IsNullOrWhiteSpace(id)) _ = StartFunnelCollectorAsync(id,navigationGeneration);
                 var selected = sessions.Find(session => session.Id == id);
                 if (selected is not null)
                     sessionTitle.Text = $"场次标题：{selected.Title} · 列表开播时间：{selected.Start}";
@@ -292,6 +296,8 @@ internal sealed partial class ProbeForm : Form
                     observedStartTime = startTime;
                     room.Text = $"直播间：{name} · 开播：{startTime ?? "待确认"}";
                     RecordDiagnostic("live_base_info 已读取 data.nickname");
+                    snapshotTaken=CollectionComplete;
+                    if(bestSnapshot is {} core) Render(core);
                     if (snapshotTaken && !configuring) ParkCollector();
                 }
                 else
@@ -313,7 +319,7 @@ internal sealed partial class ProbeForm : Form
             if (bestSnapshot is { } best && snapshot.ReportValueCount <= best.ReportValueCount) return;
             bestSnapshot = snapshot;
             RecordDiagnostic($"有效指标 {snapshot.MetricCount}/{MetricSelection.Required.Length}，成交金额：{(snapshot.Values.ContainsKey("pay_amt") ? "有" : "缺失")}，缺项：{string.Join("、", snapshot.MissingMetrics.Select(key => MetricNames[key]))}");
-            snapshotTaken = snapshot.HasReportValues;
+            snapshotTaken = CollectionComplete;
             Render(snapshot);
             if (snapshot.MissingMetrics.Count > 0 && await TryRepairMetricSelectionAsync(uri, roomId, generation)) return;
             if (snapshotTaken && !configuring && observedRoomId == roomId) ParkCollector();
@@ -350,7 +356,11 @@ internal sealed partial class ProbeForm : Form
             configure.Visible = true;
             RecordDiagnostic($"采集等待结束：{reason}，场次 {DiagnosticRoomId(id)}");
         }
-        else RecordDiagnostic($"采集等待结束，保留 {bestSnapshot.MetricCount}/{MetricSelection.Required.Length} 项指标");
+        else {
+            RecordDiagnostic($"采集等待结束，保留 {bestSnapshot.MetricCount}/{MetricSelection.Required.Length} 项指标");
+            if(funnelSnapshot is null) { status.Text="漏斗数据未收齐，请重采或查看日志";RecordDiagnostic(funnelDiagnostic??"未收到本场有效漏斗响应"); }
+        }
+        CloseFunnelCollector();
         ParkCollector();
     }
 
@@ -366,6 +376,7 @@ internal sealed partial class ProbeForm : Form
         if (collectorParked || browser.CoreWebView2 is null ||
             browser.Source is not { Host: "compass.jinritemai.com", AbsolutePath: "/screen/live/talent" } source) return;
         collectorSessionUrl = source.AbsoluteUri;
+        CloseFunnelCollector();
         collectorParked = true;
         browser.CoreWebView2.Navigate("about:blank");
     }
@@ -563,6 +574,7 @@ internal sealed partial class ProbeForm : Form
             ? "已读齐所需指标和成交金额"
             : $"已读取 {snapshot.MetricCount}/{MetricSelection.Required.Length} 项指标。缺少：{string.Join("、", missing)}";
         if (snapshot.HasReportValues && configuring) SetConfigurationVisible(false);
+        if(snapshot.HasReportValues) status.Text=funnelSnapshot?.RoomId==snapshot.RoomId?"已读齐大屏和漏斗指标":"大屏指标已齐，正在等待本场漏斗数据";
         configure.Visible = !snapshot.HasReportValues;
         if (!configuring) configure.Text = "补齐指标";
         captured.Text = $"采集时间：{snapshot.CapturedAt:HH:mm:ss}";

@@ -65,6 +65,8 @@ internal sealed partial class ProbeForm
 
     private void CloseOfficialScreen()
     {
+        CloseFunnelCollector();
+        funnelSnapshot=null;
         if (screenBrowser is not { } child) return;
         screenBrowser = null;
         navigationGeneration++;
