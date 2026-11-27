@@ -4,9 +4,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../MetricSelection.js'), 'utf8');
 const key = 'COMPASS_LIVE_SCEEN_CORE_INDICATORS_QIANCHUAN_TALENT_HIT';
-const required = ['watch_ucnt', 'pay_ucnt', 'stat_cost', 'watch_pay_ucnt_ratio',
-    'pay_deposit_pre_order_cnt', 'live_show_watch_cnt_ratio', 'watch_interact_ucnt_ratio',
-    'watch_follow_ucnt_ratio', 'follow_anchor_ucnt', 'presale_depay_deamt'];
+const required = ['follow_anchor_ucnt', 'stat_cost', 'pay_deposit_pre_order_cnt',
+        'presale_depay_deamt', 'watch_ucnt', 'pay_ucnt'];
 
 function run(initial, options = {}) {
     const storage = new Map([[key, initial], ['unrelated-preference', 'preserve']]);
@@ -32,7 +31,7 @@ function run(initial, options = {}) {
 }
 
 for (const initial of [null, '{malformed', '{}', JSON.stringify(required.slice(0, 5)),
-    JSON.stringify([...required.slice(0, 8), required[0]]), JSON.stringify([...required, 'current_cnt'])]) {
+    JSON.stringify([...required.slice(0, 5), required[0]]), JSON.stringify([...required, 'current_cnt'])]) {
     const test = run(initial);
     assert.equal(test.result.result, 'updated');
     assert.deepEqual(JSON.parse(test.storage.get(key)), required);

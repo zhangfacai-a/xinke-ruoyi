@@ -14,10 +14,10 @@ internal sealed record MetricSnapshot(string RoomId, DateTimeOffset CapturedAt, 
         ["presale_depay_deamt"] = "price"
     };
 
-    internal int MetricCount => RequiredMetrics.Keys.Count(Values.ContainsKey);
+    internal int MetricCount => MetricSelection.Required.Count(Values.ContainsKey);
     internal int ReportValueCount => MetricCount + (Values.ContainsKey("pay_amt") ? 1 : 0);
-    internal IReadOnlyList<string> MissingMetrics => RequiredMetrics.Keys.Where(key => !Values.ContainsKey(key)).ToArray();
-    internal bool HasReportValues => MetricCount == RequiredMetrics.Count && Values.ContainsKey("pay_amt");
+    internal IReadOnlyList<string> MissingMetrics => MetricSelection.Required.Where(key => !Values.ContainsKey(key)).ToArray();
+    internal bool HasReportValues => MetricCount == MetricSelection.Required.Length && Values.ContainsKey("pay_amt");
     internal decimal? InteractionEstimate =>
         Values.TryGetValue("watch_ucnt", out var watch) && Values.TryGetValue("watch_interact_ucnt_ratio", out var ratio)
             ? Math.Round(watch * ratio, MidpointRounding.AwayFromZero)

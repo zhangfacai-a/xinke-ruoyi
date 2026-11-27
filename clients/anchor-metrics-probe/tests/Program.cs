@@ -5,9 +5,9 @@ var fullRequest = new Uri($"https://compass.jinritemai.com/compass_api/author/li
 if (MetricSelection.MissingRequestedKeys(fullRequest).Length != 0)
     throw new Exception("Encoded complete selection was not recognized.");
 var partialRequest = new Uri("https://compass.jinritemai.com/compass_api/author/live/live_screen/core_data?index_selected=watch_ucnt%2Cpay_ucnt");
-if (MetricSelection.MissingRequestedKeys(partialRequest).Length != 8 ||
+if (MetricSelection.MissingRequestedKeys(partialRequest).Length != 4 ||
     !MetricSelection.MissingRequestedKeys(partialRequest).Contains("stat_cost") ||
-    MetricSelection.MissingRequestedKeys(new Uri("https://compass.jinritemai.com/")).Length != 10 ||
+    MetricSelection.MissingRequestedKeys(new Uri("https://compass.jinritemai.com/")).Length != 6 ||
     !MetricSelection.Script.Contains("COMPASS_LIVE_SCEEN_CORE_INDICATORS_QIANCHUAN_TALENT_HIT"))
     throw new Exception("Partial selection detection or embedded configuration script is invalid.");
 
@@ -60,13 +60,13 @@ var metrics = partial["data"]!["core_data"]!.AsArray();
 var fanItem = metrics.First(item => item?["index_name"]?.GetValue<string>() == "follow_anchor_ucnt");
 metrics.Remove(fanItem);
 if (!MetricSnapshot.TryParse("7711489437338700579", partial.ToJsonString(), out var partialSnapshot) ||
-    partialSnapshot?.MetricCount != 9 || partialSnapshot.HasReportValues || !partialSnapshot.MissingMetrics.Contains("follow_anchor_ucnt"))
+    partialSnapshot?.MetricCount != 5 || partialSnapshot.HasReportValues || !partialSnapshot.MissingMetrics.Contains("follow_anchor_ucnt"))
     throw new Exception("Partial successful response was not retained.");
 
 var noAmount = System.Text.Json.Nodes.JsonNode.Parse(json)!;
 noAmount["data"]!.AsObject().Remove("pay_amt");
 if (!MetricSnapshot.TryParse("7711489437338700579", noAmount.ToJsonString(), out var noAmountSnapshot) ||
-    noAmountSnapshot?.MetricCount != 10 || noAmountSnapshot.HasReportValues)
+    noAmountSnapshot?.MetricCount != 6 || noAmountSnapshot.HasReportValues)
     throw new Exception("A response with no GMV was marked complete.");
 
 var invalid = json.Replace("\"StatusCode\": 0", "\"StatusCode\": 10012", StringComparison.Ordinal);

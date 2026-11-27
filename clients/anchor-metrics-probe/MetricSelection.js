@@ -4,9 +4,8 @@
     if (window !== window.top || location.origin !== 'https://compass.jinritemai.com' ||
         location.pathname !== '/screen/live/talent') return { result: 'skipped' };
 
-    const required = ['watch_ucnt', 'pay_ucnt', 'stat_cost', 'watch_pay_ucnt_ratio',
-        'pay_deposit_pre_order_cnt', 'live_show_watch_cnt_ratio', 'watch_interact_ucnt_ratio',
-        'watch_follow_ucnt_ratio', 'follow_anchor_ucnt', 'presale_depay_deamt'];
+    const required = ['follow_anchor_ucnt', 'stat_cost', 'pay_deposit_pre_order_cnt',
+        'presale_depay_deamt', 'watch_ucnt', 'pay_ucnt'];
     const key = 'COMPASS_LIVE_SCEEN_CORE_INDICATORS_QIANCHUAN_TALENT_HIT';
     const report = { type: 'xinke-metric-selection', result: 'blocked' };
     try {

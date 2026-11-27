@@ -301,6 +301,8 @@ internal sealed partial class ProbeForm : Form
                 }
                 return;
             }
+            if (MetricSelection.MissingRequestedKeys(uri).Length > 0 &&
+                await TryRepairMetricSelectionAsync(uri, roomId, generation)) return;
             if (!MetricSnapshot.TryParse(roomId, json, out var snapshot) || snapshot is null)
             {
                 captureDiagnostic = MetricSnapshot.DescribeUnusableResponse(json);
@@ -313,7 +315,7 @@ internal sealed partial class ProbeForm : Form
             RecordDiagnostic($"有效指标 {snapshot.MetricCount}/{MetricSelection.Required.Length}，成交金额：{(snapshot.Values.ContainsKey("pay_amt") ? "有" : "缺失")}，缺项：{string.Join("、", snapshot.MissingMetrics.Select(key => MetricNames[key]))}");
             snapshotTaken = snapshot.HasReportValues;
             Render(snapshot);
-            if (snapshot.MetricCount < 9 && await TryRepairMetricSelectionAsync(uri, roomId, generation)) return;
+            if (snapshot.MissingMetrics.Count > 0 && await TryRepairMetricSelectionAsync(uri, roomId, generation)) return;
             if (snapshotTaken && !configuring && observedRoomId == roomId) ParkCollector();
             else if (snapshotTaken && !configuring) _ = ParkAfterMetadataAsync(generation);
         }
